@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -85,6 +86,27 @@ export default function MutualFundsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const categories = ['All', 'Large Cap Index', 'Flexi Cap', 'Small Cap', 'Debt'];
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Watch URL params for auto-open (e.g. from global search)
+  useEffect(() => {
+    const selectCode = searchParams.get('selectCode');
+    const selectName = searchParams.get('selectName');
+    if (selectCode) {
+      setSelectedScheme({
+        schemeCode: Number(selectCode),
+        schemeName: selectName ? decodeURIComponent(selectName) : 'Mutual Fund Details'
+      });
+      setIsModalOpen(true);
+      
+      // Clean query params so it doesn't reopen if page is refreshed or navigates
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('selectCode');
+      newParams.delete('selectName');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Load actual live returns for popular funds on mount
   useEffect(() => {
