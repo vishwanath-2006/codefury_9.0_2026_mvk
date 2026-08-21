@@ -121,7 +121,10 @@ export function calculateReturns(schemeData) {
     return { return1Yr: 'N/A', return3Yr: 'N/A', returnAll: 'N/A' };
   }
 
-  const latestItem = data[0];
+  // Explicitly sort by date descending (latest first) to guarantee data[0] is the newest NAV
+  const sorted = [...data].sort((a, b) => parseMFDate(b.date) - parseMFDate(a.date));
+
+  const latestItem = sorted[0];
   const latestNav = Number(latestItem.nav);
   const latestDate = parseMFDate(latestItem.date);
 
@@ -132,7 +135,7 @@ export function calculateReturns(schemeData) {
   // 1 Year ago
   const date1YrAgo = new Date(latestDate);
   date1YrAgo.setFullYear(date1YrAgo.getFullYear() - 1);
-  const item1YrAgo = findClosestNAV(data, date1YrAgo);
+  const item1YrAgo = findClosestNAV(sorted, date1YrAgo);
   const nav1YrAgo = item1YrAgo ? Number(item1YrAgo.nav) : null;
   let return1Yr = 'N/A';
   if (nav1YrAgo && nav1YrAgo > 0) {
@@ -142,7 +145,7 @@ export function calculateReturns(schemeData) {
   // 3 Years ago
   const date3YrAgo = new Date(latestDate);
   date3YrAgo.setFullYear(date3YrAgo.getFullYear() - 3);
-  const item3YrAgo = findClosestNAV(data, date3YrAgo);
+  const item3YrAgo = findClosestNAV(sorted, date3YrAgo);
   const nav3YrAgo = item3YrAgo ? Number(item3YrAgo.nav) : null;
   let return3Yr = 'N/A';
   if (nav3YrAgo && nav3YrAgo > 0) {
@@ -152,7 +155,7 @@ export function calculateReturns(schemeData) {
   }
 
   // Max / All-Time return (annualized if > 1 year)
-  const oldestItem = data[data.length - 1];
+  const oldestItem = sorted[sorted.length - 1];
   const oldestNav = Number(oldestItem.nav);
   const oldestDate = parseMFDate(oldestItem.date);
   let returnAll = 'N/A';

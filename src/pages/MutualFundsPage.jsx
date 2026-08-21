@@ -17,7 +17,9 @@ const POPULAR_FUNDS = [
     risk: 'Very High',
     minSip: 1000,
     rating: 5,
-    cagr3Yr: '18.45%'
+    cagr3Yr: '18.45%',
+    nav: '90.74',
+    navDate: '20-Aug-2026'
   },
   {
     schemeCode: 120847,
@@ -27,7 +29,9 @@ const POPULAR_FUNDS = [
     risk: 'Very High',
     minSip: 500,
     rating: 5,
-    cagr3Yr: '28.12%'
+    cagr3Yr: '28.12%',
+    nav: '250.45',
+    navDate: '20-Aug-2026'
   },
   {
     schemeCode: 119063,
@@ -37,7 +41,9 @@ const POPULAR_FUNDS = [
     risk: 'Above Average',
     minSip: 100,
     rating: 4,
-    cagr3Yr: '14.20%'
+    cagr3Yr: '14.20%',
+    nav: '165.20',
+    navDate: '20-Aug-2026'
   },
   {
     schemeCode: 119777,
@@ -47,9 +53,25 @@ const POPULAR_FUNDS = [
     risk: 'Above Average',
     minSip: 500,
     rating: 4,
-    cagr3Yr: '13.92%'
+    cagr3Yr: '13.92%',
+    nav: '85.60',
+    navDate: '20-Aug-2026'
   }
 ];
+
+function formatMFDateToDisplay(dateStr) {
+  if (!dateStr) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const day = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const year = parts[2];
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${day}-${months[monthIdx]}-${year}`;
+  }
+  return dateStr;
+}
 
 export default function MutualFundsPage() {
   const [search, setSearch] = useState('');
@@ -72,10 +94,22 @@ export default function MutualFundsPage() {
           POPULAR_FUNDS.map(async (fund) => {
             try {
               const details = await getSchemeDetails(fund.schemeCode);
+              const data = details?.data || [];
+              
+              // Correct array parsing by sorting explicitly descending
+              const parsedDate = (str) => {
+                const p = str.split('-');
+                return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+              };
+              const sorted = [...data].sort((a, b) => parsedDate(b.date) - parsedDate(a.date));
+              const latestItem = sorted[0] || {};
+              
               const returns = calculateReturns(details);
               return {
                 ...fund,
-                cagr3Yr: returns.return3Yr
+                cagr3Yr: returns.return3Yr,
+                nav: latestItem.nav ? Number(latestItem.nav).toFixed(2) : fund.nav,
+                navDate: latestItem.date ? formatMFDateToDisplay(latestItem.date) : fund.navDate
               };
             } catch (err) {
               console.error(`Failed to load live return for popular fund ${fund.schemeCode}:`, err);
@@ -104,7 +138,21 @@ export default function MutualFundsPage() {
     const delayDebounceFn = setTimeout(async () => {
       try {
         const results = await searchSchemes(search);
-        setSearchResults(results || []);
+        
+        // Prioritize active "Direct - Growth" funds in search suggestions
+        const sortedResults = [...(results || [])].sort((a, b) => {
+          const aName = a.schemeName.toLowerCase();
+          const bName = b.schemeName.toLowerCase();
+          
+          const aIsDirectGrowth = aName.includes('direct') && aName.includes('growth');
+          const bIsDirectGrowth = bName.includes('direct') && bName.includes('growth');
+          
+          if (aIsDirectGrowth && !bIsDirectGrowth) return -1;
+          if (!aIsDirectGrowth && bIsDirectGrowth) return 1;
+          return 0;
+        });
+        
+        setSearchResults(sortedResults);
       } catch (err) {
         console.error('Search query failed:', err);
       } finally {
@@ -227,6 +275,15 @@ export default function MutualFundsPage() {
                       <div className="max-w-[75%]">
                         <Badge variant="neutral" className="mb-1 text-[9px]">{fund.category}</Badge>
                         <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 line-clamp-2">{fund.schemeName}</h3>
+                        {fund.nav ? (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                            NAV: <span className="font-mono font-bold text-slate-800 dark:text-slate-200">₹{fund.nav}</span> {fund.navDate && `(as of ${fund.navDate})`}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-emerald-500 font-semibold mt-1">
+                            NAV: Click to view live pricing
+                          </div>
+                        )}
                       </div>
                       <Badge variant="brand" className="text-[9px] font-bold shrink-0">{fund.suitability}</Badge>
                     </div>

@@ -22,7 +22,7 @@ export default function LightweightChart({ data = [], timeFilter = '1Y' }) {
     }
 
     // Sort ascending (oldest first) for correct chronological drawing
-    const sorted = [...data].reverse();
+    const sorted = [...data].sort((a, b) => parseDate(a.date) - parseDate(b.date));
     
     if (timeFilter === 'ALL') {
       setFilteredData(sorted);
