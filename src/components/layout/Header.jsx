@@ -2,12 +2,14 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { Menu, Sun, Moon, Search, Bell, Sparkles, LogOut, User } from 'lucide-react';
+import { useOnboarding } from '../../context/OnboardingContext';
+import { Menu, Sun, Moon, Search, Sparkles, LogOut } from 'lucide-react';
 import Badge from '../ui/Badge';
 
 export default function Header({ onOpenSidebar }) {
   const { isDark, toggleTheme } = useTheme();
   const { user, profile, logout } = useAuth();
+  const { formData } = useOnboarding();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -19,7 +21,8 @@ export default function Header({ onOpenSidebar }) {
     }
   };
 
-  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email || 'User';
+  const displayName = formData.fullName || profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'FinLabs User';
+  const avatarUrl = formData.profilePhoto || profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 h-16 flex items-center justify-between px-4 sm:px-6 transition-colors">
@@ -57,21 +60,29 @@ export default function Header({ onOpenSidebar }) {
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        {user && (
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-            <button
-              onClick={() => navigate('/profile')}
-              className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left"
-              title="View Profile"
-            >
-              <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-500 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-500/30">
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left"
+            title="View Profile"
+          >
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayName}
+                className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500 shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-500 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-500/30">
                 {displayName.charAt(0).toUpperCase()}
               </div>
-              <span className="hidden md:inline-block text-xs font-semibold max-w-[100px] truncate text-slate-800 dark:text-slate-200">
-                {displayName}
-              </span>
-            </button>
+            )}
+            <span className="hidden md:inline-block text-xs font-semibold max-w-[120px] truncate text-slate-800 dark:text-slate-200">
+              {displayName}
+            </span>
+          </button>
 
+          {user && (
             <button
               onClick={handleLogout}
               className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"
@@ -79,8 +90,8 @@ export default function Header({ onOpenSidebar }) {
             >
               <LogOut className="w-4 h-4" />
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );

@@ -18,12 +18,33 @@ export function AuthProvider({ children }) {
     }
     try {
       const prof = await getUserProfile(authUser.id);
-      setProfile(prof || {
+      const googleName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.user_metadata?.preferred_username;
+      const googleAvatar = authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture;
+
+      const mergedProfile = {
         id: authUser.id,
         user_id: authUser.id,
-        full_name: authUser.user_metadata?.full_name || 'SmartWealth User',
-        email: authUser.email
-      });
+        full_name: prof?.full_name || googleName || authUser.email?.split('@')[0] || 'FinLabs User',
+        avatar_url: prof?.avatar_url || googleAvatar || null,
+        email: authUser.email,
+        ...prof,
+      };
+
+      setProfile(mergedProfile);
+
+      // Auto upsert profile row so Google name/avatar is saved to database
+      if (!prof || !prof.full_name || !prof.avatar_url) {
+        await supabase.from('profiles').upsert({
+          id: authUser.id,
+          user_id: authUser.id,
+          full_name: mergedProfile.full_name,
+          avatar_url: mergedProfile.avatar_url,
+          email: authUser.email,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' }).then(({ error }) => {
+          if (error) console.warn('Auto profile upsert warning:', error.message);
+        });
+      }
     } catch (err) {
       console.error('Failed to load profile:', err);
     }
