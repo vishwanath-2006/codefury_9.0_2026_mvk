@@ -5,7 +5,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Search, Star, ArrowUpRight, TrendingUp, Info } from 'lucide-react';
-import { searchSchemes } from '../services/mfService';
+import { searchSchemes, getSchemeDetails, calculateReturns } from '../services/mfService';
 import MutualFundDetailModal from '../components/ui/MutualFundDetailModal';
 
 const POPULAR_FUNDS = [
@@ -54,6 +54,7 @@ const POPULAR_FUNDS = [
 export default function MutualFundsPage() {
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [popularFundsWithLiveData, setPopularFundsWithLiveData] = useState(POPULAR_FUNDS);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchLoading, setSearchLoading] = useState(false);
   
@@ -62,6 +63,34 @@ export default function MutualFundsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const categories = ['All', 'Large Cap Index', 'Flexi Cap', 'Small Cap', 'Debt'];
+
+  // Load actual live returns for popular funds on mount
+  useEffect(() => {
+    async function loadPopularLiveReturns() {
+      try {
+        const updated = await Promise.all(
+          POPULAR_FUNDS.map(async (fund) => {
+            try {
+              const details = await getSchemeDetails(fund.schemeCode);
+              const returns = calculateReturns(details);
+              return {
+                ...fund,
+                cagr3Yr: returns.return3Yr
+              };
+            } catch (err) {
+              console.error(`Failed to load live return for popular fund ${fund.schemeCode}:`, err);
+              return fund;
+            }
+          })
+        );
+        setPopularFundsWithLiveData(updated);
+      } catch (err) {
+        console.error('Failed to load popular funds live returns:', err);
+      }
+    }
+
+    loadPopularLiveReturns();
+  }, []);
 
   // Debounced live searching
   useEffect(() => {
@@ -114,7 +143,7 @@ export default function MutualFundsPage() {
     }
 
     // Filter popular default list
-    return POPULAR_FUNDS.filter((fund) => {
+    return popularFundsWithLiveData.filter((fund) => {
       return categoryFilter === 'All' || fund.category === categoryFilter;
     });
   };
