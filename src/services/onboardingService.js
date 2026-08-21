@@ -26,7 +26,7 @@ export const initialOnboardingData = {
   ],
   hasInvestments: true,
   investmentCategories: ['Mutual Funds', 'Stocks'],
-  investmentExperience: 'Some experience',
+  investmentExperience: 'some_experience',
   hasHealthInsurance: true,
   hasLifeInsurance: true,
   hasEmergencyFund: true,
@@ -37,10 +37,23 @@ export const initialOnboardingData = {
 };
 
 /**
- * Fetch financial profile for authenticated user
+ * Normalizes investment experience strings to supported enums: 'beginner', 'some_experience', 'experienced'
+ */
+
+export function normalizeInvestmentExperience(exp) {
+  if (!exp) return 'beginner';
+  const lower = String(exp).toLowerCase();
+  if (lower.includes('beginner') || lower.includes('new')) return 'beginner';
+  if (lower.includes('some')) return 'some_experience';
+  if (lower.includes('experienced')) return 'experienced';
+  return exp;
+}
+
+/**
+ * Fetch financial profile, relational goals, and responses for authenticated user
  */
 export async function getFinancialProfile(userId) {
-  if (!userId) {
+  if (!userId || userId === 'dev-test-user-id-99999' || userId === 'dev-local-user') {
     try {
       const stored = localStorage.getItem('finlabs_dev_onboarding_profile');
       if (stored) return JSON.parse(stored);
@@ -51,41 +64,67 @@ export async function getFinancialProfile(userId) {
   }
 
   try {
-    const { data, error } = await supabase
+    // 1. Fetch main financial_profile
+    const { data: finData, error: finErr } = await supabase
       .from('financial_profiles')
       .select('*')
       .eq('user_id', userId)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
-      console.warn('Fetch financial profile notice:', error.message);
+    if (finErr && finErr.code !== 'PGRST116') {
+      console.warn('Fetch financial profile notice:', finErr.message);
     }
 
-    if (data) return data;
+    // 2. Fetch relational financial_goals
+    const { data: goalsData } = await supabase
+      .from('financial_goals')
+      .select('*')
+      .eq('user_id', userId);
 
-    // Local fallback check
+    if (finData) {
+      // Map relational goals if present
+      if (goalsData && goalsData.length > 0) {
+        finData.goals = goalsData.map((g) => ({
+          id: g.id,
+          title: g.goal_name,
+          category: g.category || 'General',
+          targetAmount: Number(g.target_amount) || 0,
+          currentAmount: Number(g.current_saved) || 0,
+          deadline: g.target_year || '2027',
+          priority: g.priority || 'Medium'
+        }));
+      }
+      return finData;
+    }
+
+    // 3. Fallback check for local storage
     const stored = localStorage.getItem('finlabs_dev_onboarding_profile');
     if (stored) return JSON.parse(stored);
     return null;
   } catch (err) {
-    console.error('Error fetching financial profile:', err);
+    console.error('Error fetching complete financial profile:', err);
     return null;
   }
 }
 
 /**
- * Save / update 3-step onboarding questionnaire data
+ * Save / update 3-step onboarding questionnaire data into Supabase across tables:
+ * - public.profiles
+ * - public.financial_profiles
+ * - public.financial_goals
+ * - public.onboarding_responses
  */
 export async function saveFinancialProfile(userId, formData) {
   const monthlyEssential = Number(formData.monthlyEssentialExpenses) || 0;
   const monthlyDiscretionary = Number(formData.monthlyDiscretionaryExpenses) || 0;
   const computedMonthlyExpenses = monthlyEssential + monthlyDiscretionary;
+  const expEnum = normalizeInvestmentExperience(formData.investmentExperience);
 
   const payload = {
     user_id: userId || 'dev-local-user',
     onboarding_completed: true,
 
-    // Step 1
+    // Step 1: Identity & Personal Details
     full_name: formData.fullName || '',
     age: Number(formData.age) || null,
     employment_status: formData.employmentStatus || 'Employed',
@@ -93,7 +132,7 @@ export async function saveFinancialProfile(userId, formData) {
     dependents: Number(formData.dependents) || 0,
     income_stability: formData.incomeStability || 'Stable',
 
-    // Step 2
+    // Step 2: Cash Flow, Savings & Debt
     monthly_income: Number(formData.monthlyIncome) || 0,
     other_income: Number(formData.otherIncome) || 0,
     monthly_essential_expenses: monthlyEssential,
@@ -107,11 +146,11 @@ export async function saveFinancialProfile(userId, formData) {
     monthly_debt_payments: formData.hasDebt ? Number(formData.monthlyDebtPayments) || 0 : 0,
     debt_type: formData.hasDebt ? formData.debtType || 'N/A' : 'N/A',
 
-    // Step 3
+    // Step 3: Goals, Investments, Insurance & Risk Profile
     goals: Array.isArray(formData.goals) ? formData.goals : [],
     has_investments: Boolean(formData.hasInvestments),
     investment_categories: Array.isArray(formData.investmentCategories) ? formData.investmentCategories : [],
-    investment_experience: formData.investmentExperience || 'None',
+    investment_experience: expEnum,
     has_health_insurance: Boolean(formData.hasHealthInsurance),
     has_life_insurance: Boolean(formData.hasLifeInsurance),
     has_emergency_fund: Boolean(formData.hasEmergencyFund),
@@ -122,24 +161,78 @@ export async function saveFinancialProfile(userId, formData) {
     updated_at: new Date().toISOString()
   };
 
-  // Always save in localStorage for instant local dev feedback
+  // Always update local storage for dev mode / instant local fallback
   localStorage.setItem('finlabs_dev_onboarding_profile', JSON.stringify(payload));
 
-  if (!userId) return payload;
+  if (!userId || userId === 'dev-test-user-id-99999' || userId === 'dev-local-user') {
+    return payload;
+  }
 
   try {
-    // Upsert into Supabase `financial_profiles` table
-    const { data, error } = await supabase
+    // 1. Update public.profiles
+    await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        user_id: userId,
+        full_name: payload.full_name,
+        age: payload.age,
+        employment_status: payload.employment_status,
+        occupation: payload.occupation,
+        dependents: payload.dependents,
+        income_stability: payload.income_stability,
+        updated_at: payload.updated_at
+      }, { onConflict: 'id' });
+
+    // 2. Upsert public.financial_profiles
+    const { data: finData, error: finErr } = await supabase
       .from('financial_profiles')
       .upsert(payload, { onConflict: 'user_id' })
       .select()
       .single();
 
-    if (error) {
-      console.warn('Supabase profile save notice (storing in dev mode fallback):', error.message);
+    if (finErr) {
+      console.warn('Supabase financial profile save notice:', finErr.message);
     }
 
-    // Trigger Financial Health Engine score update
+    // 3. Save Relational Goals into public.financial_goals
+    if (Array.isArray(formData.goals)) {
+      try {
+        await supabase.from('financial_goals').delete().eq('user_id', userId);
+
+        if (formData.goals.length > 0) {
+          const goalRows = formData.goals.map((g) => ({
+            user_id: userId,
+            goal_name: g.title || g.goal_name || 'Financial Goal',
+            category: g.category || 'General',
+            target_amount: Number(g.targetAmount || g.target_amount) || 0,
+            current_saved: Number(g.currentAmount || g.current_saved) || 0,
+            target_year: String(g.deadline || g.target_year || '2027'),
+            priority: g.priority || 'Medium',
+            updated_at: payload.updated_at
+          }));
+
+          await supabase.from('financial_goals').insert(goalRows);
+        }
+      } catch (goalErr) {
+        console.warn('Financial goals save notice:', goalErr.message);
+      }
+    }
+
+    // 4. Save Raw Onboarding Answers into public.onboarding_responses
+    try {
+      await supabase
+        .from('onboarding_responses')
+        .upsert({
+          user_id: userId,
+          raw_responses: formData,
+          updated_at: payload.updated_at
+        }, { onConflict: 'user_id' });
+    } catch (rawErr) {
+      console.warn('Onboarding responses save notice:', rawErr.message);
+    }
+
+    // 5. Auto-trigger Financial Health Engine score calculation & persistence
     try {
       const healthInput = {
         monthlyIncome: payload.monthly_income + payload.other_income,
@@ -159,7 +252,7 @@ export async function saveFinancialProfile(userId, formData) {
       console.warn('Financial Health Engine auto-trigger notice:', engineErr.message);
     }
 
-    return data || payload;
+    return finData || payload;
   } catch (err) {
     console.error('Error saving financial profile:', err);
     return payload;
