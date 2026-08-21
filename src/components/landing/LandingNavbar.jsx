@@ -44,7 +44,7 @@ export default function LandingNavbar() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate('/onboarding')}
+            onClick={() => navigate('/login')}
           >
             Log In
           </Button>
@@ -86,10 +86,10 @@ export default function LandingNavbar() {
             <a href="#problem" onClick={() => setMobileMenuOpen(false)}>Why FinLabs</a>
           </nav>
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-2">
-            <Button variant="outline" className="w-full justify-center" onClick={() => navigate('/dashboard')}>
+            <Button variant="outline" className="w-full justify-center" onClick={() => { setMobileMenuOpen(false); navigate('/login'); }}>
               Log In
             </Button>
-            <Button variant="primary" className="w-full justify-center" onClick={() => navigate('/dashboard')}>
+            <Button variant="primary" className="w-full justify-center" onClick={() => { setMobileMenuOpen(false); navigate('/onboarding'); }}>
               Get Started
             </Button>
           </div>
