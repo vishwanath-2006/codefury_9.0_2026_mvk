@@ -60,6 +60,7 @@ export default function DashboardPage() {
           change={healthScore >= 70 ? 'Strong Baseline' : healthScore >= 50 ? 'Moderate Baseline' : 'Needs Optimization'}
           changeType={healthScore >= 60 ? 'positive' : 'neutral'}
           description="Calculated Index"
+          onClick={() => navigate('/financial-health')}
         />
 
         <StatCard
