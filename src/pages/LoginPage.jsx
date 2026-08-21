@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Mail, Lock, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, ArrowRight, Zap } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, enableDevTestMode, isDevTestMode } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -33,6 +33,11 @@ export default function LoginPage() {
     }
   };
 
+  const handleBypassDevMode = () => {
+    enableDevTestMode();
+    navigate('/financial-health', { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-slate-900 dark:text-slate-100 transition-colors">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
@@ -51,6 +56,34 @@ export default function LoginPage() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
+        {/* Local Dev Test Mode Banner (Only rendered in localhost development environment) */}
+        {import.meta.env.DEV && (
+          <div className="mb-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs flex flex-col gap-2">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-amber-500" />
+                Local Dev Test Mode Available
+              </span>
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-500">
+                Dev Only
+              </span>
+            </div>
+            <p className="text-slate-600 dark:text-slate-300">
+              Bypass login during local development to inspect Financial Health & Dashboard with sample data.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              icon={Zap}
+              onClick={handleBypassDevMode}
+              className="mt-1 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 justify-center font-bold"
+            >
+              Activate Dev Test Session & Launch /financial-health →
+            </Button>
+          </div>
+        )}
+
         <Card className="p-8 shadow-2xl">
           {errorMsg && (
             <div className="mb-6 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-semibold text-center">

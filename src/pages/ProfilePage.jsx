@@ -79,6 +79,16 @@ export default function ProfilePage() {
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
 
+  // Helper to format experience label
+  const formatExperienceLabel = (exp) => {
+    if (!exp) return 'Beginner — I\'m new to investing';
+    const lower = exp.toLowerCase();
+    if (lower.includes('beginner')) return 'Beginner — I\'m new to investing';
+    if (lower.includes('some')) return 'Some Experience — I\'ve been investing for a while';
+    if (lower.includes('experienced')) return 'Experienced — I understand investing and manage my investments confidently';
+    return exp;
+  };
+
   // Fallback view data if profile not fully completed yet
   const displayData = {
     age: finProfile?.age || 28,
@@ -104,7 +114,7 @@ export default function ProfilePage() {
     ],
     hasInvestments: finProfile?.has_investments ?? true,
     investmentCategories: finProfile?.investment_categories || ['Mutual Funds', 'Stocks'],
-    investmentExperience: finProfile?.investment_experience || 'Some experience',
+    investmentExperience: formatExperienceLabel(finProfile?.investment_experience),
     hasHealthInsurance: finProfile?.has_health_insurance ?? true,
     hasLifeInsurance: finProfile?.has_life_insurance ?? true,
     timeHorizon: finProfile?.time_horizon || '5–10 years',
@@ -390,8 +400,10 @@ export default function ProfilePage() {
             <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.hasInvestments ? 'Yes' : 'Not yet'}</span>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Experience Level</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.investmentExperience}</span>
+            <span className="text-slate-400 block mb-0.5">Investing Experience</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 leading-snug block mt-0.5">
+              {displayData.investmentExperience}
+            </span>
           </div>
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
             <span className="text-slate-400 block mb-1">Categories</span>

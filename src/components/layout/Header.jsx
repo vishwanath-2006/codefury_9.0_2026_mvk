@@ -2,12 +2,12 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { Menu, Sun, Moon, Search, Bell, Sparkles, LogOut, User } from 'lucide-react';
+import { Menu, Sun, Moon, Search, Sparkles, LogOut, Zap } from 'lucide-react';
 import Badge from '../ui/Badge';
 
 export default function Header({ onOpenSidebar }) {
   const { isDark, toggleTheme } = useTheme();
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout, isDevTestMode, disableDevTestMode } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -44,6 +44,21 @@ export default function Header({ onOpenSidebar }) {
 
       {/* Right Controls */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Development Test Mode Badge (Only rendered when dev mode is active) */}
+        {isDevTestMode && (
+          <button
+            onClick={() => {
+              disableDevTestMode();
+              navigate('/login');
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 text-[10px] font-bold hover:bg-amber-500/30 transition"
+            title="Dev Test Mode Active. Click to exit."
+          >
+            <Zap className="w-3 h-3 text-amber-500" />
+            <span>DEV TEST MODE</span>
+          </button>
+        )}
+
         <Badge variant="brand" className="hidden sm:inline-flex gap-1 text-[10px]">
           <Sparkles className="w-3 h-3 text-emerald-500" />
           FinLabs v1.0
