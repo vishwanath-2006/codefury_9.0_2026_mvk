@@ -1,12 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
 import ProgressIndicator from '../components/ui/ProgressIndicator';
 import Badge from '../components/ui/Badge';
-import { Wallet, TrendingUp, PiggyBank, Activity, Target, PieChart, Sparkles, ArrowRight } from 'lucide-react';
+import { Wallet, TrendingUp, PiggyBank, Activity, Target, PieChart, Sparkles, ArrowRight, Settings2 } from 'lucide-react';
 import {
   mockUserSummary,
   mockHealthMetrics,
@@ -18,58 +19,74 @@ import {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { profile, user } = useAuth();
-
-  const userName = profile?.full_name || user?.user_metadata?.full_name;
-  const greetingText = userName ? `Good morning, ${userName} 👋` : 'Good morning 👋';
+  const { formData, healthScore, riskProfile } = useOnboarding();
 
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
 
+  const authUserName = profile?.full_name || user?.user_metadata?.full_name;
+  const userName = formData.fullName || authUserName || 'SmartWealth Investor';
+
+  const totalIncome = (Number(formData.primaryMonthlyIncome || 0) + Number(formData.secondaryMonthlyIncome || 0)) || mockUserSummary.monthlyIncome;
+  const totalExpenses = (Number(formData.essentialExpenses || 0) + Number(formData.discretionaryExpenses || 0));
+  const totalEmis = Number(formData.totalEmiOutflow || 0);
+  const monthlySavings = Math.max(0, totalIncome - totalExpenses - totalEmis) || mockUserSummary.monthlySavings;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
-      {/* HEADER */}
-      <PageHeader
-        title={greetingText}
-        subtitle="Here's your financial overview."
-        tag="Overview"
-      />
+      {/* HEADER WITH ONBOARDING RE-VISIT ACTION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <PageHeader
+          title={`Good day, ${userName} 👋`}
+          subtitle={`Risk Profile: ${riskProfile} Investor — Blueprint Active`}
+          tag="SmartWealth AI"
+        />
+
+        <button
+          onClick={() => navigate('/onboarding')}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500/50 hover:text-emerald-500 transition shadow-sm self-start sm:self-auto"
+        >
+          <Settings2 className="w-4 h-4 text-emerald-500" />
+          <span>Edit Wealth Blueprint</span>
+        </button>
+      </div>
 
       {/* ROW 1: KEY METRICS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Financial Health"
-          value={`${mockUserSummary.financialHealthScore} / 100`}
+          value={`${healthScore} / 100`}
           icon={Activity}
-          change={mockUserSummary.healthStatus}
-          changeType="positive"
-          description="Baseline Index"
+          change={healthScore >= 70 ? 'Strong Baseline' : healthScore >= 50 ? 'Moderate Baseline' : 'Needs Optimization'}
+          changeType={healthScore >= 60 ? 'positive' : 'neutral'}
+          description="Calculated Index"
         />
 
         <StatCard
           title="Monthly Income"
-          value={formatINR(mockUserSummary.monthlyIncome)}
+          value={formatINR(totalIncome)}
           icon={Wallet}
-          change="Verified Inflow"
+          change={formData.incomeStability || 'Verified Inflow'}
           changeType="neutral"
-          description="Fixed net cash flow"
+          description="Net Monthly Cash Inflow"
         />
 
         <StatCard
-          title="Monthly Savings"
-          value={formatINR(mockUserSummary.monthlySavings)}
+          title="Monthly Savings Surplus"
+          value={formatINR(monthlySavings)}
           icon={PiggyBank}
-          change="20% Savings Rate"
+          change={`${Math.round((monthlySavings / (totalIncome || 1)) * 100)}% Savings Rate`}
           changeType="positive"
-          description="Target benchmark >20%"
+          description="Investable surplus"
         />
 
         <StatCard
           title="Portfolio Value"
-          value={formatINR(mockUserSummary.portfolioValue)}
+          value={formatINR(Number(formData.totalInvestmentValue) || mockUserSummary.portfolioValue)}
           icon={TrendingUp}
-          change="+12.4% Growth"
+          change={`${(formData.assetClasses || []).filter(a => a !== 'None yet').length || 3} Asset Classes`}
           changeType="positive"
-          description="3 Asset Classes"
+          description="Consolidated Holdings"
         />
       </div>
 
@@ -114,7 +131,7 @@ export default function DashboardPage() {
               <div>
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <Target className="w-4 h-4 text-emerald-500" />
-                  Goals Summary
+                  Primary Goal ({formData.primaryMilestone || 'House Downpayment'})
                 </CardTitle>
                 <CardDescription>Top active goal accumulation progress</CardDescription>
               </div>
@@ -128,7 +145,23 @@ export default function DashboardPage() {
             </CardHeader>
 
             <CardContent className="space-y-3">
-              {mockTopGoals.slice(0, 3).map((goal) => (
+              <div className="p-3.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {formData.primaryMilestone || 'Down Payment for House'}
+                  </span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                    Target: {formData.targetTimeframeYears || 5} Years
+                  </span>
+                </div>
+                <ProgressIndicator value={35} max={100} color="emerald" />
+                <div className="flex justify-between text-[11px] text-slate-500 pt-0.5 font-mono">
+                  <span>Monthly Contribution: ₹{Number(formData.monthlyCommitmentAmount || 15000).toLocaleString('en-IN')}</span>
+                  <span>Target: ₹{Number(formData.targetGoalAmount || 1500000).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+
+              {mockTopGoals.slice(0, 2).map((goal) => (
                 <div key={goal.id} className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50 space-y-1.5">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-900 dark:text-slate-100">{goal.title}</span>

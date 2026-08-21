@@ -44,7 +44,7 @@ export default function LandingNavbar() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/onboarding')}
           >
             Log In
           </Button>
@@ -54,7 +54,7 @@ export default function LandingNavbar() {
             size="sm"
             icon={ArrowRight}
             iconPosition="right"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/onboarding')}
           >
             Get Started
           </Button>
