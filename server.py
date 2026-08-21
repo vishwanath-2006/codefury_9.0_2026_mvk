@@ -163,6 +163,6 @@ def sync_angelone_holdings():
         }), 500
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 5005))
     print(f"Starting Angel One integration proxy server on port {port}...")
     app.run(host='0.0.0.0', port=port, debug=True)
