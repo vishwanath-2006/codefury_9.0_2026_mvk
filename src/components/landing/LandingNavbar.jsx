@@ -54,7 +54,7 @@ export default function LandingNavbar() {
             size="sm"
             icon={ArrowRight}
             iconPosition="right"
-            onClick={() => navigate('/onboarding')}
+            onClick={() => navigate('/login')}
           >
             Get Started
           </Button>
@@ -89,7 +89,7 @@ export default function LandingNavbar() {
             <Button variant="outline" className="w-full justify-center" onClick={() => { setMobileMenuOpen(false); navigate('/login'); }}>
               Log In
             </Button>
-            <Button variant="primary" className="w-full justify-center" onClick={() => { setMobileMenuOpen(false); navigate('/onboarding'); }}>
+            <Button variant="primary" className="w-full justify-center" onClick={() => { setMobileMenuOpen(false); navigate('/login'); }}>
               Get Started
             </Button>
           </div>

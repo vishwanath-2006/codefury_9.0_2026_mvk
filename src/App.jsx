@@ -45,7 +45,14 @@ export default function App() {
               <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
               {/* SmartWealth AI 8-Step Onboarding Wizard */}
-              <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route
+                path="/onboarding"
+                element={
+                  <ProtectedRoute>
+                    <OnboardingPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Protected Application Shell Routes */}
               <Route
