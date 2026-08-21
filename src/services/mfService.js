@@ -115,6 +115,21 @@ function findClosestNAV(dataArray, targetDate) {
 /**
  * Computes annualized performance CAGR returns.
  */
+/**
+ * Checks if a scheme is obsolete (latest NAV date is older than 30 days).
+ */
+export function isSchemeObsolete(schemeData) {
+  const data = schemeData?.data;
+  if (!data || data.length === 0) return true;
+  const sorted = [...data].sort((a, b) => parseMFDate(b.date) - parseMFDate(a.date));
+  const latestItem = sorted.find(item => item && item.nav && Number(item.nav) > 0);
+  if (!latestItem) return true;
+  const latestDate = parseMFDate(latestItem.date);
+  if (isNaN(latestDate.getTime())) return true;
+  const diffDays = (Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24);
+  return diffDays > 30;
+}
+
 export function calculateReturns(schemeData) {
   const data = schemeData?.data;
   if (!data || data.length === 0) {
@@ -124,7 +139,8 @@ export function calculateReturns(schemeData) {
   // Explicitly sort by date descending (latest first) to guarantee data[0] is the newest NAV
   const sorted = [...data].sort((a, b) => parseMFDate(b.date) - parseMFDate(a.date));
 
-  const latestItem = sorted[0];
+  // Find the most recent item with a valid non-zero NAV
+  const latestItem = sorted.find(item => item && item.nav && Number(item.nav) > 0) || sorted[0];
   const latestNav = Number(latestItem.nav);
   const latestDate = parseMFDate(latestItem.date);
 

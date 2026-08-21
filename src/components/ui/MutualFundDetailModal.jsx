@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSchemeDetails, calculateReturns } from '../../services/mfService';
+import { getSchemeDetails, calculateReturns, isSchemeObsolete } from '../../services/mfService';
 import LightweightChart from './LightweightChart';
 import SipCalculator from './SipCalculator';
 import { X, Calendar, Activity, Info, BarChart3 } from 'lucide-react';
@@ -21,6 +21,14 @@ export default function MutualFundDetailModal({ isOpen, onClose, schemeCode, sch
       setError(null);
       try {
         const details = await getSchemeDetails(schemeCode);
+        
+        // Block discontinued / legacy schemes
+        if (isSchemeObsolete(details)) {
+          setError('This mutual fund scheme has been suspended or discontinued (no active NAV reported in the last 30 days).');
+          setLoading(false);
+          return;
+        }
+
         setSchemeDetails(details);
         
         const returns = calculateReturns(details);

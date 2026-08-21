@@ -28,7 +28,7 @@ import { mockMutualFunds } from '../mock/finlabsMockData';
 const POPULAR_FUNDS = [
   {
     schemeCode: 122639,
-    id: "mf2",
+    id: "pp_flexicap",
     name: "Parag Parikh Flexi Cap Fund - Direct Growth",
     fundHouse: "PPFAS Mutual Fund",
     category: "Flexi Cap",
@@ -38,12 +38,12 @@ const POPULAR_FUNDS = [
     cagr3Yr: "18.45%",
     cagr5Yr: "21.5%",
     minSip: 1000,
-    risk: "Moderately High",
+    risk: "Very High",
     expenseRatio: "0.58%",
     aum: "₹62,100 Cr",
     exitLoad: "2% if redeemed within 365 days",
     sharpeRatio: "1.48",
-    suitability: "94% Match",
+    suitability: "High Risk Matching",
     sectors: [
       { name: "Financial Services", pct: 28.4 },
       { name: "IT & US Tech Titans", pct: 19.2 },
@@ -54,7 +54,7 @@ const POPULAR_FUNDS = [
   },
   {
     schemeCode: 120847,
-    id: "mf5",
+    id: "quant_smallcap",
     name: "Quant Small Cap Fund - Direct Growth",
     fundHouse: "Quant Mutual Fund",
     category: "Small Cap",
@@ -64,12 +64,12 @@ const POPULAR_FUNDS = [
     cagr3Yr: "28.12%",
     cagr5Yr: "31.2%",
     minSip: 500,
-    risk: "High",
+    risk: "Very High",
     expenseRatio: "0.77%",
     aum: "₹21,400 Cr",
     exitLoad: "1% if redeemed within 15 days",
     sharpeRatio: "1.62",
-    suitability: "86% Match",
+    suitability: "High Risk Matching",
     sectors: [
       { name: "Energy & Power", pct: 19.8 },
       { name: "Financial Services", pct: 17.4 },
@@ -79,106 +79,29 @@ const POPULAR_FUNDS = [
     ]
   },
   {
-    schemeCode: 119063,
-    id: "mf1",
-    name: "Nifty 50 Index Fund Direct Growth",
-    fundHouse: "HDFC / UTI Index Funds",
-    category: "Large Cap Index",
-    rating: 5,
-    nav: "₹165.20",
-    cagr1Yr: "18.4%",
-    cagr3Yr: "14.20%",
-    cagr5Yr: "16.1%",
-    minSip: 500,
-    risk: "Moderate",
-    expenseRatio: "0.12%",
-    aum: "₹16,450 Cr",
-    exitLoad: "Nil",
-    sharpeRatio: "1.24",
-    suitability: "98% Match",
-    sectors: [
-      { name: "Financial Services", pct: 33.5 },
-      { name: "Information Technology", pct: 14.2 },
-      { name: "Oil, Gas & Consumable", pct: 11.8 },
-      { name: "Consumer Goods", pct: 9.4 },
-      { name: "Automobile & Auto", pct: 6.8 }
-    ]
-  },
-  {
-    schemeCode: 119777,
-    id: "mf4",
-    name: "SBI Bluechip Fund - Direct Growth",
-    fundHouse: "SBI Mutual Fund",
-    category: "Large Cap Index",
-    rating: 4,
-    nav: "₹85.60",
-    cagr1Yr: "16.8%",
-    cagr3Yr: "13.92%",
-    cagr5Yr: "15.8%",
-    minSip: 500,
-    risk: "Moderate",
-    expenseRatio: "0.82%",
-    aum: "₹44,200 Cr",
-    exitLoad: "1% if redeemed within 1 year",
-    sharpeRatio: "1.08",
-    suitability: "91% Match",
-    sectors: [
-      { name: "Financial Services", pct: 36.2 },
-      { name: "Automobile", pct: 11.5 },
-      { name: "Oil & Gas", pct: 10.4 },
-      { name: "IT Services", pct: 9.8 },
-      { name: "Construction", pct: 7.6 }
-    ]
-  },
-  {
-    schemeCode: 120503,
-    id: "mf3",
-    name: "SBI Small Cap Fund Direct",
-    fundHouse: "SBI Mutual Fund",
-    category: "Small Cap",
-    rating: 4,
-    nav: "₹162.80",
-    cagr1Yr: "26.4%",
-    cagr3Yr: "22.6%",
-    cagr5Yr: "24.1%",
-    minSip: 500,
-    risk: "High",
-    expenseRatio: "0.69%",
-    aum: "₹28,900 Cr",
-    exitLoad: "1% if redeemed within 1 year",
-    sharpeRatio: "1.18",
-    suitability: "82% Match",
-    sectors: [
-      { name: "Capital Goods", pct: 22.1 },
-      { name: "Consumer Durables", pct: 16.4 },
-      { name: "Chemicals & Materials", pct: 14.8 },
-      { name: "Healthcare & Pharma", pct: 11.2 },
-      { name: "Textiles", pct: 8.5 }
-    ]
-  },
-  {
-    schemeCode: 119800,
-    id: "mf6",
-    name: "HDFC Corporate Bond Fund",
+    schemeCode: 119018,
+    id: "hdfc_top100",
+    name: "HDFC Top 100 Fund - Direct Growth",
     fundHouse: "HDFC Mutual Fund",
-    category: "Debt",
+    category: "Large Cap Index",
     rating: 4,
-    nav: "₹29.80",
-    cagr1Yr: "7.8%",
-    cagr3Yr: "7.1%",
-    cagr5Yr: "7.6%",
+    nav: "₹125.40",
+    cagr1Yr: "19.5%",
+    cagr3Yr: "15.40%",
+    cagr5Yr: "16.8%",
     minSip: 500,
-    risk: "Low",
-    expenseRatio: "0.34%",
-    aum: "₹27,800 Cr",
-    exitLoad: "Nil",
-    sharpeRatio: "2.10",
-    suitability: "90% Match",
+    risk: "Above Average",
+    expenseRatio: "0.45%",
+    aum: "₹34,250 Cr",
+    exitLoad: "1% if redeemed within 30 days",
+    sharpeRatio: "1.32",
+    suitability: "Moderate Risk Matching",
     sectors: [
-      { name: "AAA Corporate Bonds", pct: 72.4 },
-      { name: "Sovereign G-Secs", pct: 18.2 },
-      { name: "Banking Bonds", pct: 6.4 },
-      { name: "Cash Reserves", pct: 3.0 }
+      { name: "Financial Services", pct: 32.4 },
+      { name: "Information Technology", pct: 13.8 },
+      { name: "Energy & Power", pct: 12.5 },
+      { name: "Consumer Goods", pct: 8.9 },
+      { name: "Automobile & Auto", pct: 7.2 }
     ]
   }
 ];
@@ -227,7 +150,27 @@ export default function MutualFundsPage() {
     const timer = setTimeout(async () => {
       try {
         const results = await searchSchemes(trimmed);
-        setLiveApiResults(results.slice(0, 10)); // Top 10 live API results
+        
+        // Filter out regular, dividend, idcw, legacy, payout, and discontinued schemes
+        const filtered = (results || []).filter(item => {
+          const name = item.schemeName.toLowerCase();
+          const isGrowth = name.includes('growth');
+          const isObsoleteOrRegular = name.includes('regular') || name.includes('dividend') || name.includes('idcw') || name.includes('payout') || name.includes('reinvestment') || name.includes('legacy') || name.includes('discontinued') || name.includes('suspended');
+          return isGrowth && !isObsoleteOrRegular;
+        });
+
+        // Prioritize active "Direct Plan - Growth" or "Growth" schemes
+        const sorted = filtered.sort((a, b) => {
+          const aName = a.schemeName.toLowerCase();
+          const bName = b.schemeName.toLowerCase();
+          const aDG = aName.includes('direct') && aName.includes('growth');
+          const bDG = bName.includes('direct') && bName.includes('growth');
+          if (aDG && !bDG) return -1;
+          if (!aDG && bDG) return 1;
+          return 0;
+        });
+
+        setLiveApiResults(sorted.slice(0, 10)); // Top 10 live API results
       } catch (err) {
         console.error('Live MF search error:', err);
       } finally {
