@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles, UserCheck } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -16,7 +16,7 @@ const GoogleIcon = ({ className }) => (
 );
 
 export default function SignupPage() {
-  const { signup, loginWithGoogle, loginAsGuest } = useAuth();
+  const { signup, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -47,19 +47,6 @@ export default function SignupPage() {
       navigate('/dashboard', { replace: true });
     } catch (err) {
       setErrorMsg(err.message || 'Registration failed. Please check your information.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGuestLogin = async () => {
-    setErrorMsg('');
-    setLoading(true);
-    try {
-      await loginAsGuest();
-      navigate('/onboarding', { replace: true });
-    } catch (err) {
-      setErrorMsg(err.message || 'Guest login session failed.');
     } finally {
       setLoading(false);
     }
@@ -150,7 +137,7 @@ export default function SignupPage() {
             <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
           </div>
 
-          <div className="space-y-3">
+          <div className="mt-4">
             <Button
               type="button"
               variant="outline"
@@ -171,21 +158,6 @@ export default function SignupPage() {
             >
               Sign Up with Google
             </Button>
-
-            {/* Quick Start / Demo Session Access Button */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                disabled={loading}
-                icon={UserCheck}
-                onClick={handleGuestLogin}
-                className="w-full justify-center border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-              >
-                ⚡ Quick Start (Demo Session)
-              </Button>
-            </div>
           </div>
 
           <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-5">
