@@ -10,6 +10,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import OnboardingPage from './pages/OnboardingPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 
 import DashboardPage from './pages/DashboardPage';
 import FinancialHealthPage from './pages/FinancialHealthPage';
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
+              <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
               {/* SmartWealth AI 8-Step Onboarding Wizard */}
               <Route path="/onboarding" element={<OnboardingPage />} />
