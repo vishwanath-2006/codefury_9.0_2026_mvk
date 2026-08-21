@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   Activity,
+  UserCheck,
   Wallet,
   Target,
   PieChart,
@@ -41,6 +42,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const mainNav = [
     { name: 'Overview', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Financial Health', path: '/financial-health', icon: Activity },
+    { name: 'Onboarding Setup', path: '/onboarding', icon: UserCheck, badge: 'Setup' },
     { name: 'Expenses', path: '/expenses', icon: Wallet },
     { name: 'Goals', path: '/goals', icon: Target },
     { name: 'Portfolio', path: '/portfolio', icon: PieChart },

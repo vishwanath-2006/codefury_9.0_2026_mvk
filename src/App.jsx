@@ -11,6 +11,7 @@ import SignupPage from './pages/SignupPage';
 
 import DashboardPage from './pages/DashboardPage';
 import FinancialHealthPage from './pages/FinancialHealthPage';
+import OnboardingPage from './pages/OnboardingPage';
 import ExpensesPage from './pages/ExpensesPage';
 import GoalsPage from './pages/GoalsPage';
 import PortfolioPage from './pages/PortfolioPage';
@@ -49,6 +50,7 @@ export default function App() {
             >
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/financial-health" element={<FinancialHealthPage />} />
+              <Route path="/onboarding" element={<OnboardingPage />} />
               <Route path="/expenses" element={<ExpensesPage />} />
               <Route path="/goals" element={<GoalsPage />} />
               <Route path="/portfolio" element={<PortfolioPage />} />
