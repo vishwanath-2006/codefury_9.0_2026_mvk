@@ -98,10 +98,10 @@ export default function MutualFundDetailModal({ isOpen, onClose, schemeCode, sch
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div className="space-y-6">
               
-              {/* Left Column: Metrics & NAV Chart */}
-              <div className="lg:col-span-3 space-y-5">
+              {/* Top Section: Metrics & NAV Chart */}
+              <div className="space-y-4">
                 
                 {/* Metrics Summary Row */}
                 <div className="grid grid-cols-3 gap-2 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-150/40 dark:border-slate-800/40 text-xs">
@@ -157,9 +157,9 @@ export default function MutualFundDetailModal({ isOpen, onClose, schemeCode, sch
                 </div>
               </div>
 
-              {/* Right Column: Embedded SIP Simulator */}
-              <div className="lg:col-span-2 space-y-4">
-                <div className="flex items-center gap-2 mb-2 pb-1 border-b border-slate-100 dark:border-slate-800">
+              {/* Bottom Section: Embedded SIP Simulator */}
+              <div className="space-y-4 pt-5 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2 mb-1">
                   <Activity className="w-4 h-4 text-emerald-500" />
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Simulation Wealth Widget</h4>
                 </div>
