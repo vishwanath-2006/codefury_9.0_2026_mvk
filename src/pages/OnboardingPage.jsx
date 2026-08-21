@@ -10,9 +10,6 @@ import OnboardingStep2 from '../components/onboarding/OnboardingStep2';
 import OnboardingStep3 from '../components/onboarding/OnboardingStep3';
 import OnboardingStep4 from '../components/onboarding/OnboardingStep4';
 import OnboardingStep5 from '../components/onboarding/OnboardingStep5';
-import OnboardingStep6 from '../components/onboarding/OnboardingStep6';
-import OnboardingStep7 from '../components/onboarding/OnboardingStep7';
-import OnboardingStep8 from '../components/onboarding/OnboardingStep8';
 import SynthesisLoader from '../components/onboarding/SynthesisLoader';
 
 export default function OnboardingPage() {
@@ -34,18 +31,15 @@ export default function OnboardingPage() {
   };
 
   const stepTitles = [
-    'Baseline Identity & Career',
-    'Income & Cash Flow',
-    'Expenses & Burn Rate',
-    'Liabilities & Credit Profile',
-    'Liquidity & Safety Net',
-    'Investment Portfolio',
-    'Behavioral Risk Profile',
-    'Primary Goal & Launchpad',
+    'Identity, Career & Income Inflows',
+    'Expenses, Liabilities & Credit',
+    'Liquidity, Safety Net & Investments',
+    'Risk Profile & Financial Goal',
+    'Photo Verification & Security Shield',
   ];
 
   const handleNext = () => {
-    if (currentStep < 8) {
+    if (currentStep < 5) {
       setCurrentStep((prev) => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -76,18 +70,18 @@ export default function OnboardingPage() {
       {/* Top Header Navigation */}
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-500/20">
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <span className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-              Smart<span className="text-emerald-500">Wealth AI</span>
+              Fin<span className="text-emerald-500">Labs</span>
             </span>
           </Link>
 
           <div className="flex items-center gap-4">
             <span className="text-xs font-mono font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              Step {currentStep} of 8
+              Step {currentStep} of 5
             </span>
 
             <button
@@ -109,11 +103,11 @@ export default function OnboardingPage() {
             <span className="text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px]">
               {stepTitles[currentStep - 1]}
             </span>
-            <span className="font-mono text-slate-500">{Math.round((currentStep / 8) * 100)}% Completed</span>
+            <span className="font-mono text-slate-500">{Math.round((currentStep / 5) * 100)}% Completed</span>
           </div>
 
           <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden flex gap-1">
-            {Array.from({ length: 8 }).map((_, idx) => (
+            {Array.from({ length: 5 }).map((_, idx) => (
               <div
                 key={idx}
                 className={`h-full flex-1 transition-all duration-300 rounded-full ${
@@ -131,9 +125,6 @@ export default function OnboardingPage() {
           {currentStep === 3 && <OnboardingStep3 data={formData} onChange={handleFieldChange} />}
           {currentStep === 4 && <OnboardingStep4 data={formData} onChange={handleFieldChange} />}
           {currentStep === 5 && <OnboardingStep5 data={formData} onChange={handleFieldChange} />}
-          {currentStep === 6 && <OnboardingStep6 data={formData} onChange={handleFieldChange} />}
-          {currentStep === 7 && <OnboardingStep7 data={formData} onChange={handleFieldChange} />}
-          {currentStep === 8 && <OnboardingStep8 data={formData} onChange={handleFieldChange} />}
 
           {/* Action Navigation Footer */}
           <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
@@ -147,7 +138,7 @@ export default function OnboardingPage() {
               Back
             </Button>
 
-            {currentStep < 8 ? (
+            {currentStep < 5 ? (
               <Button
                 variant="primary"
                 onClick={handleNext}
@@ -173,7 +164,7 @@ export default function OnboardingPage() {
 
       {/* Footer */}
       <footer className="py-4 text-center text-xs text-slate-400 border-t border-slate-200/60 dark:border-slate-900">
-        SmartWealth AI — Bank-grade privacy & encryption standards
+        FinLabs — Financial Intelligence Made Simple
       </footer>
 
       {/* High-End Synthesis Micro-Animation Loader */}

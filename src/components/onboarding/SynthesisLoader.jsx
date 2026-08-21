@@ -9,7 +9,7 @@ export default function SynthesisLoader({ healthScore, riskProfile, onComplete }
     { title: 'Benchmarking monthly surplus & cash flows...', icon: Activity },
     { title: 'Calculating debt-to-income ratio & credit health...', icon: ShieldCheck },
     { title: 'Evaluating market volatility risk profile...', icon: TrendingUp },
-    { title: 'Synthesizing your financial clarity engine...', icon: Sparkles },
+    { title: 'Synthesizing your FinLabs clarity engine...', icon: Sparkles },
   ];
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function SynthesisLoader({ healthScore, riskProfile, onComplete }
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Animated Progress Ring / Shield */}
+        {/* Animated Progress Ring */}
         <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
             <circle
@@ -76,7 +76,7 @@ export default function SynthesisLoader({ healthScore, riskProfile, onComplete }
 
         <div>
           <h3 className="text-xl font-extrabold text-white tracking-tight">
-            SmartWealth AI Engine
+            FinLabs AI Engine
           </h3>
           <p className="text-xs text-emerald-400 font-medium mt-1 animate-pulse">
             {synthesisSteps[currentStepIdx].title}

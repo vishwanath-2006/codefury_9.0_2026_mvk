@@ -4,48 +4,43 @@ import { supabase } from '../lib/supabaseClient';
  * Default initial onboarding form state.
  */
 export const initialOnboardingData = {
-  // Step 1: Baseline Identity & Career
+  // Section 1: Baseline Identity, Career & Cash Flow
   fullName: '',
   age: 25,
   occupation: 'Salaried Professional',
   cityTier: 'Tier 1 Metro',
-
-  // Step 2: Income & Cash Flow
   primaryMonthlyIncome: 75000,
   secondaryMonthlyIncome: 0,
   incomeStability: 'Highly Predictable',
 
-  // Step 3: Expenses & Burn Rate
+  // Section 2: Expenses, Burn Rate, Liabilities & Credit
   essentialExpenses: 30000,
   discretionaryExpenses: 15000,
   expenseTrackingMethod: 'I track every rupee',
-
-  // Step 4: Liabilities & Credit Profile
   hasCreditCards: true,
   cardCount: '1-2',
   unpaidBalance: 0,
   activeLoans: ['None'],
   totalEmiOutflow: 0,
 
-  // Step 5: Liquidity & Emergency Safety Net
+  // Section 3: Liquidity, Safety Net & Investments
   bankSavings: 150000,
   emergencyFundAmount: 150000,
   monthsCovered: '3–6 Months',
-
-  // Step 6: Existing Investment Portfolio
   assetClasses: ['Mutual Funds / SIPs', 'Direct Equity / Stocks'],
   totalInvestmentValue: 350000,
   primaryPlatforms: ['Zerodha', 'Groww'],
 
-  // Step 7: Behavioral Risk Profile
+  // Section 4: Behavioral Risk Profile & Primary Goal
   investingExperience: '1-3 Years (Intermediate)',
   marketCorrectionReaction: 'Option B', // Option A: Panic (1pt), B: Hold (2pt), C: Invest more (3pt)
-
-  // Step 8: Primary Financial Goal & Launchpad
   primaryMilestone: 'Down Payment for House',
   targetGoalAmount: 1500000,
   targetTimeframeYears: 5,
   monthlyCommitmentAmount: 15000,
+
+  // Section 5: Photo Verification
+  profilePhoto: null, // Data URL or upload reference
 };
 
 /**
@@ -96,7 +91,7 @@ export function calculateFinancialHealthScore(formData) {
 }
 
 /**
- * Calculates Risk Profile classification based on Step 7 reaction and experience.
+ * Calculates Risk Profile classification based on reaction and experience.
  */
 export function calculateRiskProfile(formData) {
   let score = 0;
@@ -144,7 +139,7 @@ export async function saveOnboardingProfile(formData) {
         .from('profiles')
         .upsert({
           id: user.id,
-          full_name: formData.fullName || user.user_metadata?.full_name || 'SmartWealth User',
+          full_name: formData.fullName || user.user_metadata?.full_name || 'FinLabs User',
           onboarding_data: formData,
           financial_health_score: healthScore,
           risk_profile: riskProfile,
