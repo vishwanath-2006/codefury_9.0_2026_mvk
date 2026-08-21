@@ -25,6 +25,20 @@ import {
 import { searchSchemes, getSchemeDetails, calculateReturns } from '../services/mfService';
 import { mockMutualFunds } from '../mock/finlabsMockData';
 
+function formatMFDateToDisplay(dateStr) {
+  if (!dateStr) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const day = parts[0];
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const year = parts[2];
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${day}-${months[monthIdx]}-${year}`;
+  }
+  return dateStr;
+}
+
 const POPULAR_FUNDS = [
   {
     schemeCode: 122639,
@@ -137,7 +151,7 @@ export default function MutualFundsPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Live MFapi search effect
+  // Live MFapi search effect with active status parallel verification check
   useEffect(() => {
     const trimmed = search.trim().toLowerCase();
     if (trimmed.length < 3) {
@@ -151,11 +165,11 @@ export default function MutualFundsPage() {
       try {
         const results = await searchSchemes(trimmed);
         
-        // Filter out regular, dividend, idcw, legacy, payout, and discontinued schemes
+        // Initial name-based heuristic filter to clean up raw results list
         const filtered = (results || []).filter(item => {
           const name = item.schemeName.toLowerCase();
           const isGrowth = name.includes('growth');
-          const isObsoleteOrRegular = name.includes('regular') || name.includes('dividend') || name.includes('idcw') || name.includes('payout') || name.includes('reinvestment') || name.includes('legacy') || name.includes('discontinued') || name.includes('suspended');
+          const isObsoleteOrRegular = name.includes('regular') || name.includes('dividend') || name.includes('idcw') || name.includes('payout') || name.includes('reinvestment') || name.includes('legacy') || name.includes('discontinued') || name.includes('suspended') || name.includes('fmp') || name.includes('institutional') || name.includes('premium') || name.includes('retail');
           return isGrowth && !isObsoleteOrRegular;
         });
 
@@ -170,13 +184,62 @@ export default function MutualFundsPage() {
           return 0;
         });
 
-        setLiveApiResults(sorted.slice(0, 10)); // Top 10 live API results
+        // Query /latest endpoint for top 5 candidates in parallel to filter out obsolete funds on the fly
+        const topCandidates = sorted.slice(0, 5);
+        const activeResults = [];
+
+        await Promise.all(
+          topCandidates.map(async (item) => {
+            try {
+              const latestRes = await fetch(`https://api.mfapi.in/mf/${item.schemeCode}/latest`);
+              if (!latestRes.ok) return;
+              const latestJson = await latestRes.json();
+              const latestItem = latestJson?.data?.[0];
+              if (!latestItem || !latestItem.date || !latestItem.nav || Number(latestItem.nav) <= 0) return;
+              
+              // Verify date is within last 30 days
+              const parseDateParts = latestItem.date.split('-');
+              const latestDate = new Date(Number(parseDateParts[2]), Number(parseDateParts[1]) - 1, Number(parseDateParts[0]));
+              const diffDays = (Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24);
+              
+              if (diffDays <= 30) {
+                // Determine category label based on name
+                let category = 'Flexi Cap';
+                const lowerName = item.schemeName.toLowerCase();
+                if (lowerName.includes('index') || lowerName.includes('nifty') || lowerName.includes('sensex')) {
+                  category = 'Large Cap Index';
+                } else if (lowerName.includes('small')) {
+                  category = 'Small Cap';
+                } else if (lowerName.includes('debt') || lowerName.includes('gilt') || lowerName.includes('liquid')) {
+                  category = 'Debt';
+                }
+
+                activeResults.push({
+                  schemeCode: item.schemeCode,
+                  schemeName: item.schemeName,
+                  category,
+                  suitability: category === 'Small Cap' ? 'High Risk Matching' : 'Moderate Risk Matching',
+                  risk: category === 'Small Cap' ? 'Very High' : 'Above Average',
+                  minSip: 500,
+                  rating: 4,
+                  cagr3Yr: 'Live NAV',
+                  nav: Number(latestItem.nav).toFixed(2),
+                  navDate: formatMFDateToDisplay(latestItem.date)
+                });
+              }
+            } catch (err) {
+              console.warn('Fuzzy check latest NAV failed for:', item.schemeCode, err);
+            }
+          })
+        );
+
+        setLiveApiResults(activeResults);
       } catch (err) {
         console.error('Live MF search error:', err);
       } finally {
         setSearchLoading(false);
       }
-    }, 300);
+    }, 450);
 
     return () => clearTimeout(timer);
   }, [search]);
@@ -357,6 +420,11 @@ export default function MutualFundsPage() {
                   <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-500 transition line-clamp-1">
                     {item.schemeName}
                   </h4>
+                  {item.nav && (
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                      NAV: <span className="font-mono font-bold text-slate-800 dark:text-slate-200">₹{item.nav}</span> {item.navDate && `(as of ${item.navDate})`}
+                    </div>
+                  )}
                 </div>
                 <Button variant="ghost" size="xs" icon={ArrowUpRight}>
                   Analytics
