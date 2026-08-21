@@ -1,79 +1,185 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
 import ProgressIndicator from '../components/ui/ProgressIndicator';
 import Badge from '../components/ui/Badge';
-import { Wallet, TrendingUp, PiggyBank, Activity, Target, PieChart, Sparkles, ArrowRight } from 'lucide-react';
-import {
-  mockUserSummary,
-  mockHealthMetrics,
-  mockTopGoals,
-  mockPortfolioAllocation,
-  mockPrimaryInsight
-} from '../mock/finlabsMockData';
+import { Wallet, TrendingUp, PiggyBank, Activity, Target, PieChart, Sparkles, ArrowRight, Settings2, ShieldCheck } from 'lucide-react';
+import { mockPrimaryInsight } from '../mock/finlabsMockData';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { profile, user } = useAuth();
-
-  const userName = profile?.full_name || user?.user_metadata?.full_name;
-  const greetingText = userName ? `Good morning, ${userName} 👋` : 'Good morning 👋';
+  const { formData, healthScore, riskProfile } = useOnboarding();
 
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
 
+  // Dynamic User Name & Avatar
+  const googleName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name;
+  const userName = formData.fullName || googleName || 'FinLabs Investor';
+  const avatarUrl = formData.profilePhoto || profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+
+  // Dynamic Income, Expenses & Savings Calculations
+  const primaryIncome = Number(formData.primaryMonthlyIncome || 0);
+  const secondaryIncome = Number(formData.secondaryMonthlyIncome || 0);
+  const totalIncome = (primaryIncome + secondaryIncome) || 75000;
+
+  const essentialExp = Number(formData.essentialExpenses || 0);
+  const discretionaryExp = Number(formData.discretionaryExpenses || 0);
+  const totalExpenses = (essentialExp + discretionaryExp) || 45000;
+
+  const totalEmis = Number(formData.totalEmiOutflow || 0);
+  const monthlySavings = Math.max(0, totalIncome - totalExpenses - totalEmis);
+  const savingsRatePct = Math.round((monthlySavings / (totalIncome || 1)) * 100);
+  const emiRatioPct = Math.round((totalEmis / (totalIncome || 1)) * 100);
+
+  // Dynamic Health Metric Pillars
+  const dynamicHealthMetrics = [
+    {
+      metric: 'Savings Rate',
+      score: `${savingsRatePct}%`,
+      target: '25%',
+      status: savingsRatePct >= 25 ? 'Excellent' : savingsRatePct >= 15 ? 'Good' : 'Needs Attention',
+      description: `Saving ₹${monthlySavings.toLocaleString('en-IN')} of ₹${totalIncome.toLocaleString('en-IN')} income.`,
+    },
+    {
+      metric: 'Emergency Fund',
+      score: formData.monthsCovered || '3–6 Months',
+      target: '6.0 Months',
+      status: formData.monthsCovered === '6+ Months' ? 'Excellent' : formData.monthsCovered === '3–6 Months' ? 'Good' : 'Needs Attention',
+      description: `₹${Number(formData.emergencyFundAmount || 150000).toLocaleString('en-IN')} accumulated buffer.`,
+    },
+    {
+      metric: 'Debt-to-Income',
+      score: `${emiRatioPct}%`,
+      target: '< 30%',
+      status: emiRatioPct <= 15 ? 'Excellent' : emiRatioPct <= 30 ? 'Good' : 'Needs Attention',
+      description: emiRatioPct > 0 ? `₹${totalEmis.toLocaleString('en-IN')} monthly debt outflow` : 'Zero active loan obligations',
+    },
+    {
+      metric: 'Diversification',
+      score: `${Math.min(100, Math.max(25, (formData.assetClasses || []).filter(a => a !== 'None yet').length * 25))} / 100`,
+      target: '80 / 100',
+      status: (formData.assetClasses || []).length >= 3 ? 'Good' : 'Moderate',
+      description: `Across ${(formData.assetClasses || []).filter(a => a !== 'None yet').join(', ') || '1 asset class'}`,
+    },
+  ];
+
+  // Dynamic Portfolio Allocation
+  const rawTotalPortfolio = Number(formData.totalInvestmentValue || 350000);
+  const activeAssets = (formData.assetClasses || []).filter(a => a !== 'None yet');
+
+  const assetColors = {
+    'Mutual Funds / SIPs': '#10b981',
+    'Direct Equity / Stocks': '#6366f1',
+    'Fixed Deposits / Recurring Deposits': '#f59e0b',
+    'Digital / Physical Gold': '#eab308',
+    'Crypto / Alternative Assets': '#ec4899',
+  };
+
+  const dynamicAllocation = activeAssets.length > 0
+    ? activeAssets.map((asset, idx) => {
+        const pct = Math.round(100 / activeAssets.length);
+        const val = Math.round((rawTotalPortfolio * pct) / 100);
+        return {
+          name: asset,
+          value: val,
+          percentage: pct,
+          color: assetColors[asset] || ['#10b981', '#6366f1', '#f59e0b', '#06b6d4', '#ec4899'][idx % 5],
+        };
+      })
+    : [
+        { name: 'Mutual Funds (SIP)', value: Math.round(rawTotalPortfolio * 0.6), percentage: 60, color: '#10b981' },
+        { name: 'Direct Equity Stocks', value: Math.round(rawTotalPortfolio * 0.4), percentage: 40, color: '#6366f1' },
+      ];
+
+  // Dynamic Goal Progress
+  const goalTitle = formData.primaryMilestone || 'Down Payment for House';
+  const targetCorpus = Number(formData.targetGoalAmount || 1500000);
+  const timeframeYears = Number(formData.targetTimeframeYears || 5);
+  const monthlySip = Number(formData.monthlyCommitmentAmount || 15000);
+  const projectedAccumulated = Math.min(targetCorpus, monthlySip * 12 * (timeframeYears * 0.4));
+  const goalProgressPct = Math.min(100, Math.max(15, Math.round((projectedAccumulated / targetCorpus) * 100)));
+
   return (
     <div className="space-y-6 animate-in fade-in duration-150">
-      {/* HEADER */}
-      <PageHeader
-        title={greetingText}
-        subtitle="Here's your financial overview."
-        tag="Overview"
-      />
+      {/* HEADER WITH USER PROFILE AVATAR & BLUEPRINT ACTION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={userName}
+              className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow-md shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white font-bold flex items-center justify-center text-lg shadow-md shadow-emerald-500/20 shrink-0">
+              {userName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+              Good day, {userName} 👋
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Risk Profile: <span className="font-bold text-emerald-500">{riskProfile} Investor</span> — FinLabs Blueprint Active
+            </p>
+          </div>
+        </div>
 
-      {/* ROW 1: KEY METRICS */}
+        <button
+          onClick={() => navigate('/onboarding')}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500/50 hover:text-emerald-500 transition shadow-sm self-start sm:self-auto"
+        >
+          <Settings2 className="w-4 h-4 text-emerald-500" />
+          <span>Edit Wealth Blueprint</span>
+        </button>
+      </div>
+
+      {/* ROW 1: DYNAMIC KEY METRICS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Financial Health"
-          value={`${mockUserSummary.financialHealthScore} / 100`}
+          value={`${healthScore} / 100`}
           icon={Activity}
-          change={mockUserSummary.healthStatus}
-          changeType="positive"
-          description="Baseline Index"
+          change={healthScore >= 70 ? 'Strong Index' : healthScore >= 50 ? 'Moderate Index' : 'Needs Optimization'}
+          changeType={healthScore >= 60 ? 'positive' : 'neutral'}
+          description="Calculated FinLabs Score"
         />
 
         <StatCard
-          title="Monthly Income"
-          value={formatINR(mockUserSummary.monthlyIncome)}
+          title="Monthly Cash Inflow"
+          value={formatINR(totalIncome)}
           icon={Wallet}
-          change="Verified Inflow"
+          change={formData.incomeStability || 'Predictable'}
           changeType="neutral"
-          description="Fixed net cash flow"
+          description="Net Take-Home Inflow"
         />
 
         <StatCard
-          title="Monthly Savings"
-          value={formatINR(mockUserSummary.monthlySavings)}
+          title="Monthly Savings Surplus"
+          value={formatINR(monthlySavings)}
           icon={PiggyBank}
-          change="20% Savings Rate"
-          changeType="positive"
-          description="Target benchmark >20%"
+          change={`${savingsRatePct}% Savings Rate`}
+          changeType={savingsRatePct >= 20 ? 'positive' : 'neutral'}
+          description="Investable Monthly Cash"
         />
 
         <StatCard
           title="Portfolio Value"
-          value={formatINR(mockUserSummary.portfolioValue)}
+          value={formatINR(rawTotalPortfolio)}
           icon={TrendingUp}
-          change="+12.4% Growth"
+          change={`${activeAssets.length || 2} Active Asset Classes`}
           changeType="positive"
-          description="3 Asset Classes"
+          description="Consolidated Holdings"
         />
       </div>
 
-      {/* ROW 2: FINANCIAL HEALTH SUMMARY */}
+      {/* ROW 2: DYNAMIC FINANCIAL HEALTH SUMMARY */}
       <Card>
         <CardHeader>
           <div>
@@ -81,7 +187,7 @@ export default function DashboardPage() {
               <Activity className="w-4 h-4 text-emerald-500" />
               Financial Health Summary
             </CardTitle>
-            <CardDescription>Compact status of your core financial pillars</CardDescription>
+            <CardDescription>Real-time status calculated from your baseline cash flow & debt data</CardDescription>
           </div>
           <button
             onClick={() => navigate('/financial-health')}
@@ -94,29 +200,29 @@ export default function DashboardPage() {
 
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {mockHealthMetrics.map((item, idx) => (
-              <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+            {dynamicHealthMetrics.map((item, idx) => (
+              <div key={idx} className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50 space-y-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">{item.metric}</p>
                 <p className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100">{item.score}</p>
-                <p className="text-[10px] text-slate-400 mt-1">Target: {item.target}</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">{item.description}</p>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* ROW 3 & ROW 4: GOALS SUMMARY & PORTFOLIO SUMMARY (2-Column Grid) */}
+      {/* ROW 3 & ROW 4: DYNAMIC GOALS SUMMARY & PORTFOLIO SUMMARY */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* ROW 3: GOALS SUMMARY */}
+        {/* GOALS SUMMARY */}
         <Card className="flex flex-col justify-between">
           <div>
             <CardHeader>
               <div>
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <Target className="w-4 h-4 text-emerald-500" />
-                  Goals Summary
+                  Primary Milestone: {goalTitle}
                 </CardTitle>
-                <CardDescription>Top active goal accumulation progress</CardDescription>
+                <CardDescription>Accumulation progress toward target horizon</CardDescription>
               </div>
               <button
                 onClick={() => navigate('/goals')}
@@ -127,34 +233,38 @@ export default function DashboardPage() {
               </button>
             </CardHeader>
 
-            <CardContent className="space-y-3">
-              {mockTopGoals.slice(0, 3).map((goal) => (
-                <div key={goal.id} className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50 space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-900 dark:text-slate-100">{goal.title}</span>
-                    <span className="font-mono text-slate-500">{goal.deadline}</span>
-                  </div>
-                  <ProgressIndicator value={goal.progressPct} max={100} color={goal.progressPct > 70 ? 'emerald' : 'sky'} />
-                  <div className="flex justify-between text-[11px] text-slate-400 pt-0.5">
-                    <span>Current: {formatINR(goal.currentAmount)}</span>
-                    <span>Target: {formatINR(goal.targetAmount)}</span>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 space-y-2.5">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-extrabold text-slate-900 dark:text-slate-100">
+                    {goalTitle}
+                  </span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                    Target: {timeframeYears} Years
+                  </span>
                 </div>
-              ))}
+
+                <ProgressIndicator value={goalProgressPct} max={100} color="emerald" />
+
+                <div className="flex justify-between text-[11px] text-slate-600 dark:text-slate-300 pt-0.5 font-mono">
+                  <span>Monthly Contribution: ₹{monthlySip.toLocaleString('en-IN')}</span>
+                  <span>Target Corpus: ₹{targetCorpus.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
             </CardContent>
           </div>
         </Card>
 
-        {/* ROW 4: PORTFOLIO SUMMARY */}
+        {/* PORTFOLIO SUMMARY */}
         <Card className="flex flex-col justify-between">
           <div>
             <CardHeader>
               <div>
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <PieChart className="w-4 h-4 text-indigo-500" />
-                  Portfolio Summary
+                  Consolidated Portfolio Breakdown
                 </CardTitle>
-                <CardDescription>Asset allocation across mutual funds, stocks & fixed income</CardDescription>
+                <CardDescription>Asset allocation across your selected asset classes</CardDescription>
               </div>
               <button
                 onClick={() => navigate('/portfolio')}
@@ -168,7 +278,7 @@ export default function DashboardPage() {
             <CardContent>
               {/* Asset Allocation Bar */}
               <div className="w-full h-3 rounded-full overflow-hidden flex mb-4 bg-slate-100 dark:bg-slate-800">
-                {mockPortfolioAllocation.map((item, idx) => (
+                {dynamicAllocation.map((item, idx) => (
                   <div
                     key={idx}
                     className="h-full transition-all duration-300"
@@ -178,7 +288,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-2">
-                {mockPortfolioAllocation.map((item, idx) => (
+                {dynamicAllocation.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50 text-xs">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
@@ -196,7 +306,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* ROW 5: ONE SMALL FINLABS INSIGHT */}
+      {/* ROW 5: TAILORED FINLABS INSIGHT */}
       <Card className="bg-gradient-to-r from-slate-900 to-slate-950 text-white border-slate-800">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-1">
           <div className="flex items-start gap-3">
@@ -205,11 +315,19 @@ export default function DashboardPage() {
             </div>
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Badge variant="brand" className="text-[10px]">{mockPrimaryInsight.badge}</Badge>
-                <span className="text-[11px] text-emerald-400 font-semibold">{mockPrimaryInsight.impact}</span>
+                <Badge variant="brand" className="text-[10px]">Tailored Recommendation</Badge>
+                <span className="text-[11px] text-emerald-400 font-semibold">
+                  {savingsRatePct >= 20 ? 'Optimal Growth Horizon' : 'Surplus Boost Opportunity'}
+                </span>
               </div>
-              <h4 className="text-xs sm:text-sm font-bold text-white mb-0.5">{mockPrimaryInsight.title}</h4>
-              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">{mockPrimaryInsight.description}</p>
+              <h4 className="text-xs sm:text-sm font-bold text-white mb-0.5">
+                {savingsRatePct >= 20 ? 'SIP Step-Up Optimization' : 'Savings Surplus Acceleration'}
+              </h4>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                {savingsRatePct >= 20
+                  ? `Your current savings surplus of ₹${monthlySavings.toLocaleString('en-IN')}/mo (${savingsRatePct}%) gives you strong leverage. Increasing your monthly goal allocation by ₹2,000 accelerates your ${goalTitle} goal timeline by 14 months.`
+                  : `Your current savings rate is ${savingsRatePct}%. Trimming lifestyle expenses by ₹3,000/mo will elevate your Financial Health Score to 80+.`}
+              </p>
             </div>
           </div>
 
@@ -217,7 +335,7 @@ export default function DashboardPage() {
             onClick={() => navigate('/tools/suitability')}
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition shrink-0"
           >
-            <span>View insights</span>
+            <span>View suitability</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

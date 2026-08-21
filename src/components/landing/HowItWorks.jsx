@@ -64,7 +64,7 @@ export default function HowItWorks() {
             size="lg"
             icon={ArrowRight}
             iconPosition="right"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/login')}
             className="shadow-lg"
           >
             Get Started

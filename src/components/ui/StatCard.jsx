@@ -2,9 +2,13 @@ import React from 'react';
 import { Card } from './Card';
 import Badge from './Badge';
 
-export default function StatCard({ title, value, change, changeType = 'positive', icon: Icon, description }) {
+export default function StatCard({ title, value, change, changeType = 'positive', icon: Icon, description, onClick }) {
   return (
-    <Card hover className="relative overflow-hidden">
+    <Card
+      hover
+      className={`relative overflow-hidden ${onClick ? 'cursor-pointer select-none transition-all active:scale-[0.98]' : ''}`}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">

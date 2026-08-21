@@ -100,7 +100,7 @@ export default function OnboardingPage() {
             monthlyDiscretionaryExpenses: existing.monthly_discretionary_expenses ? String(existing.monthly_discretionary_expenses) : prev.monthlyDiscretionaryExpenses,
             currentSavings: existing.current_savings ? String(existing.current_savings) : prev.currentSavings,
             emergencyFund: existing.emergency_fund ? String(existing.emergency_fund) : prev.emergencyFund,
-            monthlySavings: existing.monthly_savings ? String(existing.monthly_savings) : prev.monthlySavings,
+            monthlySavings: existing.monthly_savings ? String(existing.monthlySavings) : prev.monthlySavings,
             hasDebt: Boolean(existing.has_debt),
             totalDebt: existing.total_debt ? String(existing.total_debt) : prev.totalDebt,
             monthlyDebtPayments: existing.monthly_debt_payments ? String(existing.monthly_debt_payments) : prev.monthlyDebtPayments,
