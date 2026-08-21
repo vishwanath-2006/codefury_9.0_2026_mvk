@@ -1,5 +1,6 @@
 import React from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   Activity,
@@ -16,10 +17,27 @@ import {
   Settings,
   User,
   ShieldCheck,
+  LogOut,
   X
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose }) {
+  const { user, profile, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      onClose();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || 'FinLabs User';
+  const displayEmail = user?.email || 'user@finlabs.io';
+
   const mainNav = [
     { name: 'Overview', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Financial Health', path: '/financial-health', icon: Activity },
@@ -151,14 +169,24 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className="p-4 border-t border-slate-100 dark:border-slate-800/80 space-y-3">
           {renderNavGroup(bottomNav)}
 
-          <div className="pt-2 flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0">
-              AD
+          <div className="pt-2 flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
+            <div className="flex items-center gap-2.5 truncate">
+              <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-500/30">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+              <div className="truncate">
+                <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{displayName}</p>
+                <p className="text-[10px] text-slate-400 truncate">{displayEmail}</p>
+              </div>
             </div>
-            <div className="truncate">
-              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">Alex Dev</p>
-              <p className="text-[10px] text-slate-400 truncate">alex@finlabs.io</p>
-            </div>
+
+            <button
+              onClick={handleLogout}
+              className="p-1 text-slate-400 hover:text-rose-500 transition"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </aside>

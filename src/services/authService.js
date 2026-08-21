@@ -1,74 +1,139 @@
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * Sign up a new user with email and password.
+ * Register a new user with Email, Password, and Full Name.
  */
 export async function signUpUser(email, password, fullName) {
+  if (!email || !password || !fullName) {
+    throw new Error('All fields are required.');
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
-        full_name: fullName || 'User'
+        full_name: fullName
       }
     }
   });
 
   if (error) {
-    console.error('Signup error:', error);
-    throw new Error(error.message || 'Failed to sign up.');
+    console.error('Supabase SignUp Error:', error);
+    throw new Error(formatAuthError(error.message));
+  }
+
+  // Ensure profile row exists in case trigger is disabled or delayed
+  if (data?.user) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({
+        id: data.user.id,
+        user_id: data.user.id,
+        full_name: fullName,
+        email: email,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' });
+
+    if (profileError) {
+      console.warn('Profile sync notice:', profileError.message);
+    }
   }
 
   return data;
 }
 
 /**
- * Sign in an existing user with email and password.
+ * Sign in an existing user with Email and Password.
  */
 export async function signInUser(email, password) {
+  if (!email || !password) {
+    throw new Error('Please enter both email and password.');
+  }
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password
   });
 
   if (error) {
-    console.error('Sign in error:', error);
-    throw new Error(error.message || 'Invalid email or password.');
+    console.error('Supabase SignIn Error:', error);
+    throw new Error(formatAuthError(error.message));
   }
 
   return data;
 }
 
 /**
- * Sign out the current user session.
+ * Sign out the currently authenticated user.
  */
 export async function signOutUser() {
   const { error } = await supabase.auth.signOut();
   if (error) {
-    console.error('Sign out error:', error);
-    throw new Error(error.message || 'Failed to sign out.');
+    console.error('Supabase SignOut Error:', error);
+    throw new Error('Failed to sign out.');
   }
 }
 
 /**
- * Get current user profile information including role.
+ * Fetch the authenticated user's profile from public.profiles.
  */
-export async function getCurrentUserProfile() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function getUserProfile(userId) {
+  if (!userId) return null;
 
-  const { data: profile, error } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single();
 
   if (error && error.code !== 'PGRST116') {
-    console.error('Profile fetch error:', error);
+    console.error('Fetch Profile Error:', error);
   }
 
-  return {
-    ...user,
-    profile: profile || { role: 'customer', full_name: user.user_metadata?.full_name || 'Guest' }
-  };
+  return data;
+}
+
+/**
+ * Update the authenticated user's profile.
+ */
+export async function updateUserProfile(userId, updates) {
+  if (!userId) throw new Error('Unauthenticated.');
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Update Profile Error:', error);
+    throw new Error(error.message || 'Failed to update profile.');
+  }
+
+  return data;
+}
+
+/**
+ * User-friendly authentication error message formatter.
+ */
+function formatAuthError(msg) {
+  if (!msg) return 'An unexpected error occurred.';
+  if (msg.includes('User already registered') || msg.includes('email_exists')) {
+    return 'An account with this email already exists. Please log in.';
+  }
+  if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) {
+    return 'Invalid email or password. Please check your credentials.';
+  }
+  if (msg.includes('Password should be at least')) {
+    return 'Password must be at least 6 characters long.';
+  }
+  if (msg.includes('invalid format') || msg.includes('unable to validate email')) {
+    return 'Please enter a valid email address.';
+  }
+  return msg;
 }

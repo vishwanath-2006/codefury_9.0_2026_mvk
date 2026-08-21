@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
@@ -16,6 +17,10 @@ import {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const { profile, user } = useAuth();
+
+  const userName = profile?.full_name || user?.user_metadata?.full_name;
+  const greetingText = userName ? `Good morning, ${userName} 👋` : 'Good morning 👋';
 
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -24,7 +29,7 @@ export default function DashboardPage() {
     <div className="space-y-6 animate-in fade-in duration-150">
       {/* HEADER */}
       <PageHeader
-        title={`${mockUserSummary.greeting} 👋`}
+        title={greetingText}
         subtitle="Here's your financial overview."
         tag="Overview"
       />

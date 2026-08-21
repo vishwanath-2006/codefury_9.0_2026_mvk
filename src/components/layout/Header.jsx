@@ -1,10 +1,25 @@
 import React from 'react';
-import { Menu, Sun, Moon, Search, Bell, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
+import { Menu, Sun, Moon, Search, Bell, Sparkles, LogOut, User } from 'lucide-react';
 import Badge from '../ui/Badge';
 
 export default function Header({ onOpenSidebar }) {
   const { isDark, toggleTheme } = useTheme();
+  const { user, profile, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email || 'User';
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 h-16 flex items-center justify-between px-4 sm:px-6 transition-colors">
@@ -42,13 +57,30 @@ export default function Header({ onOpenSidebar }) {
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        <button
-          className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition relative"
-          title="Notifications"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500" />
-        </button>
+        {user && (
+          <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+            <button
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left"
+              title="View Profile"
+            >
+              <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-500 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-500/30">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
+              <span className="hidden md:inline-block text-xs font-semibold max-w-[100px] truncate text-slate-800 dark:text-slate-200">
+                {displayName}
+              </span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );
