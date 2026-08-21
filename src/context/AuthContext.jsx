@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { getUserProfile, signInUser, signUpUser, signOutUser, updateUserProfile } from '../services/authService';
+import { getUserProfile, signInUser, signInWithGoogle, signUpUser, signOutUser, updateUserProfile } from '../services/authService';
 
 const AuthContext = createContext();
 
@@ -148,6 +148,10 @@ export function AuthProvider({ children }) {
     return guestUser;
   };
 
+  const loginWithGoogle = async () => {
+    return await signInWithGoogle();
+  };
+
   const logout = async () => {
     try {
       await signOutUser();
@@ -184,6 +188,7 @@ export function AuthProvider({ children }) {
         loading,
         isAuthenticated: !!user || isGuest,
         login,
+        loginWithGoogle,
         signup,
         loginAsGuest,
         logout,
