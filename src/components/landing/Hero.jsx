@@ -38,7 +38,7 @@ export default function Hero() {
             size="lg"
             icon={ArrowRight}
             iconPosition="right"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/onboarding')}
             className="w-full sm:w-auto shadow-lg shadow-emerald-500/25"
           >
             Get Started

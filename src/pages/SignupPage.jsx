@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, User, ArrowRight, Sparkles, UserCheck } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 
 export default function SignupPage() {
-  const { signup } = useAuth();
+  const { signup, loginAsGuest } = useAuth();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
@@ -35,12 +35,17 @@ export default function SignupPage() {
 
     try {
       await signup(email, password, fullName);
-      navigate('/dashboard', { replace: true });
+      navigate('/onboarding', { replace: true });
     } catch (err) {
       setErrorMsg(err.message || 'Registration failed. Please check your information.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGuestLogin = () => {
+    loginAsGuest(fullName || (email ? email.split('@')[0] : 'SmartWealth Investor'));
+    navigate('/onboarding', { replace: true });
   };
 
   return (
@@ -63,8 +68,16 @@ export default function SignupPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
         <Card className="p-8 shadow-2xl">
           {errorMsg && (
-            <div className="mb-6 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-semibold text-center">
-              {errorMsg}
+            <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 space-y-2">
+              <p className="text-xs font-semibold text-center">{errorMsg}</p>
+              <button
+                type="button"
+                onClick={handleGuestLogin}
+                className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Bypass Auth & Open 8-Step Onboarding</span>
+              </button>
             </div>
           )}
 
@@ -121,6 +134,18 @@ export default function SignupPage() {
               {loading ? 'Creating Account...' : 'Create FinLabs Account'}
             </Button>
           </form>
+
+          {/* Quick Start / Demo Session Access Button */}
+          <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={handleGuestLogin}
+              className="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700"
+            >
+              <UserCheck className="w-4 h-4 text-emerald-500" />
+              <span>⚡ Quick Start 8-Step Onboarding (Demo Session)</span>
+            </button>
+          </div>
 
           <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-5">
             Already have a FinLabs account?{' '}
