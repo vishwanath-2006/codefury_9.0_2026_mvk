@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, ArrowRight, Zap, Sparkles } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -16,7 +16,7 @@ const GoogleIcon = ({ className }) => (
 );
 
 export default function LoginPage() {
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, enableDevTestMode, isDevTestMode } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -25,6 +25,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = async (e) => {
@@ -36,30 +37,72 @@ export default function LoginPage() {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err) {
-      setErrorMsg(err.message || 'Login failed. Please check your credentials.');
+      setErrorMsg(err.message || 'Invalid email or password credentials.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setErrorMsg('');
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to authenticate with Google.');
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleBypassDevMode = () => {
+    enableDevTestMode();
+    navigate('/financial-health', { replace: true });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-slate-900 dark:text-slate-100 transition-colors">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link to="/" className="inline-flex items-center gap-2.5 mb-4 group">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center font-bold shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <span className="text-2xl font-extrabold tracking-tight">
-            Fin<span className="text-emerald-500">Labs</span>
-          </span>
-        </Link>
-        <h2 className="text-2xl font-bold tracking-tight">Welcome Back</h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-          Log in to access your financial overview & intelligence dashboard
+        <div className="inline-flex items-center gap-2 text-xl font-extrabold tracking-tight text-emerald-500">
+          <ShieldCheck className="w-8 h-8 text-emerald-500" />
+          <span>FinLabs</span>
+        </div>
+        <h2 className="mt-4 text-2xl font-extrabold text-slate-900 dark:text-slate-100">
+          Welcome back to FinLabs
+        </h2>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          Access your secure financial profile and intelligence dashboard
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
+        {/* Local Dev Test Mode Banner (Only rendered in localhost development environment) */}
+        {import.meta.env.DEV && (
+          <div className="mb-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs flex flex-col gap-2">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-amber-500" />
+                Local Dev Test Mode Available
+              </span>
+              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-500">
+                Dev Only
+              </span>
+            </div>
+            <p className="text-slate-600 dark:text-slate-300">
+              Bypass login during local development to inspect Financial Health & Dashboard with sample data.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              icon={Zap}
+              onClick={handleBypassDevMode}
+              className="mt-1 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 justify-center font-bold"
+            >
+              Activate Dev Test Session & Launch /financial-health →
+            </Button>
+          </div>
+        )}
+
         <Card className="p-8 shadow-2xl">
           {errorMsg && (
             <div className="mb-6 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-semibold text-center">
@@ -67,13 +110,36 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Social Google Login Button */}
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={googleLoading || loading}
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs shadow-xs transition disabled:opacity-50"
+            >
+              <GoogleIcon className="w-4 h-4" />
+              <span>{googleLoading ? 'Redirecting to Google...' : 'Continue with Google'}</span>
+            </button>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white dark:bg-slate-900 px-2 text-slate-400 font-mono text-[10px]">
+                  Or sign in with email
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="Email Address"
               type="email"
               required
               icon={Mail}
-              placeholder="alex@finlabs.io"
+              placeholder="user@finlabs.io"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -95,54 +161,19 @@ export default function LoginPage() {
               disabled={loading}
               icon={ArrowRight}
               iconPosition="right"
-              className="w-full justify-center shadow-lg shadow-emerald-500/25"
+              className="w-full justify-center shadow-lg shadow-emerald-500/20 mt-2 font-bold"
             >
-              {loading ? 'Authenticating...' : 'Sign In to FinLabs'}
+              {loading ? 'Authenticating...' : 'Sign In to Account'}
             </Button>
           </form>
 
-          <div className="mt-5 relative flex py-2 items-center">
-            <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-            <span className="flex-shrink mx-4 text-slate-400 text-[10px] font-bold uppercase tracking-wider">or</span>
-            <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
-          </div>
-
-          <div className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              disabled={loading}
-              icon={GoogleIcon}
-              onClick={async () => {
-                try {
-                  setLoading(true);
-                  setErrorMsg('');
-                  await loginWithGoogle();
-                } catch (err) {
-                  setErrorMsg(err.message || 'Google login failed.');
-                  setLoading(false);
-                }
-              }}
-              className="w-full justify-center border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-            >
-              Sign In with Google
-            </Button>
-          </div>
-
-          <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-5">
-            Don't have a FinLabs account?{' '}
+          <div className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+            Don't have an account?{' '}
             <Link to="/signup" className="text-emerald-500 font-bold hover:underline">
-              Create an Account
+              Create free account
             </Link>
           </div>
         </Card>
-
-        <div className="mt-6 text-center text-xs text-slate-400">
-          <Link to="/" className="hover:underline">
-            ← Back to Public Website
-          </Link>
-        </div>
       </div>
     </div>
   );

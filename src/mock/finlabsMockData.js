@@ -1,135 +1,334 @@
-/**
- * FinLabs Mock Data Store
- * Structured for progressive disclosure and future Supabase/Engine integration.
- */
-
 export const mockUserSummary = {
-  name: "Alex Dev",
-  greeting: "Good morning",
-  role: "Investor & Builder",
-  financialHealthScore: 74,
-  healthStatus: "Good",
-  healthMessage: "Your financial health is strong. Increasing your savings rate from 20% to 25% will elevate your score to 85+.",
-  monthlyIncome: 40000,
-  monthlySavings: 8000,
-  monthlyExpenses: 32000,
-  portfolioValue: 482500,
-  portfolioGrowthPct: +12.4,
-  riskProfile: "Moderately Aggressive",
+  monthlyIncome: 50000,
+  monthlyExpenses: 35000,
+  monthlySurplus: 15000,
+  currentSavings: 150000,
+  emergencyFund: 100000,
+  totalDebt: 0,
+  monthlyDebtPayments: 0,
 };
 
-export const mockHealthMetrics = [
-  { metric: "Savings Rate", score: "20%", target: "25%", status: "Good", description: "You save ₹8,000 of your ₹40,000 income.", impact: "Positive" },
-  { metric: "Emergency Fund", score: "4.5 Months", target: "6.0 Months", status: "Moderate", description: "₹1,44,000 accumulated of ₹1,92,000 needed.", impact: "Needs Attention" },
-  { metric: "Debt-to-Income", score: "12%", target: "< 30%", status: "Excellent", description: "Low debt obligations relative to income.", impact: "Positive" },
-  { metric: "Diversification", score: "68 / 100", target: "80 / 100", status: "Good", description: "Balanced across mutual funds, stocks, and fixed income.", impact: "Positive" },
+export const mockHealthMetrics = {
+  overallScore: 74,
+  statusLabel: "Good Financial Baseline",
+  savingsRatePct: "30%",
+  emergencyFundMonths: "4.0 Months",
+  debtToIncomeRatio: "0%",
+  monthlySurplus: "₹15,000 / mo",
+};
+
+export const mockHealthBreakdown = [
+  { metric: "Savings Rate", score: 85, weight: "25%", status: "Optimal" },
+  { metric: "Emergency Reserves", score: 70, weight: "25%", status: "Moderate Buffer" },
+  { metric: "Debt Burden", score: 100, weight: "20%", status: "Zero Debt" },
+  { metric: "Insurance Protection", score: 80, weight: "15%", status: "Covered" },
+  { metric: "Goal Progress", score: 65, weight: "15%", status: "On Track" },
 ];
 
-export const mockStrengthsAndWeaknesses = {
-  strengths: [
-    "Controlled debt-to-income ratio below 15%",
-    "Consistent monthly equity SIP contributions",
-    "Positive net cash flow margin (+20%)"
-  ],
-  improvements: [
-    "Emergency fund is 1.5 months below the recommended 6-month buffer",
-    "Tech sector over-concentration in direct equity holdings",
-    "Unutilized ₹25,000 under Section 80C tax savings"
-  ]
-};
-
-export const mockExpensesBreakdown = {
-  totalMonthly: 32000,
-  categories: [
-    { name: "Housing & Rent", amount: 14000, percentage: 44, color: "#6366f1" },
-    { name: "Food & Dining", amount: 6500, percentage: 20, color: "#10b981" },
-    { name: "Utilities & Bills", amount: 4000, percentage: 13, color: "#f59e0b" },
-    { name: "Transport & Commute", amount: 3500, percentage: 11, color: "#06b6d4" },
-    { name: "Entertainment & Subscriptions", amount: 4000, percentage: 12, color: "#ec4899" },
-  ],
-  recentTrends: [
-    { month: "Jan", amount: 31200 },
-    { month: "Feb", amount: 33500 },
-    { month: "Mar", amount: 32000 },
-  ]
-};
-
 export const mockTopGoals = [
-  {
-    id: "g1",
-    title: "Emergency Reserve Fund",
-    targetAmount: 192000,
-    currentAmount: 144000,
-    deadline: "Dec 2026",
-    category: "Safety",
-    progressPct: 75,
-    monthlyContribution: 4000,
-  },
-  {
-    id: "g2",
-    title: "Home Downpayment",
-    targetAmount: 1500000,
-    currentAmount: 630000,
-    deadline: "Jun 2028",
-    category: "Real Estate",
-    progressPct: 42,
-    monthlyContribution: 12000,
-  },
-  {
-    id: "g3",
-    title: "Retirement Corpus 2045",
-    targetAmount: 10000000,
-    currentAmount: 2800000,
-    deadline: "Dec 2045",
-    category: "Long Term",
-    progressPct: 28,
-    monthlyContribution: 8000,
-  },
+  { id: "g1", title: "Emergency Reserve Fund", category: "Safety", targetAmount: 200000, currentAmount: 100000, deadline: "2026-12-31", priority: "High" },
+  { id: "g2", title: "Home Downpayment", category: "Real Estate", targetAmount: 1000000, currentAmount: 300000, deadline: "2028-06-30", priority: "High" },
 ];
 
 export const mockPortfolioAllocation = [
-  { name: "Mutual Funds (SIP)", value: 265375, percentage: 55, color: "#10b981" },
-  { name: "Direct Equity Stocks", value: 144750, percentage: 30, color: "#6366f1" },
-  { name: "Fixed Income & Gold", value: 72375, percentage: 15, color: "#f59e0b" },
+  { name: "Equity Mutual Funds", pct: 45, color: "#10b981" },
+  { name: "Direct Equities", pct: 25, color: "#3b82f6" },
+  { name: "Fixed Income / FDs", pct: 18, color: "#f59e0b" },
+  { name: "Gold Reserves", pct: 7, color: "#eab308" },
+  { name: "Cash Buffer", pct: 5, color: "#64748b" },
 ];
 
 export const mockPrimaryInsight = {
-  title: "Savings Rate Optimization Opportunity",
-  description: "Your current savings rate is 20% (₹8,000/mo). Increasing it to 25% (₹10,000/mo) reduces your Home Downpayment goal timeline by 14 months.",
-  badge: "Primary Action",
-  impact: "+14 Months Earlier",
-  actionRoute: "/tools/suitability"
+  title: "Optimize Surplus Allocation into SIP",
+  description: "Your monthly surplus is ₹15,000. Allocating ₹10,000 into Nifty 50 Index Fund could generate ₹18.5 Lakhs over 7 years.",
+  action: "Explore SIP Screener",
+  category: "Investments",
+  priority: "High",
 };
 
+export const mockExpensesBreakdown = [
+  { category: "Housing", amount: 22000, pct: "63%" },
+  { category: "Food & Household", amount: 8500, pct: "24%" },
+  { category: "Utilities", amount: 3200, pct: "9%" },
+  { category: "Subscriptions", amount: 1499, pct: "4%" },
+];
+
 export const mockSuitabilityInsights = [
+  { title: "Risk Appetite Match", status: "Balanced Growth", pct: "92%" },
+  { title: "Time Horizon Alignment", status: "5-10 Years", pct: "96%" },
+  { title: "Liquidity Requirement", status: "Moderate Reserve", pct: "88%" },
+];
+
+export const modulePlaceholders = {
+  title: "FinLabs Module Initialized",
+  subtitle: "Component container ready.",
+};
+
+export const mockFinancialHealthHistory = [
+  { date: "Jan 2026", score: 68 },
+  { date: "Feb 2026", score: 71 },
+  { date: "Mar 2026", score: 74 },
+];
+
+export const mockExpenses = [
+  { id: "e1", title: "House Rent & Maintenance", category: "Housing", amount: 22000, date: "2026-08-01", type: "Essential" },
+  { id: "e2", title: "Organic Groceries & Supplies", category: "Food & Household", amount: 8500, date: "2026-08-03", type: "Essential" },
+  { id: "e3", title: "Electricity & Fiber Internet", category: "Utilities", amount: 3200, date: "2026-08-05", type: "Essential" },
+  { id: "e4", title: "Weekend Dining & Outing", category: "Entertainment", amount: 4800, date: "2026-08-10", type: "Discretionary" },
+  { id: "e5", title: "Fuel & Cab Fares", category: "Transport", amount: 4200, date: "2026-08-12", type: "Essential" },
+  { id: "e6", title: "Streaming & Cloud Subscriptions", category: "Subscriptions", amount: 1499, date: "2026-08-15", type: "Discretionary" },
+];
+
+export const mockGoals = [
+  { id: "g1", title: "Emergency Reserve Fund", category: "Safety", targetAmount: 200000, currentAmount: 100000, deadline: "2026-12-31", priority: "High" },
+  { id: "g2", title: "Home Downpayment", category: "Real Estate", targetAmount: 1000000, currentAmount: 300000, deadline: "2028-06-30", priority: "High" },
+  { id: "g3", title: "EV SUV Upgrade", category: "Vehicle", targetAmount: 400000, currentAmount: 80000, deadline: "2027-03-31", priority: "Medium" },
+  { id: "g4", title: "Europe Vacation", category: "Travel", targetAmount: 250000, currentAmount: 45000, deadline: "2027-09-30", priority: "Low" },
+];
+
+export const mockPortfolioSummary = {
+  totalWealth: 1540000,
+  monthlyChange: "+₹38,200 (+2.5%)",
+  assetAllocation: [
+    { name: "Equity Mutual Funds", pct: 45, color: "#10b981" },
+    { name: "Direct Indian Equities", pct: 25, color: "#3b82f6" },
+    { name: "Fixed Income / FDs", pct: 18, color: "#f59e0b" },
+    { name: "Gold Reserves", pct: 7, color: "#eab308" },
+    { name: "Cash Liquid Buffer", pct: 5, color: "#64748b" },
+  ],
+};
+
+export const mockAiRecommendations = [
   {
-    id: "s1",
-    title: "SIP Top-up Opportunity",
-    description: "Increasing your equity SIP by ₹2,000/mo aligns perfectly with your 2028 Home Downpayment goal.",
-    type: "positive",
-    impact: "+₹3.4L projected growth",
+    id: "rec1",
+    title: "Optimize Surplus Allocation into SIP",
+    description: "Your monthly surplus is ₹15,000. Allocating ₹10,000 into Nifty 50 Index Fund could generate ₹18.5 Lakhs over 7 years.",
+    action: "Explore SIP Screener",
+    category: "Investments",
+    priority: "High",
   },
   {
-    id: "s2",
-    title: "Over-allocation Alert",
-    description: "You have 42% exposure in tech sector stocks. Consider balancing with index funds.",
-    type: "warning",
-    impact: "Risk Mitigation",
+    id: "rec2",
+    title: "Build Emergency Coverage Buffer",
+    description: "Your current reserve covers 4.0 months. Reach 6 months (₹2.1 Lakhs) before aggressive small-cap exposure.",
+    action: "View Goals",
+    category: "Safety",
+    priority: "Medium",
   },
   {
-    id: "s3",
+    id: "rec3",
     title: "Tax Saving Buffer",
     description: "You have ₹25,000 remaining under ELSS / 80C tax optimization for FY 2026.",
-    type: "info",
-    impact: "Save ₹7,800 tax",
+    action: "Save ₹7,800 tax",
+    category: "Tax Optimization",
+    priority: "Medium",
   },
 ];
 
 export const mockMutualFunds = [
-  { id: "mf1", name: "Nifty 50 Index Fund Direct-G", category: "Large Cap Index", rating: 5, cagr3Yr: "15.4%", minSip: 500, risk: "Moderate", suitability: "98% Match" },
-  { id: "mf2", name: "Parag Parikh Flexi Cap Fund", category: "Flexi Cap", rating: 5, cagr3Yr: "18.2%", minSip: 1000, risk: "Moderately High", suitability: "94% Match" },
-  { id: "mf3", name: "SBI Small Cap Fund Direct", category: "Small Cap", rating: 4, cagr3Yr: "22.6%", minSip: 500, risk: "High", suitability: "82% Match" },
-  { id: "mf4", name: "HDFC Corporate Bond Fund", category: "Debt", rating: 4, cagr3Yr: "7.1%", minSip: 500, risk: "Low", suitability: "90% Match" },
+  {
+    id: "mf1",
+    name: "Nifty 50 Index Fund Direct-G",
+    fundHouse: "UTI / Index Funds",
+    category: "Large Cap Index",
+    rating: 5,
+    nav: "₹248.50",
+    cagr1Yr: "18.4%",
+    cagr3Yr: "15.4%",
+    cagr5Yr: "16.1%",
+    minSip: 500,
+    risk: "Moderate",
+    expenseRatio: "0.12%",
+    aum: "₹16,450 Cr",
+    exitLoad: "Nil",
+    sharpeRatio: "1.24",
+    suitability: "98% Match",
+    sectors: [
+      { name: "Financial Services", pct: 33.5 },
+      { name: "Information Technology", pct: 14.2 },
+      { name: "Oil, Gas & Consumable", pct: 11.8 },
+      { name: "Consumer Goods", pct: 9.4 },
+      { name: "Automobile & Auto", pct: 6.8 },
+    ],
+    navHistory: [
+      { month: "Jan", nav: 210 },
+      { month: "Mar", nav: 218 },
+      { month: "May", nav: 226 },
+      { month: "Jul", nav: 234 },
+      { month: "Sep", nav: 240 },
+      { month: "Nov", nav: 245 },
+      { month: "Current", nav: 248.5 },
+    ]
+  },
+  {
+    id: "mf2",
+    name: "Parag Parikh Flexi Cap Fund",
+    fundHouse: "PPFAS Mutual Fund",
+    category: "Flexi Cap",
+    rating: 5,
+    nav: "₹74.20",
+    cagr1Yr: "22.8%",
+    cagr3Yr: "18.2%",
+    cagr5Yr: "21.5%",
+    minSip: 1000,
+    risk: "Moderately High",
+    expenseRatio: "0.58%",
+    aum: "₹62,100 Cr",
+    exitLoad: "2% if redeemed within 365 days",
+    sharpeRatio: "1.48",
+    suitability: "94% Match",
+    sectors: [
+      { name: "Financial Services", pct: 28.4 },
+      { name: "IT & US Tech Titans", pct: 19.2 },
+      { name: "Automobile", pct: 12.1 },
+      { name: "Capital Goods", pct: 8.9 },
+      { name: "FMCG", pct: 7.5 },
+    ],
+    navHistory: [
+      { month: "Jan", nav: 58 },
+      { month: "Mar", nav: 61 },
+      { month: "May", nav: 65 },
+      { month: "Jul", nav: 68 },
+      { month: "Sep", nav: 71 },
+      { month: "Nov", nav: 73 },
+      { month: "Current", nav: 74.2 },
+    ]
+  },
+  {
+    id: "mf3",
+    name: "SBI Small Cap Fund Direct",
+    fundHouse: "SBI Mutual Fund",
+    category: "Small Cap",
+    rating: 4,
+    nav: "₹162.80",
+    cagr1Yr: "26.4%",
+    cagr3Yr: "22.6%",
+    cagr5Yr: "24.1%",
+    minSip: 500,
+    risk: "High",
+    expenseRatio: "0.69%",
+    aum: "₹28,900 Cr",
+    exitLoad: "1% if redeemed within 1 year",
+    sharpeRatio: "1.18",
+    suitability: "82% Match",
+    sectors: [
+      { name: "Capital Goods", pct: 22.1 },
+      { name: "Consumer Durables", pct: 16.4 },
+      { name: "Chemicals & Materials", pct: 14.8 },
+      { name: "Healthcare & Pharma", pct: 11.2 },
+      { name: "Textiles", pct: 8.5 },
+    ],
+    navHistory: [
+      { month: "Jan", nav: 120 },
+      { month: "Mar", nav: 129 },
+      { month: "May", nav: 138 },
+      { month: "Jul", nav: 147 },
+      { month: "Sep", nav: 154 },
+      { month: "Nov", nav: 159 },
+      { month: "Current", nav: 162.8 },
+    ]
+  },
+  {
+    id: "mf4",
+    name: "SBI Bluechip Fund Direct-G",
+    fundHouse: "SBI Mutual Fund",
+    category: "Large Cap Index",
+    rating: 4,
+    nav: "₹92.40",
+    cagr1Yr: "16.8%",
+    cagr3Yr: "14.9%",
+    cagr5Yr: "15.8%",
+    minSip: 500,
+    risk: "Moderate",
+    expenseRatio: "0.82%",
+    aum: "₹44,200 Cr",
+    exitLoad: "1% if redeemed within 1 year",
+    sharpeRatio: "1.08",
+    suitability: "91% Match",
+    sectors: [
+      { name: "Financial Services", pct: 36.2 },
+      { name: "Automobile", pct: 11.5 },
+      { name: "Oil & Gas", pct: 10.4 },
+      { name: "IT Services", pct: 9.8 },
+      { name: "Construction", pct: 7.6 },
+    ],
+    navHistory: [
+      { month: "Jan", nav: 76 },
+      { month: "Mar", nav: 80 },
+      { month: "May", nav: 83 },
+      { month: "Jul", nav: 86 },
+      { month: "Sep", nav: 89 },
+      { month: "Nov", nav: 91 },
+      { month: "Current", nav: 92.4 },
+    ]
+  },
+  {
+    id: "mf5",
+    name: "Quant Small Cap Fund Direct-G",
+    fundHouse: "Quant Mutual Fund",
+    category: "Small Cap",
+    rating: 5,
+    nav: "₹258.10",
+    cagr1Yr: "34.2%",
+    cagr3Yr: "28.5%",
+    cagr5Yr: "31.2%",
+    minSip: 1000,
+    risk: "High",
+    expenseRatio: "0.77%",
+    aum: "₹21,400 Cr",
+    exitLoad: "1% if redeemed within 15 days",
+    sharpeRatio: "1.62",
+    suitability: "86% Match",
+    sectors: [
+      { name: "Energy & Power", pct: 19.8 },
+      { name: "Financial Services", pct: 17.4 },
+      { name: "Metals & Mining", pct: 15.1 },
+      { name: "Healthcare", pct: 12.6 },
+      { name: "Infrastructure", pct: 10.2 },
+    ],
+    navHistory: [
+      { month: "Jan", nav: 180 },
+      { month: "Mar", nav: 198 },
+      { month: "May", nav: 215 },
+      { month: "Jul", nav: 232 },
+      { month: "Sep", nav: 246 },
+      { month: "Nov", nav: 252 },
+      { month: "Current", nav: 258.1 },
+    ]
+  },
+  {
+    id: "mf6",
+    name: "HDFC Corporate Bond Fund",
+    fundHouse: "HDFC Mutual Fund",
+    category: "Debt",
+    rating: 4,
+    nav: "₹29.80",
+    cagr1Yr: "7.8%",
+    cagr3Yr: "7.1%",
+    cagr5Yr: "7.6%",
+    minSip: 500,
+    risk: "Low",
+    expenseRatio: "0.34%",
+    aum: "₹27,800 Cr",
+    exitLoad: "Nil",
+    sharpeRatio: "2.10",
+    suitability: "90% Match",
+    sectors: [
+      { name: "AAA Corporate Bonds", pct: 72.4 },
+      { name: "Sovereign G-Secs", pct: 18.2 },
+      { name: "Banking Bonds", pct: 6.4 },
+      { name: "Cash Reserves", pct: 3.0 },
+    ],
+    navHistory: [
+      { month: "Jan", nav: 27.5 },
+      { month: "Mar", nav: 27.9 },
+      { month: "May", nav: 28.3 },
+      { month: "Jul", nav: 28.8 },
+      { month: "Sep", nav: 29.2 },
+      { month: "Nov", nav: 29.5 },
+      { month: "Current", nav: 29.8 },
+    ]
+  },
 ];
 
 export const mockStocks = [

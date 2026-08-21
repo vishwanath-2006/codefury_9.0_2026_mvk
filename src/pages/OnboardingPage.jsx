@@ -71,7 +71,7 @@ export default function OnboardingPage() {
     ],
     hasInvestments: true,
     investmentCategories: ['Mutual Funds', 'Stocks'],
-    investmentExperience: 'Some experience',
+    investmentExperience: 'Some Experience',
     hasHealthInsurance: true,
     hasLifeInsurance: true,
     hasEmergencyFund: true,
@@ -704,6 +704,54 @@ export default function OnboardingPage() {
 
             <hr className="border-slate-100 dark:border-slate-800 my-6" />
 
+            {/* NEW QUESTION: WHAT IS YOUR INVESTING EXPERIENCE? */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                What is your investing experience?
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                {[
+                  {
+                    id: 'Beginner',
+                    title: '🔰 Beginner',
+                    subtitle: "I'm new to investing"
+                  },
+                  {
+                    id: 'Some Experience',
+                    title: '📈 Some Experience',
+                    subtitle: "I've been investing for a while"
+                  },
+                  {
+                    id: 'Experienced',
+                    title: '🚀 Experienced',
+                    subtitle: 'I understand investing and manage my investments confidently'
+                  }
+                ].map((item) => {
+                  const active =
+                    formData.investmentExperience === item.id ||
+                    (item.id === 'Some Experience' && formData.investmentExperience === 'Some experience');
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleChange('investmentExperience', item.id)}
+                      className={`p-3.5 rounded-xl text-xs font-bold transition border text-left flex flex-col justify-between ${
+                        active
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500 font-extrabold shadow-xs'
+                          : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-extrabold">{item.title}</span>
+                        {active && <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-normal leading-relaxed">{item.subtitle}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Investments Progressive Disclosure */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Do you currently invest?</label>
@@ -754,33 +802,6 @@ export default function OnboardingPage() {
                             }`}
                           >
                             {active ? '✓ ' : '+ '}{cat}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Investment Experience Level</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {[
-                        { id: 'Beginner', label: '🔰 Beginner (New to investing)' },
-                        { id: 'Some experience', label: '📈 Some Experience (1–3 yrs)' },
-                        { id: 'Experienced', label: '🚀 Experienced (3+ yrs)' },
-                      ].map((item) => {
-                        const active = formData.investmentExperience === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => handleChange('investmentExperience', item.id)}
-                            className={`p-2.5 rounded-xl text-xs font-bold border transition text-center ${
-                              active
-                                ? 'bg-emerald-500 text-white border-emerald-500 font-extrabold'
-                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {item.label}
                           </button>
                         );
                       })}

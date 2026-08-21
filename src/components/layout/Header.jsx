@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useOnboarding } from '../../context/OnboardingContext';
-import { Menu, Sun, Moon, Search, Sparkles, LogOut, Loader2, ArrowRight } from 'lucide-react';
+import { Menu, Sun, Moon, Search, Sparkles, LogOut, Loader2, ArrowRight, Zap } from 'lucide-react';
 import Badge from '../ui/Badge';
 import { searchSchemes } from '../../services/mfService';
 
@@ -24,7 +24,7 @@ const SEARCHABLE_PAGES = [
 
 export default function Header({ onOpenSidebar }) {
   const { isDark, toggleTheme } = useTheme();
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout, isDevTestMode, disableDevTestMode } = useAuth();
   const { formData } = useOnboarding();
   const navigate = useNavigate();
 
@@ -47,166 +47,140 @@ export default function Header({ onOpenSidebar }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Filter routes and query live Mutual Funds
+  // Debounced search logic
   useEffect(() => {
-    if (!query || query.trim().length < 2) {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) {
       setSearchResults([]);
       setMfResults([]);
       setLoading(false);
+      setShowDropdown(false);
       return;
     }
 
-    const cleanQuery = query.toLowerCase().trim();
+    setShowDropdown(true);
 
-    // 1. Local routes matching
-    const filteredPages = SEARCHABLE_PAGES.filter(page =>
-      page.name.toLowerCase().includes(cleanQuery) ||
-      page.category.toLowerCase().includes(cleanQuery)
+    // Filter local navigation pages
+    const pageMatches = SEARCHABLE_PAGES.filter(
+      (item) => item.name.toLowerCase().includes(trimmed) || item.category.toLowerCase().includes(trimmed)
     );
-    setSearchResults(filteredPages);
+    setSearchResults(pageMatches);
 
-    // 2. Live Mutual Fund API matching (minimum 3 chars)
-    if (cleanQuery.length >= 3) {
+    // Search live Mutual Funds via mfService if length >= 3
+    if (trimmed.length >= 3) {
       setLoading(true);
       const timer = setTimeout(async () => {
         try {
-          const mfs = await searchSchemes(cleanQuery);
-          
-          // Prioritize active direct growth schemes
-          const sorted = [...(mfs || [])].sort((a, b) => {
-            const aName = a.schemeName.toLowerCase();
-            const bName = b.schemeName.toLowerCase();
-            const aDG = aName.includes('direct') && aName.includes('growth');
-            const bDG = bName.includes('direct') && bName.includes('growth');
-            if (aDG && !bDG) return -1;
-            if (!aDG && bDG) return 1;
-            return 0;
-          });
-          
-          setMfResults(sorted.slice(0, 5)); // Show top 5 suggestions
+          const results = await searchSchemes(trimmed);
+          setMfResults(results.slice(0, 5)); // top 5 schemes
         } catch (err) {
-          console.error('Header global search failed:', err);
+          console.error('Header search error:', err);
         } finally {
           setLoading(false);
         }
-      }, 350);
+      }, 300);
 
       return () => clearTimeout(timer);
     } else {
       setMfResults([]);
+      setLoading(false);
     }
   }, [query]);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (err) {
-      console.error('Logout failed:', err);
-    }
-  };
-
   const handleSelectPage = (path) => {
-    navigate(path);
-    setQuery('');
     setShowDropdown(false);
+    setQuery('');
+    navigate(path);
   };
 
   const handleSelectMF = (schemeCode, schemeName) => {
-    navigate(`/investments/mutual-funds?selectCode=${schemeCode}&selectName=${encodeURIComponent(schemeName)}`);
-    setQuery('');
     setShowDropdown(false);
+    setQuery('');
+    navigate(`/investments/mutual-funds?selectCode=${schemeCode}&selectName=${encodeURIComponent(schemeName)}`);
   };
 
-  const displayName = formData.fullName || profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'FinLabs User';
-  const avatarUrl = formData.profilePhoto || profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+  const getInitials = (name) => {
+    if (!name) return 'FL';
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const displayName = profile?.full_name || formData?.fullName || user?.user_metadata?.full_name || 'FinLabs User';
+  const displayEmail = user?.email || 'authenticated.user@finlabs.io';
 
   return (
-    <header className="sticky top-0 z-35 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 h-16 flex items-center justify-between px-4 sm:px-6 transition-colors">
-      
-      {/* Left Menu Drawer & Search */}
+    <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-4 sm:px-6 flex items-center justify-between transition-colors">
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenSidebar}
-          className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
+          className="lg:hidden p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Global Search Bar Engine */}
-        <div ref={dropdownRef} className="relative hidden sm:block w-64 md:w-80">
-          <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search goals, funds, stocks, calculators..."
-            value={query}
-            onFocus={() => setShowDropdown(true)}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setShowDropdown(true);
-            }}
-            className="w-full bg-slate-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white dark:focus:bg-slate-950 transition"
-          />
+        {/* Global Search Bar */}
+        <div className="relative w-48 sm:w-80" ref={dropdownRef}>
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => query.trim() && setShowDropdown(true)}
+              placeholder="Search apps, funds (e.g. Parag, SBI)..."
+              className="w-full bg-slate-100 dark:bg-slate-800/70 text-slate-900 dark:text-slate-100 text-xs rounded-xl pl-9 pr-8 py-2 border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none transition"
+            />
+            {loading && <Loader2 className="w-3.5 h-3.5 text-emerald-500 animate-spin absolute right-3 top-1/2 -translate-y-1/2" />}
+          </div>
 
-          {/* Search Dropdown Panel */}
-          {showDropdown && (query.trim().length >= 2) && (
-            <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-xl shadow-2xl overflow-hidden z-50 text-xs text-slate-900 dark:text-slate-100 max-h-96 overflow-y-auto no-scrollbar">
-              
-              {/* Pages & Features Matches */}
+          {/* Search Dropdown */}
+          {showDropdown && (
+            <div className="absolute left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3 z-50 max-h-96 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+              {/* App Pages Matches */}
               {searchResults.length > 0 && (
-                <div className="p-2 border-b border-slate-100 dark:border-slate-800/80">
-                  <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">Pages & Tools</div>
-                  {searchResults.map((item) => (
-                    <button
-                      key={item.path}
-                      onClick={() => handleSelectPage(item.path)}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 flex justify-between items-center transition"
-                    >
-                      <span className="font-semibold">{item.name}</span>
-                      <span className="text-[9px] text-slate-400 uppercase font-mono">{item.category}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Live Mutual Funds Matches */}
-              <div className="p-2">
-                <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-                  <span>Mutual Funds (Live)</span>
-                  {loading && <Loader2 className="w-3 h-3 text-emerald-500 animate-spin" />}
-                </div>
-
-                {mfResults.length > 0 ? (
-                  <div className="space-y-0.5">
-                    {mfResults.map((item) => (
+                <div className="mb-3">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block px-2 mb-1.5">Navigation Features</span>
+                  <div className="space-y-1">
+                    {searchResults.map((item) => (
                       <button
-                        key={item.schemeCode}
-                        onClick={() => handleSelectMF(item.schemeCode, item.schemeName)}
-                        className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 flex items-start gap-1.5 group transition"
+                        key={item.path}
+                        onClick={() => handleSelectPage(item.path)}
+                        className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 transition flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300"
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-slate-700 dark:text-slate-200 group-hover:text-emerald-500 truncate transition-colors">
-                            {item.schemeName}
-                          </div>
-                          <div className="text-[9px] text-slate-400 font-mono">Code: {item.schemeCode}</div>
-                        </div>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <span>{item.name}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">{item.category}</span>
                       </button>
                     ))}
                   </div>
-                ) : (
-                  !loading && (
-                    <div className="px-2.5 py-2 text-slate-500 dark:text-slate-400 italic">
-                      {query.trim().length >= 3 ? 'No funds matching query' : 'Type 3+ characters to search live'}
-                    </div>
-                  )
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* No matches fallback */}
+              {/* Mutual Funds Live Matches */}
+              {mfResults.length > 0 && (
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block px-2 mb-1.5">Mutual Funds (Live AMFI)</span>
+                  <div className="space-y-1">
+                    {mfResults.map((fund) => (
+                      <button
+                        key={fund.schemeCode}
+                        onClick={() => handleSelectMF(fund.schemeCode, fund.schemeName)}
+                        className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-emerald-500/10 hover:text-emerald-500 transition flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300"
+                      >
+                        <span className="truncate pr-2">{fund.schemeName}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {searchResults.length === 0 && mfResults.length === 0 && !loading && (
-                <div className="p-4 text-center text-slate-500 dark:text-slate-400">
-                  No matching tools or mutual funds found.
+                <div className="py-4 text-center text-xs text-slate-400 font-mono">
+                  No matching apps or schemes found for "{query}"
                 </div>
               )}
             </div>
@@ -214,8 +188,22 @@ export default function Header({ onOpenSidebar }) {
         </div>
       </div>
 
-      {/* Right Controls */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-3">
+        {/* Dev Test Mode Badge */}
+        {isDevTestMode && (
+          <button
+            onClick={() => {
+              disableDevTestMode();
+              navigate('/login');
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 text-[10px] font-bold hover:bg-amber-500/30 transition"
+            title="Dev Test Mode Active. Click to exit."
+          >
+            <Zap className="w-3 h-3 text-amber-500" />
+            <span>DEV TEST MODE</span>
+          </button>
+        )}
+
         <Badge variant="brand" className="hidden sm:inline-flex gap-1 text-[10px]">
           <Sparkles className="w-3 h-3 text-emerald-500" />
           FinLabs v1.0
@@ -223,43 +211,28 @@ export default function Header({ onOpenSidebar }) {
 
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-          title="Toggle Light/Dark Mode"
+          className="p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          aria-label="Toggle Dark Mode"
         >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
         </button>
 
         <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
-          <button
-            onClick={() => navigate('/profile')}
-            className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-left"
-            title="View Profile"
-          >
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt={displayName}
-                className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500 shrink-0"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-500 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-500/30">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <span className="hidden md:inline-block text-xs font-semibold max-w-[120px] truncate text-slate-800 dark:text-slate-200">
-              {displayName}
-            </span>
-          </button>
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-500 font-bold flex items-center justify-center text-xs border border-emerald-500/30">
+            {getInitials(displayName)}
+          </div>
+          <div className="hidden sm:block text-left text-xs">
+            <span className="font-bold text-slate-900 dark:text-slate-100 block leading-none">{displayName}</span>
+            <span className="text-[10px] text-slate-400 font-mono truncate max-w-[120px] block mt-0.5">{displayEmail}</span>
+          </div>
 
-          {user && (
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition"
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            onClick={logout}
+            className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition ml-1"
+            title="Log Out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </header>
