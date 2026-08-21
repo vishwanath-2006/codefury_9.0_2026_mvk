@@ -163,7 +163,33 @@ export default function MutualFundsPage() {
     setSearchLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const results = await searchSchemes(trimmed);
+        let results = [];
+        const popularAMCs = ['sbi', 'hdfc', 'axis', 'quant', 'icici', 'nippon', 'kotak', 'tata', 'mirae', 'uti', 'dsp', 'ppfas', 'parag'];
+        
+        if (popularAMCs.includes(trimmed)) {
+          // Fetch multiple combinations in parallel to retrieve active equity/small/blue/flexi direct growth plans
+          const subQueries = [
+            `${trimmed} direct growth`,
+            `${trimmed} small`,
+            `${trimmed} blue`,
+            `${trimmed} flexi`
+          ];
+          const queryResList = await Promise.all(
+            subQueries.map(q => searchSchemes(q).catch(() => []))
+          );
+          // Flatten and de-duplicate by schemeCode
+          const seen = new Set();
+          for (const list of queryResList) {
+            for (const item of list) {
+              if (!seen.has(item.schemeCode)) {
+                seen.add(item.schemeCode);
+                results.push(item);
+              }
+            }
+          }
+        } else {
+          results = await searchSchemes(trimmed);
+        }
         
         // Initial name-based heuristic filter to clean up raw results list
         const filtered = (results || []).filter(item => {

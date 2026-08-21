@@ -71,8 +71,52 @@ export default function Header({ onOpenSidebar }) {
       setLoading(true);
       const timer = setTimeout(async () => {
         try {
-          const results = await searchSchemes(trimmed);
-          setMfResults(results.slice(0, 5)); // top 5 schemes
+          let results = [];
+          const popularAMCs = ['sbi', 'hdfc', 'axis', 'quant', 'icici', 'nippon', 'kotak', 'tata', 'mirae', 'uti', 'dsp', 'ppfas', 'parag'];
+          
+          if (popularAMCs.includes(trimmed)) {
+            const subQueries = [
+              `${trimmed} direct growth`,
+              `${trimmed} small`,
+              `${trimmed} blue`,
+              `${trimmed} flexi`
+            ];
+            const queryResList = await Promise.all(
+              subQueries.map(q => searchSchemes(q).catch(() => []))
+            );
+            const seen = new Set();
+            for (const list of queryResList) {
+              for (const item of list) {
+                if (!seen.has(item.schemeCode)) {
+                  seen.add(item.schemeCode);
+                  results.push(item);
+                }
+              }
+            }
+          } else {
+            results = await searchSchemes(trimmed);
+          }
+
+          // Filter out regular, dividend, idcw, legacy, payout, and discontinued schemes
+          const filtered = (results || []).filter(item => {
+            const name = item.schemeName.toLowerCase();
+            const isGrowth = name.includes('growth');
+            const isObsoleteOrRegular = name.includes('regular') || name.includes('dividend') || name.includes('idcw') || name.includes('payout') || name.includes('reinvestment') || name.includes('legacy') || name.includes('discontinued') || name.includes('suspended') || name.includes('fmp') || name.includes('institutional') || name.includes('premium') || name.includes('retail');
+            return isGrowth && !isObsoleteOrRegular;
+          });
+
+          // Prioritize active "Direct Plan - Growth" or "Growth" schemes
+          const sorted = filtered.sort((a, b) => {
+            const aName = a.schemeName.toLowerCase();
+            const bName = b.schemeName.toLowerCase();
+            const aDG = aName.includes('direct') && aName.includes('growth');
+            const bDG = bName.includes('direct') && bName.includes('growth');
+            if (aDG && !bDG) return -1;
+            if (!aDG && bDG) return 1;
+            return 0;
+          });
+
+          setMfResults(sorted.slice(0, 5)); // top 5 schemes
         } catch (err) {
           console.error('Header search error:', err);
         } finally {
