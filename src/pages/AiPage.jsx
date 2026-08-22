@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth, resolveUserName } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -36,8 +36,28 @@ export default function AiPage() {
   const [inputQuery, setInputQuery] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Chat scroll refs
+  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
+
   // Financial Analysis state for Action Plan
   const [userAnalysis, setUserAnalysis] = useState(null);
+
+  // Auto-scroll to bottom of chat container whenever messages or loading state change
+  const scrollToBottom = (behavior = 'smooth') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior,
+        block: 'end'
+      });
+    } else if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  };
+
+  useEffect(() => {
+    scrollToBottom('smooth');
+  }, [messages, loading]);
 
   // Load user financial context for Action Plan on mount
   useEffect(() => {
@@ -204,7 +224,7 @@ export default function AiPage() {
 
       {/* Chat Messages Container */}
       <Card className="min-h-[380px] max-h-[500px] flex flex-col justify-between p-4 overflow-hidden">
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
           {messages.map((msg, idx) => (
             <div
               key={idx}
@@ -244,6 +264,9 @@ export default function AiPage() {
               </div>
             </div>
           )}
+
+          {/* Bottom auto-scroll anchor */}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Bar */}
@@ -265,7 +288,7 @@ export default function AiPage() {
           <button
             type="submit"
             disabled={loading || !inputQuery.trim()}
-            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
           >
             <span>Ask</span>
             <Send className="w-3.5 h-3.5" />

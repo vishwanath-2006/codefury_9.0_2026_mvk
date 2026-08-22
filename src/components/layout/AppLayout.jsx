@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useOnboarding } from '../../context/OnboardingContext';
 import OnboardingEntryModal from '../onboarding/OnboardingEntryModal';
+import FloatingAiWidget from '../common/FloatingAiWidget';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -44,6 +45,9 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Floating FinLabs AI Robot Widget */}
+      <FloatingAiWidget />
 
       {/* Universal Onboarding Entry Modal Popup */}
       <OnboardingEntryModal
