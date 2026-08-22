@@ -10,23 +10,47 @@ export default function ComparisonBarChart({
   unit = '%',
   prefix = '',
   isReturn = false,
+  isValuation = false,
   theme = 'emerald'
 }) {
   if (!data || data.length === 0) return null;
 
-  // Extract numeric values for scaling (trying numericKey -> metricKey -> parse string)
-  const numValues = data.map((d) => {
+  // Check if dataset contains mixed asset types for valuation context
+  const assetTypes = new Set(data.map((d) => d.type || d.assetType || 'stock'));
+  const isMixedAssetTypes = assetTypes.size > 1;
+
+  // Compute max values per asset category for type-aware normalized scaling
+  const maxByCategory = {};
+  data.forEach((d) => {
+    const cat = d.type || d.assetType || 'stock';
+    let val = 0;
+    if (numericKey && d[numericKey] !== undefined && d[numericKey] !== null) {
+      val = Math.abs(Number(d[numericKey]) || 0);
+    } else {
+      const direct = Number(d[metricKey]);
+      if (!isNaN(direct)) {
+        val = Math.abs(direct);
+      } else {
+        const match = String(d[metricKey] || '').match(/[\d.]+/);
+        val = match ? Math.abs(parseFloat(match[0]) || 0) : 1;
+      }
+    }
+    if (!maxByCategory[cat] || val > maxByCategory[cat]) {
+      maxByCategory[cat] = val;
+    }
+  });
+
+  // Overall max value across all items
+  const allNumValues = data.map((d) => {
     if (numericKey && d[numericKey] !== undefined && d[numericKey] !== null) {
       return Math.abs(Number(d[numericKey]) || 0);
     }
     const directNum = Number(d[metricKey]);
     if (!isNaN(directNum)) return Math.abs(directNum);
-    // Parse numeric substring if string contains numbers (e.g. "31.2x P/E" -> 31.2, "0.58% TER" -> 0.58)
     const match = String(d[metricKey] || '').match(/[\d.]+/);
     return match ? Math.abs(parseFloat(match[0]) || 0) : 1;
   });
-
-  const maxVal = Math.max(...numValues, 1);
+  const overallMax = Math.max(...allNumValues, 1);
 
   const getGradient = (isPositive) => {
     if (isReturn) {
@@ -57,6 +81,7 @@ export default function ComparisonBarChart({
 
       <div className="space-y-3.5">
         {data.map((item, idx) => {
+          const cat = item.type || item.assetType || 'stock';
           let numVal = 0;
           if (numericKey && item[numericKey] !== undefined && item[numericKey] !== null) {
             numVal = Number(item[numericKey]) || 0;
@@ -83,7 +108,17 @@ export default function ComparisonBarChart({
             }
           }
 
-          const pctWidth = maxVal > 0 ? Math.min(100, Math.max(14, (Math.abs(numVal) / maxVal) * 100)) : 20;
+          // Compute normalized visual width (type-aware for valuation)
+          let pctWidth = 20;
+          if (isValuation && isMixedAssetTypes) {
+            // For mixed asset valuation (e.g. P/E vs TER), scale within its own asset class
+            const catMax = maxByCategory[cat] || 1;
+            pctWidth = Math.min(100, Math.max(25, (Math.abs(numVal) / catMax) * 100));
+          } else {
+            const denom = overallMax > 0 ? overallMax : 1;
+            pctWidth = Math.min(100, Math.max(14, (Math.abs(numVal) / denom) * 100));
+          }
+
           const isPositive = numVal >= 0;
 
           return (

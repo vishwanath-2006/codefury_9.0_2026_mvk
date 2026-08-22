@@ -14,21 +14,44 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
 
-  // Prepare normalized time-series data (base = 100 at start of selected timeframe)
+  // Prepare normalized time-series data using actual calendar date filtering
   const normalizedSeries = useMemo(() => {
     if (!items || items.length === 0) return [];
 
-    let daysToSlice = 250;
-    if (timeFilter === '1M') daysToSlice = 22;
-    if (timeFilter === '6M') daysToSlice = 120;
-    if (timeFilter === '1Y') daysToSlice = 250;
+    const now = new Date();
+    let daysCutoff = 365;
+    if (timeFilter === '1M') daysCutoff = 32;
+    if (timeFilter === '6M') daysCutoff = 185;
+    if (timeFilter === '1Y') daysCutoff = 366;
+
+    const cutoffTimestamp = now.getTime() - daysCutoff * 24 * 60 * 60 * 1000;
 
     return items.map((item, itemIdx) => {
       const color = SERIES_COLORS[itemIdx % SERIES_COLORS.length];
       const rawHistory = item.history || [];
-      const sliced = rawHistory.slice(-daysToSlice);
 
-      if (sliced.length === 0) {
+      // Filter by real calendar date timestamp
+      let filtered = rawHistory.filter((pt) => {
+        if (pt.rawDate instanceof Date) {
+          return pt.rawDate.getTime() >= cutoffTimestamp;
+        }
+        if (pt.date && pt.date.includes('-')) {
+          const parts = pt.date.split('-');
+          if (parts.length === 3) {
+            const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+            return d.getTime() >= cutoffTimestamp;
+          }
+        }
+        return true;
+      });
+
+      // Fallback if filtering yields fewer than 2 points
+      if (filtered.length < 2) {
+        const sliceCount = timeFilter === '1M' ? 22 : timeFilter === '6M' ? 120 : 250;
+        filtered = rawHistory.slice(-sliceCount);
+      }
+
+      if (filtered.length === 0) {
         return {
           id: item.id || item.symbol,
           symbol: item.symbol,
@@ -38,9 +61,10 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         };
       }
 
-      const basePrice = Number(sliced[0].price) || 1;
+      // First valid historical point is baseline (Base = 100.00)
+      const basePrice = Number(filtered[0].price) || 1;
 
-      const points = sliced.map((pt) => {
+      const points = filtered.map((pt) => {
         const currentPrice = Number(pt.price);
         const normalizedVal = Number(((currentPrice / basePrice) * 100).toFixed(2));
         const returnPct = Number((((currentPrice - basePrice) / basePrice) * 100).toFixed(2));

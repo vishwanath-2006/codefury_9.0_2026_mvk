@@ -496,6 +496,7 @@ export default function InvestmentComparisonPage() {
                   data={comparisonData}
                   displayKey="valuationDisplay"
                   numericKey="valuationNumeric"
+                  isValuation={true}
                   theme="indigo"
                 />
                 <ComparisonBarChart
