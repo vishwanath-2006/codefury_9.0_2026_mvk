@@ -1,6 +1,8 @@
-import React from 'react';
-import { User, Calendar, MapPin, IndianRupee, ShieldAlert, Sparkles, Briefcase } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Calendar, MapPin, IndianRupee, ShieldAlert, Sparkles, Briefcase, Smartphone, Send, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Input, Select } from '../ui/Input';
+import Button from '../ui/Button';
+import Badge from '../ui/Badge';
 
 export default function OnboardingStep1({ data, onChange }) {
   const occupations = [
@@ -22,6 +24,52 @@ export default function OnboardingStep1({ data, onChange }) {
     { id: 'Moderate Variation', label: 'Moderate Variation', desc: 'Base pay + performance bonuses/commission' },
     { id: 'Freelance / Irregular', label: 'Freelance / Irregular', desc: 'Project-based income or variable business revenue' },
   ];
+
+  // OTP Verification States
+  const [otpSent, setOtpSent] = useState(false);
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [userOtpInput, setUserOtpInput] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    let interval = null;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  const handleSendOtp = () => {
+    setOtpError('');
+    const cleanPhone = (data.phone || '').replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setOtpError('Please enter a valid 10-digit mobile phone number.');
+      return;
+    }
+
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setGeneratedOtp(code);
+    setOtpSent(true);
+    setUserOtpInput('');
+    setResendTimer(30);
+  };
+
+  const handleVerifyOtp = () => {
+    setOtpError('');
+    if (!userOtpInput || userOtpInput.trim() !== generatedOtp) {
+      setOtpError(`Invalid OTP. Please enter ${generatedOtp} from the SMS alert banner above.`);
+      return;
+    }
+
+    onChange('phoneVerified', true);
+    setOtpSent(false);
+    setUserOtpInput('');
+  };
 
   const totalInflow = Number(data.primaryMonthlyIncome || 0) + Number(data.secondaryMonthlyIncome || 0);
 
@@ -65,6 +113,106 @@ export default function OnboardingStep1({ data, onChange }) {
             value={data.age || ''}
             onChange={(e) => onChange('age', Number(e.target.value))}
           />
+        </div>
+
+        {/* MOBILE PHONE NUMBER WITH OTP VERIFICATION */}
+        <div className="p-4 bg-slate-50 dark:bg-slate-900/80 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="font-bold text-slate-900 dark:text-slate-100 text-xs flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-emerald-500" />
+              Mobile Phone Number (OTP Verification) <span className="text-rose-500">*</span>
+            </label>
+
+            {data.phoneVerified && (
+              <Badge variant="success" className="font-mono text-xs flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Verified via OTP
+              </Badge>
+            )}
+          </div>
+
+          {data.phoneVerified ? (
+            <div className="flex items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
+                <span>Mobile Verified: <strong>{data.phone}</strong></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onChange('phoneVerified', false)}
+                className="text-[11px] text-slate-500 hover:text-rose-500 underline font-semibold"
+              >
+                Change Number
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Enter 10-digit Mobile Number"
+                    value={data.phone || ''}
+                    onChange={(e) => onChange('phone', e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-mono text-xs font-bold focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  icon={Send}
+                  onClick={handleSendOtp}
+                  className="bg-emerald-500 hover:bg-emerald-600 font-bold text-xs shrink-0"
+                >
+                  {otpSent ? 'Resend OTP' : 'Send OTP'}
+                </Button>
+              </div>
+
+              {/* SMS SIMULATED OTP TOAST BANNER */}
+              {otpSent && (
+                <div className="space-y-3 animate-in fade-in">
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>📱 <strong>SMS Alert:</strong> Your FinLabs verification OTP is <span className="font-mono text-sm underline">{generatedOtp}</span></span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">Simulated SMS</span>
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      maxLength={4}
+                      placeholder="Enter OTP"
+                      value={userOtpInput}
+                      onChange={(e) => setUserOtpInput(e.target.value)}
+                      className="w-36 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center font-mono text-sm tracking-widest font-bold focus:border-emerald-500 focus:outline-none"
+                    />
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="sm"
+                      icon={ShieldCheck}
+                      onClick={handleVerifyOtp}
+                      className="bg-emerald-600 hover:bg-emerald-700 font-bold text-xs"
+                    >
+                      Verify OTP
+                    </Button>
+                    {resendTimer > 0 && (
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        Resend in {resendTimer}s
+                      </span>
+                    )}
+                  </div>
+
+                  {otpError && (
+                    <p className="text-xs text-rose-500 font-semibold">{otpError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <Select

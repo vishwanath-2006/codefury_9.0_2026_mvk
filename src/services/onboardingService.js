@@ -9,6 +9,8 @@ import { saveFinancialHealthScore } from './financialHealth/adapter';
 export const createEmptyOnboardingData = (user = null, profile = null) => ({
   user_id: user?.id || null,
   fullName: profile?.full_name || user?.user_metadata?.full_name || '',
+  phone: '',
+  phoneVerified: false,
   age: '',
   employmentStatus: 'Employed',
   occupation: '',
