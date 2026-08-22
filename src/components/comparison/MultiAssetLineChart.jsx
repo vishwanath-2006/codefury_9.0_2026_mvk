@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { Info } from 'lucide-react';
+import { Info, Sparkles } from 'lucide-react';
 
 const SERIES_COLORS = [
   { stroke: '#10b981', name: 'Emerald', hex: '#10b981' }, // 1st: Emerald
@@ -79,6 +79,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
           color,
           isUnlisted: item.assetType === 'ipo' || item.type === 'ipo',
           hasData: false,
+          gmpDisplay: item.returnDisplay || `${item.gmpPct}% GMP`,
           points: []
         };
       }
@@ -112,13 +113,14 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
   }, [items, timeFilter]);
 
   // Compute common min and max across all series for proper scaling
-  const { minVal, maxVal, dataLength, hasAnyData } = useMemo(() => {
-    if (normalizedSeries.length === 0) return { minVal: 90, maxVal: 110, dataLength: 0, hasAnyData: false };
+  const { minVal, maxVal, dataLength, hasAnyData, isAllUnlistedIpos } = useMemo(() => {
+    if (normalizedSeries.length === 0) return { minVal: 90, maxVal: 110, dataLength: 0, hasAnyData: false, isAllUnlistedIpos: false };
 
     let min = Infinity;
     let max = -Infinity;
     let maxLen = 0;
     let foundData = false;
+    const allUnlisted = normalizedSeries.every((s) => s.isUnlisted);
 
     normalizedSeries.forEach((s) => {
       if (s.points.length > maxLen) maxLen = s.points.length;
@@ -137,7 +139,8 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
       minVal: Math.max(0, min - pad),
       maxVal: max + pad,
       dataLength: maxLen,
-      hasAnyData: foundData
+      hasAnyData: foundData,
+      isAllUnlistedIpos: allUnlisted
     };
   }, [normalizedSeries]);
 
@@ -312,9 +315,6 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
     setHoverIndex(null);
   };
 
-  const validSeries = normalizedSeries.find((s) => s.points.length > 0);
-  const hoveredDate = validSeries?.points[hoverIndex]?.date || '';
-
   // Intelligent tooltip horizontal position that never clips off-screen
   const getTooltipStyle = () => {
     const tooltipWidth = 220;
@@ -331,6 +331,9 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
       top: '15px'
     };
   };
+
+  const validSeries = normalizedSeries.find((s) => s.points.length > 0);
+  const hoveredDate = validSeries?.points[hoverIndex]?.date || '';
 
   return (
     <div className="space-y-3 w-full min-w-0">
@@ -358,17 +361,31 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         className="relative w-full min-w-0 max-w-full overflow-hidden select-none bg-slate-950/40 rounded-xl p-4 border border-slate-800/60 min-h-[220px] flex flex-col justify-center"
       >
         {!hasAnyData ? (
-          <div className="py-8 px-4 text-center space-y-2.5 max-w-md mx-auto">
-            <div className="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400">
-              <Info className="w-4 h-4 text-emerald-400" />
+          isAllUnlistedIpos ? (
+            <div className="py-8 px-4 text-center space-y-2.5 max-w-md mx-auto">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <h4 className="text-xs font-bold text-slate-200">
+                Primary-market asset — no secondary-market history
+              </h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                {normalizedSeries[0]?.displayName} tracks primary market Grey Market Premium ({normalizedSeries[0]?.gmpDisplay}). Historical price action will activate following official exchange listing.
+              </p>
             </div>
-            <h4 className="text-xs font-bold text-slate-200">
-              Historical Daily Time-Series Data Unavailable
-            </h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              No genuine historical candlestick / daily NAV feed is currently connected for this comparison. Trailing period performance (1M, 6M, 1Y) remains accurately displayed in the Quick Comparison table and Visual Analytics cards above.
-            </p>
-          </div>
+          ) : (
+            <div className="py-8 px-4 text-center space-y-2.5 max-w-md mx-auto">
+              <div className="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400">
+                <Info className="w-4 h-4 text-emerald-400" />
+              </div>
+              <h4 className="text-xs font-bold text-slate-200">
+                Historical performance data unavailable
+              </h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Real historical observations are required for this chart. No synthetic data is displayed. Trailing period metrics (1M, 6M, 1Y) remain accessible in the Quick Comparison and Visual Analytics Breakdown above.
+              </p>
+            </div>
+          )
         ) : (
           <>
             <canvas

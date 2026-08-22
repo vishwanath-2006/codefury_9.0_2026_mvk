@@ -240,6 +240,107 @@ async def get_stock_quote_get(symbol: str, demo: Optional[bool] = False, apiKey:
     req = QuoteRequest(symbol=symbol, apiKey=apiKey, clientId=clientId, pin=pin, totpSecret=totpSecret, demo=demo)
     return await get_stock_quote(req)
 
+class HistoricalCandleRequest(BaseModel):
+    symbol: str
+    interval: Optional[str] = "ONE_DAY"
+    fromDate: Optional[str] = None
+    toDate: Optional[str] = None
+    apiKey: Optional[str] = None
+    clientId: Optional[str] = None
+    pin: Optional[str] = None
+    totpSecret: Optional[str] = None
+    demo: Optional[bool] = False
+
+@app.post("/api/broker/angelone/historical-candles")
+async def get_historical_candles(payload: HistoricalCandleRequest):
+    symbol = payload.symbol.upper()
+    api_key, client_id, pin, totp_secret = get_credentials(payload)
+
+    if payload.demo or not all([api_key, client_id, pin, totp_secret]):
+        return {
+            "status": "unavailable",
+            "symbol": symbol,
+            "source": "no_live_connection",
+            "candles": []
+        }
+
+    try:
+        totp_token = pyotp.TOTP(totp_secret).now()
+        smart_api = SmartConnect(api_key=api_key)
+        session_data = smart_api.generateSession(client_id, pin, totp_token)
+
+        if not session_data.get('status'):
+            raise HTTPException(status_code=401, detail=f"Login failed: {session_data.get('message', 'Unknown Error')}")
+
+        search_res = smart_api.searchScrip("NSE", symbol)
+        if not search_res or not isinstance(search_res, list) or len(search_res) == 0:
+            search_res = smart_api.searchScrip("NSE", symbol[:4])
+
+        if not search_res or not isinstance(search_res, list) or len(search_res) == 0:
+            raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found on NSE")
+
+        scrip = search_res[0]
+        symbol_token = scrip.get('symboltoken')
+
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        to_str = payload.toDate or now.strftime("%Y-%m-%d 15:30")
+        from_str = payload.fromDate or (now - timedelta(days=365)).strftime("%Y-%m-%d 09:15")
+
+        historic_param = {
+            "exchange": "NSE",
+            "symboltoken": symbol_token,
+            "interval": payload.interval or "ONE_DAY",
+            "fromdate": from_str,
+            "todate": to_str
+        }
+
+        candle_res = smart_api.getCandleData(historic_param)
+        if not candle_res.get('status'):
+            return {
+                "status": "error",
+                "symbol": symbol,
+                "message": candle_res.get('message', 'Failed to retrieve candles'),
+                "candles": []
+            }
+
+        raw_data = candle_res.get('data', [])
+        candles = []
+        for c in raw_data:
+            if isinstance(c, list) and len(c) >= 5:
+                date_str = str(c[0]).split('T')[0] if 'T' in str(c[0]) else str(c[0]).split(' ')[0]
+                candles.append({
+                    "date": date_str,
+                    "open": float(c[1]),
+                    "high": float(c[2]),
+                    "low": float(c[3]),
+                    "close": float(c[4]),
+                    "price": float(c[4]),
+                    "volume": int(c[5]) if len(c) > 5 else 0
+                })
+
+        return {
+            "status": "success",
+            "symbol": symbol,
+            "source": "live_angelone",
+            "candles": candles
+        }
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        return {
+            "status": "error",
+            "symbol": symbol,
+            "message": str(e),
+            "candles": []
+        }
+
+@app.get("/api/broker/angelone/historical-candles")
+async def get_historical_candles_get(symbol: str, interval: Optional[str] = "ONE_DAY", fromDate: Optional[str] = None, toDate: Optional[str] = None, demo: Optional[bool] = False, apiKey: Optional[str] = None, clientId: Optional[str] = None, pin: Optional[str] = None, totpSecret: Optional[str] = None):
+    req = HistoricalCandleRequest(symbol=symbol, interval=interval, fromDate=fromDate, toDate=toDate, apiKey=apiKey, clientId=clientId, pin=pin, totpSecret=totpSecret, demo=demo)
+    return await get_historical_candles(req)
+
 class TokenSyncRequest(BaseModel):
     auth_token: str
     apiKey: Optional[str] = None

@@ -2,7 +2,7 @@
  * FINLABS FORENSIC CANONICAL MULTI-ASSET COMPARISON SERVICE
  * Single verified source of truth for Stocks, Mutual Funds, and IPOs.
  * Truthful Financial Architecture:
- * - Trailing canonical returns, valuation multiples, and risk profiles are source-backed.
+ * - Real-time quotes and historical OHLC candles are fetched from Angel One broker endpoints.
  * - No synthetic, random, or reverse-engineered daily price trajectories are manufactured.
  * - If genuine historical observation series are not connected, history remains strictly empty ([])
  *   and the UI reflects an honest data-unavailable state rather than fabricating market curves.
@@ -415,6 +415,36 @@ export async function fetchLiveStockQuote(symbol) {
 }
 
 /**
+ * Fetches real historical daily OHLC candles from the Angel One SmartAPI backend endpoint.
+ */
+export async function fetchLiveHistoricalCandles(symbol) {
+  try {
+    const response = await fetch('/api/broker/angelone/historical-candles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: symbol.toUpperCase(),
+        interval: 'ONE_DAY',
+        demo: false
+      })
+    });
+
+    if (!response.ok) return [];
+    const data = await response.json();
+    if (data && data.status === 'success' && Array.isArray(data.candles)) {
+      return data.candles.map((c) => ({
+        date: c.date,
+        rawDate: new Date(c.date),
+        price: Number(c.price || c.close)
+      }));
+    }
+  } catch (e) {
+    // Return empty array if backend historical endpoint is unavailable
+  }
+  return [];
+}
+
+/**
  * Unifies search across Stocks, Mutual Funds, and IPOs.
  */
 export function searchAllInvestments(query, filterType = 'all') {
@@ -540,6 +570,7 @@ export async function loadUnifiedComparison(selectedItems) {
         };
 
         const quote = await fetchLiveStockQuote(base.symbol);
+        const historyCandles = await fetchLiveHistoricalCandles(base.symbol);
 
         return {
           id: base.id || `stock-${base.symbol}`,
@@ -571,7 +602,7 @@ export async function loadUnifiedComparison(selectedItems) {
           valuationDisplay: base.basePe ? `${base.basePe}x P/E` : 'N/A',
           valuationNumeric: base.basePe ? Number(base.basePe) : null,
           peRatio: base.basePe ? Number(base.basePe) : null,
-          history: base.history || []
+          history: historyCandles.length > 0 ? historyCandles : []
         };
       }
 
@@ -626,7 +657,7 @@ export async function loadUnifiedComparison(selectedItems) {
           valuationDisplay: `${mf.expenseRatio} TER`,
           valuationNumeric: mf.expenseRatioNum || 0.5,
           peRatio: null,
-          history: mf.history || []
+          history: []
         };
       }
 
@@ -683,7 +714,7 @@ export async function loadUnifiedComparison(selectedItems) {
           valuationDisplay: ipo.gmpLabel || `${ipo.gmpPct}% GMP`,
           valuationNumeric: ipo.gmpPct || null,
           peRatio: null,
-          history: ipo.history || []
+          history: []
         };
       }
 
