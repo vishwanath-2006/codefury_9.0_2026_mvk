@@ -20,6 +20,7 @@ export function OnboardingProvider({ children }) {
       localStorage.setItem('finlabs_onboarding_completed', 'true');
     } else {
       localStorage.removeItem('finlabs_onboarding_completed');
+      sessionStorage.removeItem('finlabs_entry_modal_dismissed');
     }
     setIsOnboardedState(Boolean(value));
   };
@@ -30,6 +31,16 @@ export function OnboardingProvider({ children }) {
     setIsOnboardedState(true);
     setProfileState(result);
     return result;
+  };
+
+  const completeOnboarding = async (formData) => {
+    return await updateProfile(formData);
+  };
+
+  const resetToOverview = () => {
+    localStorage.removeItem('finlabs_onboarding_completed');
+    sessionStorage.removeItem('finlabs_entry_modal_dismissed');
+    setIsOnboardedState(false);
   };
 
   const userProfile = getUserFinancialProfile(profileState.formData || initialOnboardingData);
@@ -45,6 +56,8 @@ export function OnboardingProvider({ children }) {
         isOnboarded,
         setIsOnboarded,
         updateProfile,
+        completeOnboarding,
+        resetToOverview,
       }}
     >
       {children}

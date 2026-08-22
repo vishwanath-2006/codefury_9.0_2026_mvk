@@ -29,13 +29,15 @@ import { getFinancialProfile, saveFinancialProfile } from '../services/onboardin
 
 export default function OnboardingPage() {
   const { user, profile } = useAuth();
-  const { updateProfile, setIsOnboarded } = useOnboarding();
+  const { updateProfile, completeOnboarding, setIsOnboarded } = useOnboarding();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const stepParam = parseInt(searchParams.get('step'), 10);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [synthesizing, setSynthesizing] = useState(false);
+  const [synthesisProgress, setSynthesisProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const fileInputRef = useRef(null);
 
@@ -247,9 +249,14 @@ export default function OnboardingPage() {
     if (e) e.preventDefault();
     setErrorMsg('');
     setSaving(true);
+    setSynthesizing(true);
+    setSynthesisProgress(15);
+
+    setTimeout(() => setSynthesisProgress(50), 300);
+    setTimeout(() => setSynthesisProgress(85), 750);
+    setTimeout(() => setSynthesisProgress(100), 1100);
 
     try {
-      // Auto-set 0 debt if hasDebt is false
       const finalPayload = {
         ...formData,
         monthlyDebtPayments: formData.hasDebt ? formData.monthlyDebtPayments : '0',
@@ -257,12 +264,15 @@ export default function OnboardingPage() {
         totalInvestmentValue: portfolioSum > 0 ? String(portfolioSum) : '350000'
       };
 
-      await updateProfile(finalPayload);
-      setIsOnboarded(true);
-      navigate('/financial-health', { replace: true });
+      await completeOnboarding(finalPayload);
+
+      setTimeout(() => {
+        setSynthesizing(false);
+        navigate('/financial-health', { replace: true });
+      }, 1200);
     } catch (err) {
       setErrorMsg(err.message || 'Failed to save financial profile.');
-    } finally {
+      setSynthesizing(false);
       setSaving(false);
     }
   };
@@ -1120,6 +1130,34 @@ export default function OnboardingPage() {
           )}
         </div>
       </Card>
+
+      {/* HIGH-END SYNTHESIS LOADING OVERLAY */}
+      {synthesizing && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center animate-in fade-in duration-200">
+          <div className="p-4 rounded-3xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mb-5 shadow-2xl shadow-emerald-500/20 animate-pulse">
+            <Sparkles className="w-10 h-10" />
+          </div>
+
+          <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight mb-2">
+            Synthesizing Your Financial Clarity Engine...
+          </h3>
+
+          <p className="text-xs sm:text-sm text-slate-300 max-w-md mb-6 leading-relaxed">
+            Parsing 3-step profile inputs, computing Debt-to-Income ratios, and building your personalized Financial Health Index.
+          </p>
+
+          <div className="w-full max-w-md h-3 rounded-full bg-slate-800 overflow-hidden p-0.5 border border-slate-700 shadow-inner">
+            <div
+              className="h-full bg-emerald-500 rounded-full transition-all duration-300 shadow-md shadow-emerald-500/50"
+              style={{ width: `${synthesisProgress}%` }}
+            />
+          </div>
+
+          <span className="text-xs font-mono font-bold text-emerald-400 mt-3">
+            {synthesisProgress}% Complete
+          </span>
+        </div>
+      )}
     </div>
   );
 }
