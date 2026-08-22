@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getSavedOnboardingProfile, saveOnboardingProfile, initialOnboardingData } from '../services/onboardingService';
+import { getSavedOnboardingProfile, saveOnboardingProfile, initialOnboardingData, getUserFinancialProfile } from '../services/onboardingService';
 
 const OnboardingContext = createContext(null);
 
@@ -32,12 +32,15 @@ export function OnboardingProvider({ children }) {
     return result;
   };
 
+  const userProfile = getUserFinancialProfile(profileState.formData || initialOnboardingData);
+
   return (
     <OnboardingContext.Provider
       value={{
         formData: profileState.formData || initialOnboardingData,
+        userProfile,
         healthScore: profileState.healthScore ?? 74,
-        riskProfile: profileState.riskProfile || 'Moderate',
+        riskProfile: profileState.riskProfile || userProfile.riskProfileLabel || 'Moderate',
         completedAt: profileState.completedAt,
         isOnboarded,
         setIsOnboarded,

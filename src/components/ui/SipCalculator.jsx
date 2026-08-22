@@ -2,10 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Card } from './Card';
 import Badge from './Badge';
 
-export default function SipCalculator({ initialExpectedRate = 12 }) {
-  const [monthlyInvestment, setMonthlyInvestment] = useState(5000);
+export default function SipCalculator({ initialMonthlyInvestment = 15000, initialExpectedRate = 12, initialTenureYears = 5 }) {
+  const [monthlyInvestment, setMonthlyInvestment] = useState(initialMonthlyInvestment);
   const [expectedRate, setExpectedRate] = useState(initialExpectedRate);
-  const [tenureYears, setTenureYears] = useState(10);
+  const [tenureYears, setTenureYears] = useState(initialTenureYears);
+
+  useEffect(() => {
+    if (initialMonthlyInvestment && !isNaN(initialMonthlyInvestment)) {
+      setMonthlyInvestment(initialMonthlyInvestment);
+    }
+  }, [initialMonthlyInvestment]);
+
+  useEffect(() => {
+    if (initialTenureYears && !isNaN(initialTenureYears)) {
+      setTenureYears(initialTenureYears);
+    }
+  }, [initialTenureYears]);
 
   // Sync expected rate if the initialExpectedRate prop changes
   useEffect(() => {

@@ -7,42 +7,51 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import PlatformOverviewBanner from '../components/common/PlatformOverviewBanner';
 import FeatureOverviewCard from '../components/common/FeatureOverviewCard';
-import { Target, Plus, Calendar, TrendingUp } from 'lucide-react';
+import { Target, Plus } from 'lucide-react';
 
 export default function GoalsPage() {
-  const { formData, isOnboarded } = useOnboarding();
+  const { userProfile, isOnboarded } = useOnboarding();
 
   const formatINR = (val) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val ?? 0);
 
-  const milestoneTitle = formData.primaryMilestone || 'Down Payment for House';
-  const targetCorpus = Number(formData.targetGoalAmount || 1500000);
-  const timeframeYears = Number(formData.targetTimeframeYears || 5);
-  const monthlySip = Number(formData.monthlyCommitmentAmount || 15000);
+  const goal = userProfile.primaryGoal;
+  const targetCorpus = goal.targetAmount || 1500000;
+  const accumulated = goal.accumulatedAmount || 450000;
+  const timeframeYears = goal.timeframeYears || 5;
 
-  const projectedAccumulated = Math.min(targetCorpus, monthlySip * 12 * (timeframeYears * 0.4));
-  const progressPct = Math.min(100, Math.max(15, Math.round((projectedAccumulated / targetCorpus) * 100)));
+  // % Achieved = min(100, round((Accumulated / Target Corpus) * 100))
+  const progressPct = Math.min(100, Math.max(0, Math.round((accumulated / targetCorpus) * 100))) || 30;
+
+  // Exact Annuity SIP Calculation Logic
+  // n = months between today & target date
+  const n = Math.max(1, timeframeYears * 12);
+  const targetDeficit = Math.max(0, targetCorpus - accumulated);
+  const r = 0.01; // 12% p.a. (1% monthly rate)
+
+  // Monthly SIP = round((Target Deficit * r) / (((1 + r)^n) - 1))
+  const calculatedSip = Math.round((targetDeficit * r) / (Math.pow(1 + r, n) - 1)) || 15000;
 
   const activeGoals = [
     {
       id: 'g1',
-      title: milestoneTitle,
-      category: 'Primary Milestone',
-      currentAmount: projectedAccumulated,
+      title: goal.name,
+      category: goal.category || 'Real Estate',
+      currentAmount: accumulated,
       targetAmount: targetCorpus,
-      deadline: `${new Date().getFullYear() + timeframeYears}`,
+      deadline: goal.targetDate,
       progressPct: progressPct,
-      monthlyContribution: monthlySip,
+      monthlyContribution: calculatedSip,
     },
     {
       id: 'g2',
-      title: 'Emergency Safety Buffer',
-      category: 'Liquidity Shield',
-      currentAmount: Number(formData.emergencyFundAmount || 150000),
-      targetAmount: Number(formData.essentialExpenses || 25000) * 6 || 150000,
+      title: 'Emergency Reserve Buffer',
+      category: 'Safety',
+      currentAmount: userProfile.emergencyFundAmount,
+      targetAmount: userProfile.essentialExpenses * 6,
       deadline: 'Immediate',
-      progressPct: 85,
-      monthlyContribution: Math.round(monthlySip * 0.25),
+      progressPct: Math.min(100, Math.round((userProfile.emergencyFundAmount / (userProfile.essentialExpenses * 6 || 1)) * 100)),
+      monthlyContribution: Math.round(calculatedSip * 0.2),
     },
   ];
 
@@ -66,7 +75,7 @@ export default function GoalsPage() {
           moduleName="Multi-Horizon Goal Planner"
           subtitle="Simulates timeline horizons and recurring monthly SIP requirements to achieve your major life milestones (housing, education, retirement, emergency cushion)."
           capabilities={[
-            'Computes required monthly SIP contribution based on targeted inflation rate.',
+            'Computes required monthly SIP contribution using target inflation and compound interest formulas.',
             'Tracks real-time progress bars across liquid emergency funds and long-term goals.',
             'Adjusts asset allocation recommendations based on years to goal maturity.'
           ]}
@@ -82,67 +91,56 @@ export default function GoalsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 bg-slate-900 rounded-3xl text-white">
             <div className="p-4 bg-slate-800 rounded-2xl space-y-3">
               <div className="flex justify-between text-xs">
-                <span className="font-bold text-emerald-400">House Down Payment</span>
-                <span className="font-mono">45% Progress</span>
+                <span className="font-bold text-emerald-400">{goal.name}</span>
+                <span className="font-mono">{progressPct}% Progress</span>
               </div>
               <div className="h-2 bg-emerald-500 rounded-full w-1/2"></div>
               <div className="flex justify-between text-xs font-mono">
-                <span>Target: ₹15,000,000</span>
-                <span>SIP: ₹15,000/mo</span>
-              </div>
-            </div>
-            <div className="p-4 bg-slate-800 rounded-2xl space-y-3">
-              <div className="flex justify-between text-xs">
-                <span className="font-bold text-teal-400">Emergency Reserve</span>
-                <span className="font-mono">80% Progress</span>
-              </div>
-              <div className="h-2 bg-teal-500 rounded-full w-4/5"></div>
-              <div className="flex justify-between text-xs font-mono">
-                <span>Target: ₹200,000</span>
-                <span>Buffer: 6 Months</span>
+                <span>Target: ₹{targetCorpus.toLocaleString('en-IN')}</span>
+                <span>SIP: ₹{calculatedSip.toLocaleString('en-IN')}/mo</span>
               </div>
             </div>
           </div>
         </FeatureOverviewCard>
       ) : (
         /* LIVE GOALS MODE */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeGoals.map((goal) => (
-            <Card key={goal.id} hover className="flex flex-col justify-between p-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {activeGoals.map((g) => (
+            <Card key={g.id} hover className="flex flex-col justify-between p-5">
               <div>
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <Badge variant="brand" className="mb-1 text-[10px]">{goal.category}</Badge>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{goal.title}</h3>
+                    <Badge variant="brand" className="mb-1 text-[10px]">{g.category}</Badge>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{g.title}</h3>
                   </div>
-                  <Badge variant={goal.progressPct > 70 ? 'success' : 'neutral'}>
-                    {goal.progressPct}% Achieved
+                  <Badge variant={g.progressPct > 70 ? 'success' : 'neutral'}>
+                    {g.progressPct}% Achieved
                   </Badge>
                 </div>
 
                 <div className="my-4">
-                  <ProgressIndicator value={goal.progressPct} max={100} color={goal.progressPct > 70 ? 'emerald' : 'sky'} />
+                  <ProgressIndicator value={g.progressPct} max={100} color={g.progressPct > 70 ? 'emerald' : 'sky'} />
                 </div>
 
                 <div className="space-y-2 text-xs border-t border-slate-100 dark:border-slate-800 pt-3 font-mono">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Accumulated</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatINR(goal.currentAmount)}</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatINR(g.currentAmount)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Target Corpus</span>
-                    <span className="font-bold text-slate-900 dark:text-slate-100">{formatINR(goal.targetAmount)}</span>
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{formatINR(g.targetAmount)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Target Date</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">{goal.deadline}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">{g.deadline}</span>
                   </div>
                 </div>
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-xs">
-                <span className="text-slate-400">Monthly Contribution</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatINR(goal.monthlyContribution)}/mo</span>
+                <span className="text-slate-400">Monthly Contribution (Annuity SIP)</span>
+                <span className="font-mono font-bold text-emerald-500">{formatINR(g.monthlyContribution)}/mo</span>
               </div>
             </Card>
           ))}

@@ -37,6 +37,95 @@ export const initialOnboardingData = {
 };
 
 /**
+ * Universal UserFinancialProfile normalizer with guaranteed NaN fallbacks
+ */
+export function getUserFinancialProfile(raw) {
+  const d = raw || {};
+  
+  const primaryIncome = Number(d.primaryMonthlyIncome ?? d.monthlyIncome ?? 75000) || 75000;
+  const secondaryIncome = Number(d.secondaryMonthlyIncome ?? d.otherIncome ?? 0) || 0;
+  const monthlyIncome = primaryIncome + secondaryIncome || 75000;
+
+  const essentialExpenses = Number(d.essentialExpenses ?? d.monthlyEssentialExpenses ?? 30000) || 30000;
+  const discretionaryExpenses = Number(d.discretionaryExpenses ?? d.monthlyDiscretionaryExpenses ?? 15000) || 15000;
+  const totalMonthlyEmis = Number(d.totalEmiOutflow ?? d.monthlyDebtPayments ?? 0) || 0;
+
+  const bankSavings = Number(d.bankSavings ?? d.currentSavings ?? 150000) || 150000;
+  const emergencyFundAmount = Number(d.emergencyFundAmount ?? d.emergencyFund ?? 150000) || 150000;
+
+  const rawTotalValue = Number(d.totalInvestmentValue ?? d.portfolioValue ?? 350000) || 350000;
+  const assetClasses = Array.isArray(d.assetClasses) && d.assetClasses.length > 0
+    ? d.assetClasses
+    : (Array.isArray(d.investmentCategories) && d.investmentCategories.length > 0 ? d.investmentCategories : ['Mutual Funds / SIPs', 'Direct Equity / Stocks']);
+
+  const isMF = assetClasses.some(a => a.includes('Mutual Funds'));
+  const isStocks = assetClasses.some(a => a.includes('Stocks') || a.includes('Equity'));
+  const isFD = assetClasses.some(a => a.includes('Fixed') || a.includes('FD'));
+  const isGold = assetClasses.some(a => a.includes('Gold'));
+
+  const portfolio = {
+    mutualFunds: isMF ? Math.round(rawTotalValue * 0.5) : 0,
+    stocks: isStocks ? Math.round(rawTotalValue * 0.3) : 0,
+    fixedDeposits: isFD ? Math.round(rawTotalValue * 0.1) : 0,
+    gold: isGold ? Math.round(rawTotalValue * 0.1) : 0,
+    cashBuffer: bankSavings,
+  };
+
+  const totalPortfolioNetWorth = (portfolio.mutualFunds + portfolio.stocks + portfolio.fixedDeposits + portfolio.gold + portfolio.cashBuffer) || rawTotalValue || 1;
+
+  const riskToleranceStr = String(d.riskTolerance || d.marketCorrectionReaction || 'Moderate').toLowerCase();
+  const riskScore = (riskToleranceStr.includes('conservative') || riskToleranceStr.includes('option a')) ? 1 : (riskToleranceStr.includes('aggressive') || riskToleranceStr.includes('option c')) ? 3 : 2;
+
+  const primaryGoalName = d.primaryMilestone || (d.goals && d.goals[0]?.title) || 'Home Down Payment';
+  const targetAmount = Number(d.targetGoalAmount || (d.goals && d.goals[0]?.targetAmount) || 1500000) || 1500000;
+  const timeframeYears = Number(d.targetTimeframeYears || 5) || 5;
+  const accumulatedAmount = Number((d.goals && d.goals[0]?.currentAmount) || Math.round(targetAmount * 0.3)) || Math.round(targetAmount * 0.3);
+
+  const targetDateObj = new Date();
+  targetDateObj.setFullYear(targetDateObj.getFullYear() + timeframeYears);
+  const targetDate = targetDateObj.toISOString().split('T')[0];
+
+  const netMonthlySurplus = Math.max(0, monthlyIncome - essentialExpenses - discretionaryExpenses - totalMonthlyEmis);
+
+  return {
+    fullName: d.fullName || d.full_name || 'FinLabs Investor',
+    age: Number(d.age || 28) || 28,
+    occupation: d.occupation || 'Software Engineer',
+    cityTier: d.cityTier || 'Tier 1 Metro',
+
+    monthlyIncome,
+    secondaryIncome,
+    essentialExpenses,
+    discretionaryExpenses,
+    netMonthlySurplus,
+
+    hasCreditCard: Boolean(d.hasCreditCards ?? d.has_debt),
+    activeCardsCount: Number(d.cardCount ? parseInt(d.cardCount) : 1) || 1,
+    totalMonthlyEmis,
+    outstandingDebt: Number(d.unpaidBalance ?? d.totalDebt ?? 0) || 0,
+
+    bankSavings,
+    emergencyFundAmount,
+    hasHealthInsurance: d.hasHealthInsurance ?? true,
+    hasLifeInsurance: d.hasLifeInsurance ?? true,
+
+    portfolio,
+    totalPortfolioNetWorth,
+    riskScore, // 1, 2, 3
+    riskProfileLabel: riskScore === 1 ? 'Conservative' : riskScore === 3 ? 'Aggressive' : 'Moderate',
+    primaryGoal: {
+      name: primaryGoalName,
+      category: 'Real Estate',
+      accumulatedAmount,
+      targetAmount,
+      targetDate,
+      timeframeYears,
+      monthlyCommitmentAmount: Number(d.monthlyCommitmentAmount || 15000) || 15000,
+    }
+  };
+}
+
+/**
  * Fetch financial profile for authenticated user
  */
 export async function getFinancialProfile(userId) {

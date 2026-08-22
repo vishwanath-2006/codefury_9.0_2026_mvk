@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
@@ -6,47 +6,27 @@ import StatCard from '../components/ui/StatCard';
 import Badge from '../components/ui/Badge';
 import PlatformOverviewBanner from '../components/common/PlatformOverviewBanner';
 import FeatureOverviewCard from '../components/common/FeatureOverviewCard';
-import { PieChart, TrendingUp, TrendingDown, LineChart, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
+import { PieChart, TrendingUp, LineChart, ShieldCheck, RefreshCw, Lock } from 'lucide-react';
 
 export default function PortfolioPage() {
-  const { formData, isOnboarded } = useOnboarding();
+  const { userProfile, isOnboarded } = useOnboarding();
   const [syncing, setSyncing] = useState(false);
   const [holdings, setHoldings] = useState(null);
-  const [error, setError] = useState(null);
-  const [source, setSource] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null);
-  const [syncWarning, setSyncWarning] = useState(null);
 
   const formatINR = (val) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val ?? 0);
 
-  // Dynamic Portfolio Calculations
-  const rawTotalPortfolio = Number(formData.totalInvestmentValue || 350000);
-  const activeAssets = (formData.assetClasses || []).filter(a => a !== 'None yet');
+  // Dynamic Deterministic Portfolio Calculations (Zero-Division Safe)
+  const portfolio = userProfile.portfolio || { mutualFunds: 175000, stocks: 105000, fixedDeposits: 35000, gold: 35000, cashBuffer: 150000 };
+  const totalNetWorth = (portfolio.mutualFunds + portfolio.stocks + portfolio.fixedDeposits + portfolio.gold + portfolio.cashBuffer) || 1;
 
-  const assetColors = {
-    'Mutual Funds / SIPs': '#10b981',
-    'Direct Equity / Stocks': '#6366f1',
-    'Fixed Deposits / Recurring Deposits': '#f59e0b',
-    'Digital / Physical Gold': '#eab308',
-    'Crypto / Alternative Assets': '#ec4899',
-  };
-
-  const dynamicAllocation = activeAssets.length > 0
-    ? activeAssets.map((asset, idx) => {
-        const pct = Math.round(100 / activeAssets.length);
-        const val = Math.round((rawTotalPortfolio * pct) / 100);
-        return {
-          name: asset,
-          value: val,
-          percentage: pct,
-          color: assetColors[asset] || ['#10b981', '#6366f1', '#f59e0b', '#06b6d4', '#ec4899'][idx % 5],
-        };
-      })
-    : [
-        { name: 'Mutual Funds (SIP)', value: Math.round(rawTotalPortfolio * 0.6), percentage: 60, color: '#10b981' },
-        { name: 'Direct Equity Stocks', value: Math.round(rawTotalPortfolio * 0.4), percentage: 40, color: '#6366f1' },
-      ];
+  const dynamicAllocation = [
+    { name: 'Equity Mutual Funds', value: portfolio.mutualFunds, percentage: Math.round(((portfolio.mutualFunds) / totalNetWorth) * 100) || 0, color: '#10b981' },
+    { name: 'Direct Equities / Stocks', value: portfolio.stocks, percentage: Math.round(((portfolio.stocks) / totalNetWorth) * 100) || 0, color: '#6366f1' },
+    { name: 'Fixed Income / FDs', value: portfolio.fixedDeposits, percentage: Math.round(((portfolio.fixedDeposits) / totalNetWorth) * 100) || 0, color: '#f59e0b' },
+    { name: 'Gold Reserves', value: portfolio.gold, percentage: Math.round(((portfolio.gold) / totalNetWorth) * 100) || 0, color: '#eab308' },
+    { name: 'Liquid Cash Buffer', value: portfolio.cashBuffer, percentage: Math.round(((portfolio.cashBuffer) / totalNetWorth) * 100) || 0, color: '#06b6d4' },
+  ].filter(item => item.value > 0 || item.percentage > 0);
 
   const fallbackHoldings = [
     { symbol: "RELIANCE", quantity: 15, averagePrice: 2850.00, ltp: 2980.50, investedValue: 42750, currentValue: 44707.5, pnl: 1957.50, pnlPercentage: 4.58 },
@@ -60,18 +40,12 @@ export default function PortfolioPage() {
     window.location.href = `https://smartapi.angelone.in/publisher-login?api_key=${smartApiKey}&redirect_url=${redirectUrl}`;
   };
 
-  const syncWithToken = async (token) => {
+  const syncWithToken = () => {
     setSyncing(true);
-    setError(null);
-    try {
+    setTimeout(() => {
       setHoldings(fallbackHoldings);
-      setSource("mock_demo_fallback");
-      setSuccessMessage("Angel One Demat Connected successfully (Synced View)");
-    } catch (err) {
-      console.warn('Broker sync error:', err);
-    } finally {
       setSyncing(false);
-    }
+    }, 600);
   };
 
   return (
@@ -105,9 +79,9 @@ export default function PortfolioPage() {
           {/* Mock Portfolio Visual */}
           <div className="p-6 bg-slate-900 rounded-3xl text-white space-y-4">
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-emerald-400">Net Worth: ₹350,000</p></div>
-              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-indigo-400">Mutual Funds: 60%</p></div>
-              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-amber-400">Stocks: 40%</p></div>
+              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-emerald-400">Net Worth: ₹{totalNetWorth.toLocaleString('en-IN')}</p></div>
+              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-indigo-400">Mutual Funds: 50%</p></div>
+              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-amber-400">Stocks: 30%</p></div>
             </div>
             <div className="w-full h-3 bg-emerald-500 rounded-full"></div>
           </div>
@@ -119,24 +93,24 @@ export default function PortfolioPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard
               title="Total Net Worth"
-              value={formatINR(rawTotalPortfolio)}
+              value={formatINR(totalNetWorth)}
               icon={TrendingUp}
-              change={`${activeAssets.length || 2} Asset Classes`}
+              change={`${dynamicAllocation.length} Active Asset Classes`}
               changeType="positive"
-              description="Consolidated Holdings"
+              description="Consolidated Net Holdings"
             />
 
             <StatCard
-              title="Primary Asset"
-              value={dynamicAllocation[0]?.name || 'Mutual Funds'}
+              title="Primary Asset Class"
+              value={dynamicAllocation[0]?.name || 'Equity Mutual Funds'}
               icon={PieChart}
-              change={`${dynamicAllocation[0]?.percentage || 60}% Allocation`}
+              change={`${dynamicAllocation[0]?.percentage || 0}% Allocation`}
               changeType="positive"
               description="Core holdings"
             />
 
             <StatCard
-              title="Broker Status"
+              title="Broker Integration"
               value="Angel One API"
               icon={LineChart}
               change="Ready for Sync"
@@ -212,7 +186,7 @@ export default function PortfolioPage() {
                 </button>
                 <button
                   disabled={syncing}
-                  onClick={() => syncWithToken('demo')}
+                  onClick={syncWithToken}
                   className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 text-xs font-bold transition"
                 >
                   Load Demo Holdings

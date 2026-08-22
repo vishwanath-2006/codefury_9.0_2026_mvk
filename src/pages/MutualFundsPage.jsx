@@ -24,6 +24,20 @@ import {
 } from 'lucide-react';
 import { searchSchemes, getSchemeDetails, calculateReturns } from '../services/mfService';
 import { mockMutualFunds } from '../mock/finlabsMockData';
+import { useOnboarding } from '../context/OnboardingContext';
+
+function getRiskSuitabilityBadge(userRiskScore, fundRisk) {
+  const riskStr = (fundRisk || '').toLowerCase();
+  const isHighRisk = riskStr.includes('very high') || riskStr.includes('small cap') || riskStr.includes('high');
+
+  if (userRiskScore === 1 && isHighRisk) {
+    return { label: 'Low Suitability (High Volatility)', bg: 'bg-rose-500/10 text-rose-500 border border-rose-500/20' };
+  }
+  if (userRiskScore === 3 && (isHighRisk || riskStr.includes('equity'))) {
+    return { label: 'High Growth Match', bg: 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' };
+  }
+  return { label: 'Optimal Match (Balanced)', bg: 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' };
+}
 
 function formatMFDateToDisplay(dateStr) {
   if (!dateStr) return '';
@@ -121,6 +135,7 @@ const POPULAR_FUNDS = [
 ];
 
 export default function MutualFundsPage() {
+  const { userProfile } = useOnboarding();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchLoading, setSearchLoading] = useState(false);
@@ -167,7 +182,6 @@ export default function MutualFundsPage() {
         const popularAMCs = ['sbi', 'hdfc', 'axis', 'quant', 'icici', 'nippon', 'kotak', 'tata', 'mirae', 'uti', 'dsp', 'ppfas', 'parag'];
         
         if (popularAMCs.includes(trimmed)) {
-          // Fetch multiple combinations in parallel to retrieve active equity/small/blue/flexi direct growth plans
           const subQueries = [
             `${trimmed} direct growth`,
             `${trimmed} small`,
@@ -177,7 +191,6 @@ export default function MutualFundsPage() {
           const queryResList = await Promise.all(
             subQueries.map(q => searchSchemes(q).catch(() => []))
           );
-          // Flatten and de-duplicate by schemeCode
           const seen = new Set();
           for (const list of queryResList) {
             for (const item of list) {
@@ -191,7 +204,6 @@ export default function MutualFundsPage() {
           results = await searchSchemes(trimmed);
         }
         
-        // Initial name-based heuristic filter to clean up raw results list
         const filtered = (results || []).filter(item => {
           const name = item.schemeName.toLowerCase();
           const isGrowth = name.includes('growth');
@@ -199,7 +211,6 @@ export default function MutualFundsPage() {
           return isGrowth && !isObsoleteOrRegular;
         });
 
-        // Prioritize active "Direct Plan - Growth" or "Growth" schemes
         const sorted = filtered.sort((a, b) => {
           const aName = a.schemeName.toLowerCase();
           const bName = b.schemeName.toLowerCase();
@@ -210,7 +221,6 @@ export default function MutualFundsPage() {
           return 0;
         });
 
-        // Query /latest endpoint for top 5 candidates in parallel to filter out obsolete funds on the fly
         const topCandidates = sorted.slice(0, 5);
         const activeResults = [];
 
@@ -223,13 +233,11 @@ export default function MutualFundsPage() {
               const latestItem = latestJson?.data?.[0];
               if (!latestItem || !latestItem.date || !latestItem.nav || Number(latestItem.nav) <= 0) return;
               
-              // Verify date is within last 30 days
               const parseDateParts = latestItem.date.split('-');
               const latestDate = new Date(Number(parseDateParts[2]), Number(parseDateParts[1]) - 1, Number(parseDateParts[0]));
               const diffDays = (Date.now() - latestDate.getTime()) / (1000 * 60 * 60 * 24);
               
               if (diffDays <= 30) {
-                // Determine category label based on name
                 let category = 'Flexi Cap';
                 const lowerName = item.schemeName.toLowerCase();
                 if (lowerName.includes('index') || lowerName.includes('nifty') || lowerName.includes('sensex')) {
@@ -270,12 +278,10 @@ export default function MutualFundsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Robust multi-word partial/fuzzy local search matching algorithm
   const filterLocalFunds = (funds, query, category) => {
     const trimmed = query.trim().toLowerCase();
 
     return funds.filter((fund) => {
-      // Category Filter Check
       const matchesCategory =
         category === 'All' ||
         fund.category.toLowerCase().includes(category.toLowerCase());
@@ -364,53 +370,58 @@ export default function MutualFundsPage() {
 
         {filteredLocalFunds.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredLocalFunds.map((fund) => (
-              <Card key={fund.id} hover className="p-5 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-start mb-2 gap-2">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Badge variant="neutral" className="text-[10px]">{fund.category}</Badge>
-                        <span className="text-[10px] text-slate-400 font-mono">{fund.fundHouse}</span>
+            {filteredLocalFunds.map((fund) => {
+              const matchBadge = getRiskSuitabilityBadge(userProfile.riskScore, fund.risk);
+              return (
+                <Card key={fund.id} hover className="p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Badge variant="neutral" className="text-[10px]">{fund.category}</Badge>
+                          <span className="text-[10px] text-slate-400 font-mono">{fund.fundHouse}</span>
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">{fund.name}</h3>
                       </div>
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">{fund.name}</h3>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${matchBadge.bg}`}>
+                        {matchBadge.label}
+                      </span>
                     </div>
-                    <Badge variant="brand" className="text-[10px] font-bold shrink-0">{fund.suitability}</Badge>
+
+                    <div className="grid grid-cols-3 gap-2 my-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs">
+                      <div>
+                        <span className="text-[10px] uppercase text-slate-400 font-bold block">3Y CAGR</span>
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">{fund.cagr3Yr}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase text-slate-400 font-bold block">Min SIP</span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-sm">₹{fund.minSip}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase text-slate-400 font-bold block">Risk Rating</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{fund.risk}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 my-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs">
-                    <div>
-                      <span className="text-[10px] uppercase text-slate-400 font-bold block">3Y CAGR</span>
-                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-sm">{fund.cagr3Yr}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] uppercase text-slate-400 font-bold block">Min SIP</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-sm">₹{fund.minSip}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] uppercase text-slate-400 font-bold block">Risk Rating</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{fund.risk}</span>
-                    </div>
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      {fund.rating} / 5 Rating
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={ArrowUpRight}
+                      iconPosition="right"
+                      onClick={() => handleOpenSchemeModal({ schemeCode: fund.schemeCode, schemeName: fund.name })}
+                    >
+                      Fund Analytics
+                    </Button>
                   </div>
-                </div>
-
-                <div className="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-xs text-slate-400 flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    {fund.rating} / 5 Rating
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={ArrowUpRight}
-                    iconPosition="right"
-                    onClick={() => handleOpenSchemeModal({ schemeCode: fund.schemeCode, schemeName: fund.name })}
-                  >
-                    Fund Analytics
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         ) : liveApiResults.length === 0 ? (
           <EmptyState
