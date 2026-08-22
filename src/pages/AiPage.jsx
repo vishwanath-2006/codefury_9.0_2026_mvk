@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, resolveUserName } from '../context/AuthContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -28,8 +28,8 @@ const STAGE3_SUGGESTED_PROMPTS = [
 
 export default function AiPage() {
   const { user, profile } = useAuth();
-  const userName = profile?.full_name || user?.user_metadata?.full_name;
-  const firstName = userName ? userName.split(' ')[0] : null;
+  const userName = resolveUserName(user, profile);
+  const firstName = userName && userName !== 'Investor' ? userName.split(' ')[0] : null;
 
   const [messages, setMessages] = useState([]);
   const [inputQuery, setInputQuery] = useState('');

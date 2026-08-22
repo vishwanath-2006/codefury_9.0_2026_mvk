@@ -6,18 +6,38 @@ const AuthContext = createContext();
 
 const IS_DEV = import.meta.env.DEV;
 
-// Isolated Development-Only Mock User & Profile (Never used in production)
+// Reusable Name Resolution Helper
+export function resolveUserName(user, profile) {
+  if (profile?.full_name && !profile.full_name.includes('Alex Dev')) {
+    return profile.full_name;
+  }
+  if (user?.user_metadata?.full_name && !user.user_metadata.full_name.includes('Alex Dev')) {
+    return user.user_metadata.full_name;
+  }
+  if (user?.user_metadata?.name && !user.user_metadata.name.includes('Alex Dev')) {
+    return user.user_metadata.name;
+  }
+  if (user?.email) {
+    const prefix = user.email.split('@')[0];
+    if (prefix && prefix !== 'dev.tester') {
+      return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+  }
+  return 'Investor';
+}
+
+// Development-Only Mock User & Profile
 const DEV_MOCK_USER = Object.freeze({
   id: 'dev-test-user-id-99999',
   email: 'dev.tester@finlabs.io',
-  user_metadata: { full_name: 'Alex Dev (Local Test)' },
+  user_metadata: { full_name: 'FinLabs Investor' },
   created_at: new Date().toISOString(),
 });
 
 const DEV_MOCK_PROFILE = Object.freeze({
   id: 'dev-test-user-id-99999',
   user_id: 'dev-test-user-id-99999',
-  full_name: 'Alex Dev (Local Test)',
+  full_name: 'FinLabs Investor',
   email: 'dev.tester@finlabs.io',
   avatar_url: null,
 });
@@ -63,7 +83,7 @@ export function AuthProvider({ children }) {
       setProfile({
         id: authUser.id,
         user_id: authUser.id,
-        full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'FinLabs User',
+        full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Investor',
         email: authUser.email,
         avatar_url: authUser.user_metadata?.avatar_url || null,
       });
