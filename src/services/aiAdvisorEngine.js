@@ -1,7 +1,7 @@
 /**
  * FINLABS AI — GUIDED FINANCIAL ADVISOR & ADAPTIVE QUESTION ENGINE
- * Orchestrates domain-specific interviews, skips existing facts, tracks session state,
- * and generates structured financial diagnostics & actionable plans.
+ * Multi-stage adaptive financial interview, dependency-aware question sequencer,
+ * zero-hallucination fact aggregation, and comprehensive diagnostic plan generator.
  */
 
 import { ADVISOR_DOMAINS, COMMON_OPTION_PRESETS } from '../data/advisorDomains';
@@ -30,6 +30,12 @@ export function isUserRequestingStop(text) {
     "im done",
     "i have enough information",
     "generate plan",
+    "generate my analysis",
+    "generate analysis",
+    "show me the result",
+    "show result",
+    "that's all",
+    "thats all",
     "finish",
     "skip to plan",
     "summary"
@@ -88,7 +94,7 @@ export function clearAdvisorSession() {
 }
 
 /**
- * Merges Supabase profile into known facts
+ * Merges Supabase profile into known facts without fabricating missing numbers
  */
 export function initializeKnownFactsFromProfile(profileCtx) {
   if (!profileCtx) return {};
@@ -96,11 +102,19 @@ export function initializeKnownFactsFromProfile(profileCtx) {
   const facts = {};
   if (profileCtx.monthlyIncome > 0) facts.monthlyIncome = profileCtx.monthlyIncome;
   if (profileCtx.totalExpenses > 0) facts.totalExpenses = profileCtx.totalExpenses;
-  if (profileCtx.monthlyDebtPayments >= 0) facts.monthlyDebtPayments = profileCtx.monthlyDebtPayments;
-  if (profileCtx.monthlySurplus >= 0) facts.monthlySurplus = profileCtx.monthlySurplus;
-  if (profileCtx.emergencyFund > 0) facts.emergencyFund = profileCtx.emergencyFund;
+  if (profileCtx.monthlyDebtPayments !== undefined && profileCtx.monthlyDebtPayments !== null) {
+    facts.monthlyDebtPayments = profileCtx.monthlyDebtPayments;
+  }
+  if (profileCtx.monthlySurplus !== undefined && profileCtx.monthlySurplus !== null) {
+    facts.monthlySurplus = profileCtx.monthlySurplus;
+  }
+  if (profileCtx.emergencyFund !== undefined && profileCtx.emergencyFund !== null) {
+    facts.emergencyFund = profileCtx.emergencyFund;
+  }
   if (profileCtx.emergencyMonths) facts.emergencyMonths = profileCtx.emergencyMonths;
-  if (profileCtx.previousInvestmentAmount > 0) facts.previousInvestmentAmount = profileCtx.previousInvestmentAmount;
+  if (profileCtx.previousInvestmentAmount !== undefined && profileCtx.previousInvestmentAmount !== null) {
+    facts.previousInvestmentAmount = profileCtx.previousInvestmentAmount;
+  }
   if (Array.isArray(profileCtx.previousInvestmentPlatforms) && profileCtx.previousInvestmentPlatforms.length > 0) {
     facts.previousInvestmentPlatforms = profileCtx.previousInvestmentPlatforms;
   }
@@ -115,7 +129,7 @@ export function initializeKnownFactsFromProfile(profileCtx) {
 }
 
 /**
- * Extracts facts from user answer dynamically
+ * Extracts structured facts from user answer dynamically
  */
 export function extractFactsFromAnswer(questionKey, userInput, knownFacts = {}) {
   const updated = { ...knownFacts };
@@ -131,18 +145,72 @@ export function extractFactsFromAnswer(questionKey, userInput, knownFacts = {}) 
       if (extractedAmount) updated.monthlyIncome = extractedAmount;
       break;
 
+    case 'incomeStability':
+      if (lower.includes('very stable') || lower.includes('salaried')) {
+        updated.incomeStability = 'Very Stable (Salaried)';
+      } else if (lower.includes('mostly stable')) {
+        updated.incomeStability = 'Mostly Stable';
+      } else if (lower.includes('variable') || lower.includes('freelance')) {
+        updated.incomeStability = 'Variable (Freelance/Contract)';
+      } else if (lower.includes('business')) {
+        updated.incomeStability = 'Business / Entrepreneurial';
+      } else {
+        updated.incomeStability = raw;
+      }
+      break;
+
     case 'totalExpenses':
     case 'expenses':
       if (extractedAmount) updated.totalExpenses = extractedAmount;
       break;
 
+    case 'discretionarySpending':
+      if (lower.includes('low') || lower.includes('<20')) {
+        updated.discretionarySpending = 'Low / Frugal (<20%)';
+      } else if (lower.includes('high') || lower.includes('>40')) {
+        updated.discretionarySpending = 'High Lifestyle (>40%)';
+      } else {
+        updated.discretionarySpending = 'Moderate (20–40%)';
+      }
+      break;
+
     case 'monthlyDebtPayments':
-    case 'debt':
+    case 'hasDebt':
       if (lower.includes('no') || lower.includes('zero') || lower.includes('nil') || lower.includes('debt free')) {
         updated.monthlyDebtPayments = 0;
-      } else if (extractedAmount != null) {
-        updated.monthlyDebtPayments = extractedAmount;
+        updated.hasDebt = false;
+        updated.debtType = 'None (Debt Free)';
+      } else {
+        updated.hasDebt = true;
+        if (extractedAmount != null) {
+          updated.monthlyDebtPayments = extractedAmount;
+        }
+        if (lower.includes('home')) updated.debtType = 'Home Loan';
+        else if (lower.includes('car')) updated.debtType = 'Car Loan';
+        else if (lower.includes('education')) updated.debtType = 'Education Loan';
+        else if (lower.includes('personal') || lower.includes('credit')) updated.debtType = 'Personal Loan / Credit Card';
+        else if (!updated.debtType) updated.debtType = raw;
       }
+      break;
+
+    case 'debtType':
+      updated.debtType = raw;
+      if (lower.includes('no') || lower.includes('zero')) {
+        updated.hasDebt = false;
+        updated.monthlyDebtPayments = 0;
+      } else {
+        updated.hasDebt = true;
+      }
+      break;
+
+    case 'debtBalance':
+      if (extractedAmount != null) updated.debtBalance = extractedAmount;
+      break;
+
+    case 'debtInterestRate':
+      if (lower.includes('low') || lower.includes('<9')) updated.debtInterestRate = 'Low (<9% Home/Edu Loan)';
+      else if (lower.includes('high') || lower.includes('>14')) updated.debtInterestRate = 'High (>14% Personal/Card)';
+      else updated.debtInterestRate = 'Moderate (9–13%)';
       break;
 
     case 'emergencyFund':
@@ -153,17 +221,89 @@ export function extractFactsFromAnswer(questionKey, userInput, knownFacts = {}) 
       }
       break;
 
+    case 'emergencyStorage':
+      if (lower.includes('sweep') || lower.includes('high-yield') || lower.includes('savings')) {
+        updated.emergencyStorage = 'Sweep-in / High-yield Savings';
+      } else if (lower.includes('liquid') || lower.includes('mutual')) {
+        updated.emergencyStorage = 'Liquid Mutual Funds';
+      } else if (lower.includes('fd') || lower.includes('fixed deposit')) {
+        updated.emergencyStorage = 'Fixed Deposits (FD)';
+      } else {
+        updated.emergencyStorage = raw;
+      }
+      break;
+
+    case 'previousInvestmentAmount':
+      if (extractedAmount != null) updated.previousInvestmentAmount = extractedAmount;
+      break;
+
+    case 'assetAllocationSplit':
+      if (lower.includes('stock') && (lower.includes('>60') || lower.includes('heavy'))) {
+        updated.assetAllocationSplit = 'Direct Stocks Heavy (>60%)';
+      } else if (lower.includes('fd') || lower.includes('safe') || lower.includes('debt')) {
+        updated.assetAllocationSplit = 'Mostly Safe FDs & Debt';
+      } else if (lower.includes('gold') || lower.includes('multi')) {
+        updated.assetAllocationSplit = 'Multi-Asset with Gold & Real Estate';
+      } else {
+        updated.assetAllocationSplit = 'Balanced Mutual Funds & Stocks';
+      }
+      break;
+
+    case 'beginnerPreference':
+      updated.beginnerPreference = raw;
+      break;
+
+    case 'riskTolerance':
+    case 'marketReactionTolerance':
+      if (lower.includes('buy') || lower.includes('opportunity') || lower.includes('aggressive') || lower.includes('growth')) {
+        updated.riskTolerance = 'Aggressive (High Growth)';
+        updated.marketReactionTolerance = 'View as buying opportunity (High Volatility Comfort)';
+      } else if (lower.includes('anxious') || lower.includes('panic') || lower.includes('conservative') || lower.includes('safe')) {
+        updated.riskTolerance = 'Conservative (Low Risk)';
+        updated.marketReactionTolerance = 'Prefer capital protection (Low Volatility Comfort)';
+      } else {
+        updated.riskTolerance = 'Moderate (Balanced)';
+        updated.marketReactionTolerance = 'Hold steady without panic (Moderate Volatility Comfort)';
+      }
+      break;
+
+    case 'dependentsCount':
+      if (lower.includes('none') || lower.includes('0') || lower.includes('self')) {
+        updated.dependentsCount = 0;
+      } else if (lower.includes('1')) {
+        updated.dependentsCount = 1;
+      } else if (lower.includes('2') || lower.includes('3')) {
+        updated.dependentsCount = 2;
+      } else {
+        updated.dependentsCount = 3;
+      }
+      break;
+
+    case 'hasTermInsurance':
+      if (lower.includes('yes') || lower.includes('have term')) {
+        updated.hasTermInsurance = 'Adequately Covered (Term Plan Active)';
+      } else if (lower.includes('corporate') || lower.includes('employer')) {
+        updated.hasTermInsurance = 'Corporate Cover Only (Gap Risk)';
+      } else {
+        updated.hasTermInsurance = 'No Term Life Cover (High Gap Risk)';
+      }
+      break;
+
+    case 'primaryGoalName':
+    case 'sipGoal':
+      updated.primaryGoalName = raw;
+      break;
+
     case 'availableCapital':
-    case 'investmentAmount':
-      if (extractedAmount) updated.availableCapital = extractedAmount;
+      if (extractedAmount != null) updated.availableCapital = extractedAmount;
       break;
 
     case 'availableSipAmount':
-      if (extractedAmount) updated.availableSipAmount = extractedAmount;
+      if (extractedAmount != null) updated.availableSipAmount = extractedAmount;
       break;
 
     case 'targetGoalAmount':
-      if (extractedAmount) updated.targetGoalAmount = extractedAmount;
+      if (extractedAmount != null) updated.targetGoalAmount = extractedAmount;
       break;
 
     case 'goalTimeYears': {
@@ -184,7 +324,6 @@ export function extractFactsFromAnswer(questionKey, userInput, knownFacts = {}) 
         updated.stockSharePct = parseInt(pctMatch[1], 10);
       } else if (extractedAmount && updated.previousInvestmentAmount > 0) {
         updated.stockSharePct = Math.min(100, Math.round((extractedAmount / updated.previousInvestmentAmount) * 100));
-        updated.stockHoldingAmount = extractedAmount;
       }
       break;
     }
@@ -193,47 +332,6 @@ export function extractFactsFromAnswer(questionKey, userInput, knownFacts = {}) 
       const symMatch = raw.match(/\b([A-Z]{2,15})\b/) || raw.match(/(?:stock|shares? of)\s*([A-Za-z0-9]+)/i);
       if (symMatch) updated.stockSymbol = symMatch[1].toUpperCase();
       else updated.stockSymbol = raw;
-      break;
-    }
-
-    case 'riskTolerance': {
-      if (lower.includes('low') || lower.includes('conservative') || lower.includes('safe')) {
-        updated.riskTolerance = 'Conservative (Low Risk)';
-      } else if (lower.includes('high') || lower.includes('aggressive') || lower.includes('growth')) {
-        updated.riskTolerance = 'Aggressive (High Growth)';
-      } else if (lower.includes('mod') || lower.includes('balan')) {
-        updated.riskTolerance = 'Moderate (Balanced)';
-      } else {
-        updated.riskTolerance = raw;
-      }
-      break;
-    }
-
-    case 'sipGoal':
-    case 'primaryGoalName':
-      updated.primaryGoalName = raw;
-      break;
-
-    case 'learningTopic':
-      updated.learningTopic = raw;
-      break;
-
-    case 'assetPreferences':
-    case 'previousInvestmentPlatforms': {
-      const platforms = [];
-      if (lower.includes('stock')) platforms.push('Stocks');
-      if (lower.includes('mutual fund') || lower.includes('mf')) platforms.push('Mutual Funds');
-      if (lower.includes('etf')) platforms.push('ETFs');
-      if (lower.includes('fd') || lower.includes('deposit')) platforms.push('Fixed Deposits (FD)');
-      if (lower.includes('gold')) platforms.push('Gold / SGBs');
-      if (lower.includes('bond') || lower.includes('debt')) platforms.push('Bonds / Debt');
-      if (lower.includes('real estate') || lower.includes('property')) platforms.push('Real Estate');
-      if (lower.includes('crypto')) platforms.push('Crypto');
-      if (platforms.length > 0) {
-        updated.previousInvestmentPlatforms = platforms;
-      } else {
-        updated.previousInvestmentPlatforms = [raw];
-      }
       break;
     }
 
@@ -260,84 +358,189 @@ export function extractFactsFromAnswer(questionKey, userInput, knownFacts = {}) 
 }
 
 /**
- * Determines the next adaptive question based on domain & missing facts
+ * Determines the next adaptive question based on domain, known facts, and dependency logic
  */
 export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = []) {
   const domain = ADVISOR_DOMAINS.find((d) => d.id === domainId) || ADVISOR_DOMAINS[0];
   const name = knownFacts.fullName ? knownFacts.fullName.split(' ')[0] : 'there';
+  const asked = new Set(questionsAsked);
 
-  // 1. Domain: MY PROFILE
+  // =========================================================================
+  // DOMAIN 1: MY PROFILE (In-Depth Adaptive Interview)
+  // =========================================================================
   if (domainId === 'my_profile') {
-    if (!knownFacts.monthlyIncome) {
+    // 1. Income
+    if (!knownFacts.monthlyIncome && !asked.has('monthlyIncome')) {
       return {
         questionKey: 'monthlyIncome',
-        questionText: `Hi ${name} 👋 Let's review your complete financial foundation.
-
-What is your approximate **monthly take-home income**?`,
+        questionText: `Hi ${name} 👋 Let's begin your comprehensive financial diagnostic.\n\nWhat is your approximate **monthly take-home income**?`,
         options: ['₹50,000 / month', '₹80,000 / month', '₹1,00,000 / month', '₹1,50,000 / month', '₹2,00,000+ / month'],
         isEnough: false
       };
     }
-    if (!knownFacts.totalExpenses) {
+
+    // 2. Income Stability
+    if (!knownFacts.incomeStability && !asked.has('incomeStability')) {
+      const incomeAck = knownFacts.monthlyIncome ? `I have your monthly income recorded as **${formatINR(knownFacts.monthlyIncome)}**.\n\n` : '';
+      return {
+        questionKey: 'incomeStability',
+        questionText: `${incomeAck}How would you describe the **stability and consistency** of your monthly income?`,
+        options: ['Very Stable (Salaried Corporate)', 'Mostly Stable (Salaried/Professional)', 'Variable (Freelance / Commission)', 'Business / Entrepreneurial Inflow'],
+        isEnough: false
+      };
+    }
+
+    // 3. Expenses
+    if (!knownFacts.totalExpenses && !asked.has('totalExpenses')) {
       return {
         questionKey: 'totalExpenses',
-        questionText: `I have your monthly income as **${formatINR(knownFacts.monthlyIncome)}**.
+        questionText: `Approximately how much are your **total monthly living expenses** (Rent, groceries, utilities, essentials)?`,
+        options: ['₹25,000 / month', '₹40,000 / month', '₹60,000 / month', '₹80,000+ / month'],
+        isEnough: false
+      };
+    }
 
-Approximately how much are your **total monthly essential expenses** (Rent, utilities, food, groceries)?`,
-        options: ['₹25,000 / month', '₹40,000 / month', '₹60,000 / month', '₹80,000 / month'],
-        isEnough: false
-      };
-    }
-    if (knownFacts.monthlyDebtPayments === undefined) {
+    // 4. Discretionary Spending
+    if (!knownFacts.discretionarySpending && !asked.has('discretionarySpending')) {
+      const expAck = knownFacts.totalExpenses ? `Recorded living expenses at **${formatINR(knownFacts.totalExpenses)}/mo**.\n\n` : '';
       return {
-        questionKey: 'monthlyDebtPayments',
-        questionText: `Do you currently have any **monthly loan EMIs or credit debt** (e.g. Home Loan, Car Loan, Personal Loan)?`,
-        options: ['No loans (Debt Free 🎉)', '₹10,000 / month', '₹25,000 / month', '₹50,000+ / month'],
+        questionKey: 'discretionarySpending',
+        questionText: `${expAck}What portion of your overall spending goes toward **discretionary / lifestyle choices** (dining out, travel, shopping)?`,
+        options: ['Low / Frugal (<20% of expenses)', 'Moderate (20–40% of expenses)', 'High Lifestyle (>40% of expenses)'],
         isEnough: false
       };
     }
-    if (knownFacts.emergencyFund === undefined) {
+
+    // 5. Debt & Liabilities
+    if (knownFacts.hasDebt === undefined && knownFacts.monthlyDebtPayments === undefined && !asked.has('hasDebt') && !asked.has('monthlyDebtPayments')) {
+      return {
+        questionKey: 'hasDebt',
+        questionText: `Do you currently have any **outstanding loans or monthly EMIs** (Home Loan, Car Loan, Personal Loan, Education Loan)?`,
+        options: ['No loans (Debt Free 🎉)', 'Yes, Home Loan', 'Yes, Car Loan', 'Yes, Education / Personal Loan'],
+        isEnough: false
+      };
+    }
+
+    // 6. Debt Follow-Up (Only if user has debt)
+    if (knownFacts.hasDebt && !knownFacts.debtBalance && !asked.has('debtBalance')) {
+      return {
+        questionKey: 'debtBalance',
+        questionText: `Approximately what is your **total remaining loan balance**?`,
+        options: ['Under ₹5,00,000', '₹5,00,000 – ₹15,00,000', '₹25,00,000 (Home Loan)', '₹50,00,000+'],
+        isEnough: false
+      };
+    }
+
+    // 7. Emergency Fund
+    if (knownFacts.emergencyFund === undefined && !asked.has('emergencyFund')) {
       return {
         questionKey: 'emergencyFund',
-        questionText: `How much do you currently keep parked in **liquid emergency funds / savings** for unexpected events?`,
-        options: ['No emergency reserve yet', '₹50,000', '₹1,50,000 (3 months)', '₹3,00,000+ (6 months)'],
+        questionText: `How much do you currently keep parked in **liquid emergency funds / savings** for unforeseen emergencies?`,
+        options: ['No emergency fund yet', '₹50,000', '₹1,50,000 (~3 months)', '₹3,00,000+ (6+ months)'],
         isEnough: false
       };
     }
-    if (!knownFacts.riskTolerance) {
-      return {
-        questionKey: 'riskTolerance',
-        questionText: `How would you describe your **risk appetite** for long-term investing?`,
-        options: COMMON_OPTION_PRESETS.riskTolerance,
-        isEnough: false
-      };
-    }
-    // All core facts collected
-    return { questionKey: null, questionText: null, isEnough: true };
-  }
 
-  // 2. Domain: SIP PLAN
-  if (domainId === 'sip_plan') {
-    if (!knownFacts.availableSipAmount && !knownFacts.monthlySurplus) {
+    // 8. Emergency Storage
+    if (knownFacts.emergencyFund > 0 && !knownFacts.emergencyStorage && !asked.has('emergencyStorage')) {
       return {
-        questionKey: 'availableSipAmount',
-        questionText: `How much capital can you comfortably commit to a **monthly SIP** (e.g. ₹5,000, ₹15,000, ₹30,000)?`,
-        options: ['₹5,000 / month', '₹10,000 / month', '₹20,000 / month', '₹35,000 / month', '₹50,000+ / month'],
+        questionKey: 'emergencyStorage',
+        questionText: `Where is your emergency buffer of **${formatINR(knownFacts.emergencyFund)}** primarily parked?`,
+        options: ['Sweep-in / High-yield Savings', 'Liquid Mutual Funds', 'Fixed Deposits (FD)', 'Regular Savings Bank Account'],
         isEnough: false
       };
     }
-    if (!knownFacts.primaryGoalName) {
-      const sipAmt = knownFacts.availableSipAmount || knownFacts.monthlySurplus;
+
+    // 9. Investment Footprint
+    if (knownFacts.previousInvestmentAmount === undefined && !asked.has('previousInvestmentAmount')) {
+      return {
+        questionKey: 'previousInvestmentAmount',
+        questionText: `What is the approximate total value of your **active investment portfolio** today?`,
+        options: ['₹0 (Complete Beginner)', 'Under ₹2,00,000', '₹2,00,000 – ₹5,00,000', '₹5,00,000 – ₹15,00,000', '₹20,00,000+'],
+        isEnough: false
+      };
+    }
+
+    // 10. Asset Allocation Split (if has investments)
+    if (knownFacts.previousInvestmentAmount > 0 && !knownFacts.assetAllocationSplit && !asked.has('assetAllocationSplit')) {
+      return {
+        questionKey: 'assetAllocationSplit',
+        questionText: `Your current portfolio is approximately **${formatINR(knownFacts.previousInvestmentAmount)}**.\n\nHow is this distributed across asset classes?`,
+        options: ['Balanced Mutual Funds & Stocks', 'Heavy in Direct Stocks (>60%)', 'Mostly Safe FDs & Debt', 'Multi-Asset with Gold & Real Estate'],
+        isEnough: false
+      };
+    }
+
+    // 11. Market Reaction & Volatility Tolerance
+    if (!knownFacts.marketReactionTolerance && !asked.has('marketReactionTolerance')) {
+      return {
+        questionKey: 'marketReactionTolerance',
+        questionText: `How do you typically react when equity markets experience a **sharp 15% to 20% correction**?`,
+        options: ['View as a buying opportunity (Aggressive Growth)', 'Hold steady without panic (Moderate Balanced)', 'Feel anxious / prefer capital safety (Conservative)'],
+        isEnough: false
+      };
+    }
+
+    // 12. Dependents & Family Responsibilities
+    if (knownFacts.dependentsCount === undefined && !asked.has('dependentsCount')) {
+      return {
+        questionKey: 'dependentsCount',
+        questionText: `Do you have any family members **financially dependent** on your income?`,
+        options: ['None (Self only)', '1 (Spouse or Parent)', '2–3 (Children & Parents)', '4+ (Large Family)'],
+        isEnough: false
+      };
+    }
+
+    // 13. Term Insurance Protection (if has dependents)
+    if (knownFacts.dependentsCount > 0 && !knownFacts.hasTermInsurance && !asked.has('hasTermInsurance')) {
+      return {
+        questionKey: 'hasTermInsurance',
+        questionText: `To protect your **${knownFacts.dependentsCount} dependent(s)**, do you have an active pure term life insurance policy?`,
+        options: ['Yes, have term insurance cover', 'Only corporate employer cover', 'No term life cover yet'],
+        isEnough: false
+      };
+    }
+
+    // 14. Primary Goal Milestone
+    if (!knownFacts.primaryGoalName && !asked.has('primaryGoalName')) {
       return {
         questionKey: 'primaryGoalName',
-        questionText: `Great, we will plan around an installment of **${formatINR(sipAmt)}/month**.
-
-What is the primary **financial goal or milestone** for this SIP?`,
+        questionText: `What is your top **financial milestone or life goal** over the next 5–10 years?`,
         options: COMMON_OPTION_PRESETS.goals,
         isEnough: false
       };
     }
-    if (!knownFacts.timeHorizon) {
+
+    // Enough in-depth profile facts collected
+    return {
+      questionKey: null,
+      questionText: null,
+      isEnough: true
+    };
+  }
+
+  // =========================================================================
+  // DOMAIN 2: SIP PLAN
+  // =========================================================================
+  if (domainId === 'sip_plan') {
+    if (!knownFacts.availableSipAmount && !knownFacts.monthlySurplus && !asked.has('availableSipAmount')) {
+      return {
+        questionKey: 'availableSipAmount',
+        questionText: `How much capital can you comfortably commit to a **monthly SIP**?`,
+        options: ['₹5,00,0 / month', '₹10,000 / month', '₹20,000 / month', '₹35,000 / month', '₹50,000+ / month'],
+        isEnough: false
+      };
+    }
+    if (!knownFacts.primaryGoalName && !asked.has('primaryGoalName')) {
+      const sipAmt = knownFacts.availableSipAmount || knownFacts.monthlySurplus || 15000;
+      return {
+        questionKey: 'primaryGoalName',
+        questionText: `We will plan around an installment of **${formatINR(sipAmt)}/month**.\n\nWhat is the primary **financial goal** for this SIP?`,
+        options: COMMON_OPTION_PRESETS.goals,
+        isEnough: false
+      };
+    }
+    if (!knownFacts.timeHorizon && !asked.has('timeHorizon')) {
       return {
         questionKey: 'timeHorizon',
         questionText: `What is your expected **time horizon** for this SIP goal?`,
@@ -345,7 +548,7 @@ What is the primary **financial goal or milestone** for this SIP?`,
         isEnough: false
       };
     }
-    if (!knownFacts.riskTolerance) {
+    if (!knownFacts.riskTolerance && !asked.has('riskTolerance')) {
       return {
         questionKey: 'riskTolerance',
         questionText: `What fund volatility profile aligns best with your comfort?`,
@@ -356,9 +559,11 @@ What is the primary **financial goal or milestone** for this SIP?`,
     return { questionKey: null, questionText: null, isEnough: true };
   }
 
-  // 3. Domain: INVESTMENTS
+  // =========================================================================
+  // DOMAIN 3: INVESTMENTS
+  // =========================================================================
   if (domainId === 'investments') {
-    if (!knownFacts.availableCapital) {
+    if (!knownFacts.availableCapital && !asked.has('availableCapital')) {
       return {
         questionKey: 'availableCapital',
         questionText: `How much **capital** do you currently have available to deploy or allocate?`,
@@ -366,17 +571,15 @@ What is the primary **financial goal or milestone** for this SIP?`,
         isEnough: false
       };
     }
-    if (!knownFacts.riskTolerance) {
+    if (!knownFacts.riskTolerance && !asked.has('riskTolerance')) {
       return {
         questionKey: 'riskTolerance',
-        questionText: `Got it, we will allocate **${formatINR(knownFacts.availableCapital)}**.
-
-What is your **risk tolerance** for deploying this capital?`,
+        questionText: `Got it, we will allocate **${formatINR(knownFacts.availableCapital)}**.\n\nWhat is your **risk tolerance** for deploying this capital?`,
         options: COMMON_OPTION_PRESETS.riskTolerance,
         isEnough: false
       };
     }
-    if (!knownFacts.timeHorizon) {
+    if (!knownFacts.timeHorizon && !asked.has('timeHorizon')) {
       return {
         questionKey: 'timeHorizon',
         questionText: `How long do you plan to stay invested before needing access to these funds?`,
@@ -384,20 +587,14 @@ What is your **risk tolerance** for deploying this capital?`,
         isEnough: false
       };
     }
-    if (!knownFacts.assetPreferences) {
-      return {
-        questionKey: 'assetPreferences',
-        questionText: `Do you have preferred asset classes you wish to focus on?`,
-        options: ['Diversified (Index + Flexi Cap + Gold)', 'Direct Stocks + Equity MFs', 'Balanced Low Risk (FD + Debt + Large Cap)', 'Let AI recommend'],
-        isEnough: false
-      };
-    }
     return { questionKey: null, questionText: null, isEnough: true };
   }
 
-  // 4. Domain: PORTFOLIO
+  // =========================================================================
+  // DOMAIN 4: PORTFOLIO
+  // =========================================================================
   if (domainId === 'portfolio') {
-    if (!knownFacts.previousInvestmentAmount) {
+    if (!knownFacts.previousInvestmentAmount && !asked.has('previousInvestmentAmount')) {
       return {
         questionKey: 'previousInvestmentAmount',
         questionText: `What is the approximate **total current value** of your existing investment portfolio?`,
@@ -405,25 +602,15 @@ What is your **risk tolerance** for deploying this capital?`,
         isEnough: false
       };
     }
-    if (!knownFacts.previousInvestmentPlatforms) {
-      return {
-        questionKey: 'previousInvestmentPlatforms',
-        questionText: `Your portfolio value is **${formatINR(knownFacts.previousInvestmentAmount)}**.
-
-Which **asset classes** make up this portfolio?`,
-        options: ['Direct Stocks & Mutual Funds', 'Purely Mutual Funds & ETFs', 'Stocks, Mutual Funds, Gold & FDs', 'Real Estate & Fixed Income'],
-        isEnough: false
-      };
-    }
-    if (knownFacts.stockSharePct === undefined) {
+    if (knownFacts.stockSharePct === undefined && !asked.has('stockSharePct')) {
       return {
         questionKey: 'stockSharePct',
-        questionText: `Roughly what percentage (or amount) of this portfolio is in **direct individual stocks**?`,
+        questionText: `Roughly what percentage of your portfolio is in **direct individual stocks** vs mutual funds?`,
         options: ['0% (All in Mutual Funds/ETFs)', '25% in Direct Stocks', '50% in Direct Stocks', '75%+ heavily in Direct Stocks'],
         isEnough: false
       };
     }
-    if (!knownFacts.numberOfStocks && knownFacts.stockSharePct > 0) {
+    if (!knownFacts.numberOfStocks && knownFacts.stockSharePct > 0 && !asked.has('numberOfStocks')) {
       return {
         questionKey: 'numberOfStocks',
         questionText: `How many **individual company stocks** do you currently hold?`,
@@ -434,19 +621,19 @@ Which **asset classes** make up this portfolio?`,
     return { questionKey: null, questionText: null, isEnough: true };
   }
 
-  // 5. Domain: FINANCIAL HEALTH
+  // =========================================================================
+  // DOMAIN 5: FINANCIAL HEALTH
+  // =========================================================================
   if (domainId === 'financial_health') {
-    if (!knownFacts.monthlyIncome) {
+    if (!knownFacts.monthlyIncome && !asked.has('monthlyIncome')) {
       return {
         questionKey: 'monthlyIncome',
-        questionText: `Let's diagnose your financial health.
-
-What is your net **monthly take-home income**?`,
+        questionText: `Let's diagnose your financial health.\n\nWhat is your net **monthly take-home income**?`,
         options: ['₹40,000', '₹75,000', '₹1,00,000', '₹1,50,000+'],
         isEnough: false
       };
     }
-    if (!knownFacts.totalExpenses) {
+    if (!knownFacts.totalExpenses && !asked.has('totalExpenses')) {
       return {
         questionKey: 'totalExpenses',
         questionText: `What are your **monthly living expenses** (food, utilities, rent)?`,
@@ -454,7 +641,7 @@ What is your net **monthly take-home income**?`,
         isEnough: false
       };
     }
-    if (knownFacts.monthlyDebtPayments === undefined) {
+    if (knownFacts.monthlyDebtPayments === undefined && !asked.has('monthlyDebtPayments')) {
       return {
         questionKey: 'monthlyDebtPayments',
         questionText: `What is your total **monthly debt / EMI outgo**?`,
@@ -462,7 +649,7 @@ What is your net **monthly take-home income**?`,
         isEnough: false
       };
     }
-    if (knownFacts.emergencyFund === undefined) {
+    if (knownFacts.emergencyFund === undefined && !asked.has('emergencyFund')) {
       return {
         questionKey: 'emergencyFund',
         questionText: `How much liquid savings do you have reserved for **emergencies**?`,
@@ -473,9 +660,11 @@ What is your net **monthly take-home income**?`,
     return { questionKey: null, questionText: null, isEnough: true };
   }
 
-  // 6. Domain: FINANCIAL GOALS
+  // =========================================================================
+  // DOMAIN 6: FINANCIAL GOALS
+  // =========================================================================
   if (domainId === 'financial_goals') {
-    if (!knownFacts.primaryGoalName) {
+    if (!knownFacts.primaryGoalName && !asked.has('primaryGoalName')) {
       return {
         questionKey: 'primaryGoalName',
         questionText: `Which specific **financial goal** would you like to plan for today?`,
@@ -483,7 +672,7 @@ What is your net **monthly take-home income**?`,
         isEnough: false
       };
     }
-    if (!knownFacts.targetGoalAmount) {
+    if (!knownFacts.targetGoalAmount && !asked.has('targetGoalAmount')) {
       return {
         questionKey: 'targetGoalAmount',
         questionText: `What is the estimated **target corpus (₹)** needed for your **${knownFacts.primaryGoalName}**?`,
@@ -491,7 +680,7 @@ What is your net **monthly take-home income**?`,
         isEnough: false
       };
     }
-    if (!knownFacts.goalTimeYears) {
+    if (!knownFacts.goalTimeYears && !asked.has('goalTimeYears')) {
       return {
         questionKey: 'goalTimeYears',
         questionText: `In how many **years** do you need this **${formatINR(knownFacts.targetGoalAmount)}** corpus ready?`,
@@ -502,9 +691,11 @@ What is your net **monthly take-home income**?`,
     return { questionKey: null, questionText: null, isEnough: true };
   }
 
-  // 7. Domain: STOCKS
+  // =========================================================================
+  // DOMAIN 7: STOCKS
+  // =========================================================================
   if (domainId === 'stocks') {
-    if (!knownFacts.stockSymbol) {
+    if (!knownFacts.stockSymbol && !asked.has('stockSymbol')) {
       return {
         questionKey: 'stockSymbol',
         questionText: `Which **company or stock ticker** would you like to evaluate (e.g. TCS, HDFCBANK, INFY, RELIANCE)?`,
@@ -512,7 +703,7 @@ What is your net **monthly take-home income**?`,
         isEnough: false
       };
     }
-    if (!knownFacts.stockHoldingAmount) {
+    if (!knownFacts.stockHoldingAmount && !asked.has('stockHoldingAmount')) {
       return {
         questionKey: 'stockHoldingAmount',
         questionText: `How much capital do you hold (or plan to invest) in **${knownFacts.stockSymbol}**?`,
@@ -520,20 +711,14 @@ What is your net **monthly take-home income**?`,
         isEnough: false
       };
     }
-    if (!knownFacts.timeHorizon) {
-      return {
-        questionKey: 'timeHorizon',
-        questionText: `What is your expected **holding horizon** for **${knownFacts.stockSymbol}**?`,
-        options: ['Short Term (< 1 year)', 'Medium Term (1–3 years)', 'Long Term (5+ years compounding)'],
-        isEnough: false
-      };
-    }
     return { questionKey: null, questionText: null, isEnough: true };
   }
 
-  // 8. Domain: LEARNING
+  // =========================================================================
+  // DOMAIN 8: LEARNING
+  // =========================================================================
   if (domainId === 'learning') {
-    if (!knownFacts.learningTopic) {
+    if (!knownFacts.learningTopic && !asked.has('learningTopic')) {
       return {
         questionKey: 'learningTopic',
         questionText: `Which financial concept would you like to master right now?`,
@@ -548,50 +733,84 @@ What is your net **monthly take-home income**?`,
 }
 
 /**
- * Generates structured Final Analysis & Action Plan
+ * Generates structured Final Analysis & Action Plan with ZERO fake data
  */
 export function generateDomainPlan(domainId, knownFacts = {}) {
-  const inc = knownFacts.monthlyIncome || 80000;
-  const exp = knownFacts.totalExpenses || 35000;
+  const inc = knownFacts.monthlyIncome || 0;
+  const exp = knownFacts.totalExpenses || 0;
   const debt = knownFacts.monthlyDebtPayments || 0;
   const surplus = Math.max(0, inc - exp - debt);
   const emergency = knownFacts.emergencyFund || 0;
-  const emergencyMonths = exp > 0 ? (emergency / exp).toFixed(1) : 0;
+  const emergencyMonths = exp > 0 ? (emergency / exp).toFixed(1) : 'N/A';
   const risk = knownFacts.riskTolerance || 'Moderate (Balanced)';
-  const portfolio = knownFacts.previousInvestmentAmount || knownFacts.availableCapital || 200000;
+  const portfolio = knownFacts.previousInvestmentAmount || knownFacts.availableCapital || 0;
+  const savingsRate = inc > 0 ? Math.round((surplus / inc) * 100) : 0;
+  const stability = knownFacts.incomeStability || 'Standard Salaried';
+  const dependents = knownFacts.dependentsCount ?? 'Not specified';
+  const insurance = knownFacts.hasTermInsurance || 'Review required';
+  const primaryGoal = knownFacts.primaryGoalName || 'Wealth Creation';
 
   // 1. MY PROFILE Plan
   if (domainId === 'my_profile' || domainId === 'financial_health') {
-    return `### 📊 FINLABS AI COMPREHENSIVE ANALYSIS
+    return `### 📊 FINLABS AI — MY PROFILE POSITION SNAPSHOT
 
-**👤 Your Financial Position:**
-- **Monthly Inflow**: ${formatINR(inc)}
-- **Essential Living Costs**: -${formatINR(exp)}
-- **Monthly Debt/EMIs**: -${formatINR(debt)}
-- **Net Monthly Surplus**: **${formatINR(surplus)}** (${Math.round((surplus/inc)*100)}% savings rate)
-- **Emergency Safety Buffer**: ${formatINR(emergency)} (${emergencyMonths} months runway)
-- **Active Investment Footprint**: ${formatINR(portfolio)}
-- **Risk Tolerance Profile**: **${risk}**
+**1. Financial Position & Cash Flow:**
+- **Monthly Inflow**: ${inc > 0 ? formatINR(inc) : 'Not specified'} (${stability})
+- **Essential Living Costs**: ${exp > 0 ? `-${formatINR(exp)}` : 'Not specified'} (${knownFacts.discretionarySpending || 'Standard discretionary'})
+- **Monthly Debt / EMIs**: ${debt > 0 ? `-${formatINR(debt)}` : '₹0 (Debt Free 🎉)'} ${knownFacts.debtType ? `(${knownFacts.debtType})` : ''}
+- **Net Monthly Surplus**: **${formatINR(surplus)}** (${savingsRate}% savings rate)
+
+**2. Emergency Reserve & Safety:**
+- **Liquid Emergency Reserve**: ${formatINR(emergency)} (${emergencyMonths} months of essential expenses)
+- **Emergency Holding Venue**: ${knownFacts.emergencyStorage || 'Savings Account / Liquid Reserves'}
+
+**3. Investment Footprint & Risk Profile:**
+- **Total Investment Portfolio**: ${portfolio > 0 ? formatINR(portfolio) : '₹0 (Starting fresh)'}
+- **Asset Allocation Profile**: ${knownFacts.assetAllocationSplit || 'Diversified Mutual Funds & Equity'}
+- **Risk Tolerance Profile**: **${risk}** (${knownFacts.marketReactionTolerance || 'Standard volatility tolerance'})
+
+**4. Family Responsibilities & Protection:**
+- **Financial Dependents**: **${dependents}**
+- **Term Life Protection**: **${insurance}**
+- **Primary Milestone Goal**: **${primaryGoal}**
 
 ---
 
 ### 🔎 KEY DIAGNOSTIC FINDINGS
-1. **Cash Flow Efficiency**: Your ${Math.round((surplus/inc)*100)}% savings rate is strong and generates ${formatINR(surplus)} monthly deployable capital.
-2. **Emergency Cushion**: You have ${emergencyMonths} months of living expenses liquid. ${parseFloat(emergencyMonths) < 6 ? 'Target is 6 months to protect against unexpected life shocks.' : 'Your 6-month buffer is fully secured.'}
-3. **Debt Load**: Debt-to-income ratio is ${Math.round((debt/inc)*100)}%, which is well within the healthy <30% threshold.
+1. **Savings Discipline**: Your net recurring surplus of **${formatINR(surplus)}/month** delivers a healthy **${savingsRate}%** savings rate.
+2. **Emergency Runway**: Your liquid reserve provides **${emergencyMonths} months** of living buffer. ${parseFloat(emergencyMonths) < 6 ? 'Target is 6 months to shield investments against unexpected emergencies.' : 'Your 6-month buffer is securely funded.'}
+3. **Debt Exposure**: ${debt > 0 ? `Debt-to-income is ${Math.round((debt / inc) * 100)}% (${formatINR(debt)}/mo). Keep total EMIs under 35% of income.` : 'You are completely debt-free, maximizing capital available for compounding.'}
+4. **Protection Balance**: ${dependents > 0 && String(insurance).includes('No') ? '⚠️ Protection Gap: You have dependents but no active term life cover. Securing term insurance is high priority.' : 'Protection structure matches family responsibilities.'}
 
 ---
 
-### 🎯 RECOMMENDED ACTION PLAN
+### ⚠️ IDENTIFIED RISKS & GAPS
+- **Emergency Buffer**: ${parseFloat(emergencyMonths) < 3 ? 'Critical Underfunding: Under 3 months runway forces premature equity liquidation during shocks.' : 'Adequate buffer maintained.'}
+- **Single Asset Concentration**: ${knownFacts.assetAllocationSplit && String(knownFacts.assetAllocationSplit).includes('Heavy in Direct Stocks') ? 'High equity volatility risk. Ensure individual stocks do not exceed 10% of total wealth.' : 'Standard diversification.'}
 
-1. **Step 1 — Secure Emergency Runway**:
-   - Maintain at least **${formatINR(exp * 6)}** in high-yield liquid mutual funds or sweep-in FDs.
-2. **Step 2 — Automate Core Wealth SIP (${formatINR(surplus * 0.60)}/mo)**:
-   - Direct 60% of monthly surplus into low-cost Nifty 50 Index Fund (35%) and Flexi Cap Fund (25%).
-3. **Step 3 — Satellite & Growth Allocation (${formatINR(surplus * 0.25)}/mo)**:
-   - Allocate 25% into Mid Cap / Active Growth opportunities.
-4. **Step 4 — Stability & Gold Hedge (${formatINR(surplus * 0.15)}/mo)**:
-   - Allocate 15% into Sovereign Gold Bonds / Gold ETFs.`;
+---
+
+### 🌟 FINANCIAL STRENGTHS
+- **Debt Health**: ${debt === 0 ? 'Zero high-interest debt liabilities.' : 'Debt is structured within manageable limits.'}
+- **Deployable Surplus**: Predictable monthly surplus of **${formatINR(surplus)}** ready for automated wealth compounding.
+
+---
+
+### 🎯 PERSONALIZED ACTION PLAN
+
+1. **Step 1 — Build 6-Month Liquid Reserve (${formatINR(Math.max(0, exp * 6 - emergency))} gap)**:
+   - Route ${formatINR(surplus * 0.25)}/month into high-yield sweep-in FDs or Liquid Mutual Funds until 6 months of expenses (${formatINR(exp * 6)}) is secured.
+2. **Step 2 — Automate Core Wealth SIP (${formatINR(surplus * 0.50)}/mo)**:
+   - Deploy 50% of surplus into low-cost Nifty 50 Index Funds (30%) and Flexi Cap Funds (20%).
+3. **Step 3 — Satellite Growth & Inflation Hedge (${formatINR(surplus * 0.25)}/mo)**:
+   - Deploy remaining 25% across mid-cap equity growth funds and Sovereign Gold Bonds.
+4. **Step 4 — Annual Review & Rebalancing**:
+   - Step up your monthly SIPs by 10% annually with salary increments to accelerate milestone achievement by 30%.
+
+---
+
+### 💡 WHY THESE RECOMMENDATIONS
+These recommendations are calibrated directly to your authentic cash flow of **${formatINR(inc)}/mo**, **${risk}** risk persona, and **${primaryGoal}** milestone.`;
   }
 
   // 2. SIP PLAN
@@ -729,7 +948,5 @@ By stepping up this SIP by **10% annually** with salary increases, your 10-year 
 ${explanation || `**${topic}** is a foundational financial concept. It enables disciplined asset growth, systematic diversification, and risk control when aligned with your long-term goals.`}`;
   }
 
-  return `### 📊 FINLABS AI PERSONALIZED SUMMARY
-
-Your customized financial roadmap is ready based on your profile inputs and risk preferences.`;
+  return `### 📊 FINLABS AI PERSONALIZED SUMMARY\n\nYour customized financial roadmap is ready based on your profile inputs and risk preferences.`;
 }

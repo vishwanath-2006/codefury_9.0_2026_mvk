@@ -13,14 +13,24 @@ export const ADVISOR_DOMAINS = [
     badge: 'Diagnostic',
     targetFacts: [
       'monthlyIncome',
+      'incomeStability',
       'totalExpenses',
+      'discretionarySpending',
       'monthlyDebtPayments',
+      'debtType',
+      'debtBalance',
+      'debtInterestRate',
       'emergencyFund',
+      'emergencyStorage',
       'previousInvestmentAmount',
+      'assetAllocationSplit',
       'riskTolerance',
-      'timeHorizon'
+      'timeHorizon',
+      'dependentsCount',
+      'hasTermInsurance',
+      'primaryGoalName'
     ],
-    initialPrompt: "Let's review and complete your full financial profile to create your baseline wealth diagnostic."
+    initialPrompt: "Great. I'll help you understand your complete financial profile.\n\nI already have some information from your FinLabs profile, so I won't ask you for information I already know.\n\nI'll ask you a few questions one at a time. Each answer will help me decide what I should ask next.\n\nYou can stop anytime by selecting:\n[✓ I HAVE ENOUGH INFORMATION]"
   },
   {
     id: 'sip_plan',

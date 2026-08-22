@@ -16,7 +16,9 @@ import {
   ArrowRight,
   RefreshCw,
   Compass,
-  Check
+  Check,
+  FileText,
+  HelpCircle
 } from 'lucide-react';
 import { ADVISOR_DOMAINS } from '../data/advisorDomains';
 import {
@@ -48,6 +50,7 @@ export default function AiPage() {
   const [inputQuery, setInputQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [isPlanGenerated, setIsPlanGenerated] = useState(false);
+  const [isReadyForPlanPrompt, setIsReadyForPlanPrompt] = useState(false);
 
   // Chat scroll refs
   const messagesEndRef = useRef(null);
@@ -64,7 +67,7 @@ export default function AiPage() {
 
   useEffect(() => {
     scrollToBottom('smooth');
-  }, [messages, loading, currentStep, activeDomain]);
+  }, [messages, loading, currentStep, activeDomain, isReadyForPlanPrompt]);
 
   // 1. Initialize Profile Context & Restore Active Session
   useEffect(() => {
@@ -85,6 +88,7 @@ export default function AiPage() {
           setAnswersHistory(savedSession.answersHistory || []);
           setMessages(savedSession.messages || []);
           setIsPlanGenerated(savedSession.isPlanGenerated || false);
+          setIsReadyForPlanPrompt(savedSession.isReadyForPlanPrompt || false);
         } else {
           setKnownFacts(baseFacts);
           // Initial greeting without selecting a domain yet
@@ -122,18 +126,20 @@ Instead of making you think of random questions, I'll guide you step-by-step thr
         questionsAsked,
         answersHistory,
         messages,
-        isPlanGenerated
+        isPlanGenerated,
+        isReadyForPlanPrompt
       });
     }
-  }, [activeDomain, currentStep, knownFacts, questionsAsked, answersHistory, messages, isPlanGenerated, user?.id]);
+  }, [activeDomain, currentStep, knownFacts, questionsAsked, answersHistory, messages, isPlanGenerated, isReadyForPlanPrompt, user?.id]);
 
-  // 3. Handle Domain Selection
+  // 3. Handle Domain Selection (Starts guided interview, NEVER generates immediate report)
   const handleSelectDomain = (domainId) => {
     const domain = ADVISOR_DOMAINS.find((d) => d.id === domainId);
     if (!domain) return;
 
     setActiveDomain(domainId);
     setIsPlanGenerated(false);
+    setIsReadyForPlanPrompt(false);
 
     // Append user selection
     const userMsg = {
@@ -143,11 +149,13 @@ Instead of making you think of random questions, I'll guide you step-by-step thr
     };
 
     // Evaluate next question based on existing known facts
-    const nextStep = getNextAdvisorStep(domainId, knownFacts, questionsAsked);
+    const nextStep = getNextAdvisorStep(domainId, knownFacts, []);
 
-    let aiGreetingText = `Great! ${domain.initialPrompt}`;
+    let aiGreetingText = domain.initialPrompt;
     if (nextStep.questionText) {
       aiGreetingText += `
+
+---
 
 ${nextStep.questionText}`;
     }
@@ -161,12 +169,7 @@ ${nextStep.questionText}`;
     setMessages((prev) => [...prev, userMsg, aiMsg]);
     setCurrentStep(nextStep);
     if (nextStep.questionKey) {
-      setQuestionsAsked((prev) => [...prev, nextStep.questionKey]);
-    }
-
-    if (nextStep.isEnough) {
-      // If we already have all facts for this domain, generate plan directly
-      triggerPlanGeneration(domainId, knownFacts);
+      setQuestionsAsked([nextStep.questionKey]);
     }
   };
 
@@ -185,11 +188,12 @@ ${nextStep.questionText}`;
 
 **✅ I've completed your personalized analysis for ${domainObj ? domainObj.title : 'this area'}.**
 
-What would you like to work on next?`
+What would you like to explore next?`
     };
 
     setMessages((prev) => [...prev, planMessage]);
     setIsPlanGenerated(true);
+    setIsReadyForPlanPrompt(false);
     setCurrentStep(null);
   };
 
@@ -216,46 +220,38 @@ What would you like to work on next?`
     const updatedFacts = extractFactsFromAnswer(currentQKey, text, knownFacts);
     setKnownFacts(updatedFacts);
     setAnswersHistory((prev) => [...prev, { questionKey: currentQKey, answer: text }]);
+    const newQuestionsAsked = [...questionsAsked, currentQKey];
+    setQuestionsAsked(newQuestionsAsked);
 
     setLoading(true);
 
     try {
-      // Evaluate if we should ask next question or finalize
-      const nextStep = getNextAdvisorStep(activeDomain || 'my_profile', updatedFacts, [...questionsAsked, currentQKey]);
+      // Evaluate if we should ask next question or prompt for completion
+      const nextStep = getNextAdvisorStep(activeDomain || 'my_profile', updatedFacts, newQuestionsAsked);
 
-      if (nextStep.isEnough || !nextStep.questionText) {
-        // Complete domain interview and render plan
-        triggerPlanGeneration(activeDomain, updatedFacts);
+      if (nextStep.isEnough || !nextStep.questionText || newQuestionsAsked.length >= 7) {
+        // Offer completion choice or generate plan
+        setIsReadyForPlanPrompt(true);
+        setCurrentStep(null);
+
+        const readyMsg = {
+          id: `ai_ready_${Date.now()}`,
+          sender: 'ai',
+          text: `Got it. I have collected comprehensive details to build your in-depth **${ADVISOR_DOMAINS.find((d) => d.id === activeDomain)?.title || 'Financial'} Diagnostic**.
+
+Would you like me to generate your complete analysis and action plan now?`
+        };
+        setMessages((prev) => [...prev, readyMsg]);
       } else {
-        // Acknowledge briefly and ask next question
-        let responseText = nextStep.questionText;
-
-        // Optional server-side NLP enrichment
-        try {
-          const serverResponse = await generateAiResponse(
-            `Context: Working on domain ${activeDomain}. User just answered: "${text}". Next question to ask: "${nextStep.questionText}"`,
-            user?.id,
-            profile,
-            messages
-          );
-          if (serverResponse && !serverResponse.includes('Unable to formulate')) {
-            // Keep clean formatted response
-          }
-        } catch (e) {
-          // fallback to deterministic response
-        }
-
+        // Ask next question
         const aiResponseMsg = {
           id: `ai_${Date.now()}`,
           sender: 'ai',
-          text: responseText
+          text: nextStep.questionText
         };
 
         setMessages((prev) => [...prev, aiResponseMsg]);
         setCurrentStep(nextStep);
-        if (nextStep.questionKey) {
-          setQuestionsAsked((prev) => [...prev, nextStep.questionKey]);
-        }
       }
     } catch (err) {
       console.error('Advisor processing error:', err);
@@ -280,6 +276,7 @@ What would you like to work on next?`
     setActiveDomain(null);
     setCurrentStep(null);
     setIsPlanGenerated(false);
+    setIsReadyForPlanPrompt(false);
     setQuestionsAsked([]);
     setAnswersHistory([]);
     setMessages([
@@ -453,8 +450,42 @@ What would you like to work on next?`
             </div>
           )}
 
-          {/* STATE B: Active Interview with Quick Option Buttons */}
-          {activeDomain && !isPlanGenerated && currentStep && !loading && (
+          {/* STATE B: Interview Ready for Plan Confirmation */}
+          {activeDomain && isReadyForPlanPrompt && !isPlanGenerated && !loading && (
+            <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 space-y-2.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>Ready to generate your diagnostic & personalized action plan!</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => triggerPlanGeneration(activeDomain, knownFacts)}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-98 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-md shadow-emerald-500/20 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>📊 Generate My Complete Analysis</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsReadyForPlanPrompt(false);
+                    const nextStep = getNextAdvisorStep(activeDomain, knownFacts, questionsAsked);
+                    if (nextStep.questionText) {
+                      setMessages((prev) => [...prev, { id: `ai_${Date.now()}`, sender: 'ai', text: nextStep.questionText }]);
+                      setCurrentStep(nextStep);
+                    } else {
+                      triggerPlanGeneration(activeDomain, knownFacts);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                >
+                  <span>💬 Ask Me More Questions</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STATE C: Active Interview with Quick Option Buttons & Stop Button */}
+          {activeDomain && !isPlanGenerated && !isReadyForPlanPrompt && currentStep && !loading && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -607,7 +638,7 @@ function renderFormattedAiMessage(rawText) {
     }
 
     // 3. Numbered list item
-    const numMatch = trimmed.match(/^(\\d+)\\.\\s+(.*)$/);
+    const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
     if (numMatch) {
       const num = numMatch[1];
       const text = numMatch[2];
@@ -636,7 +667,7 @@ function renderFormattedAiMessage(rawText) {
     if (trimmed.startsWith('**') && trimmed.endsWith('**') && !trimmed.includes(':')) {
       elements.push(
         <div key={lineIdx} className="font-extrabold text-emerald-400 text-sm mt-3 mb-1 tracking-tight">
-          {trimmed.replace(/\\*\\*/g, '')}
+          {trimmed.replace(/\*\*/g, '')}
         </div>
       );
       return;
@@ -664,7 +695,7 @@ function renderFormattedAiMessage(rawText) {
 }
 
 function parseInlineMarkdown(text) {
-  const parts = text.split(/(\\*\\*.*?\\*\\*|`.*?`)/g);
+  const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
 
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
