@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Sparkles, X, Move, EyeOff, RotateCcw, Bot, Send, User, Loader2, Maximize2 } from 'lucide-react';
 import { generateAiResponse } from '../../services/aiService';
 
-const STORAGE_KEY = 'finlabs_robot_position_v3';
+const STORAGE_KEY = 'finlabs_robot_state_v4';
 const MARGIN = 24;
 const ROBOT_WIDTH = 110;
 const ROBOT_HEIGHT = 140;
@@ -15,7 +15,7 @@ export default function FloatingAiWidget() {
   const location = useLocation();
 
   const [bubbleDismissed, setBubbleDismissed] = useState(false);
-  const [position, setPosition] = useState({ x: null, y: null });
+  const [position, setPosition] = useState({ x: null, y: null }); // null means default CSS right:24px bottom:24px
   const [isHidden, setIsHidden] = useState(false);
   const [hiddenEdge, setHiddenEdge] = useState('right');
   const [lastVisiblePos, setLastVisiblePos] = useState({ x: null, y: null });
@@ -49,42 +49,44 @@ export default function FloatingAiWidget() {
     }
   }, [chatMessages, chatLoading, isChatOpen]);
 
-  // Initial Position Loading
+  // 1. Initial State: Always default to VISIBLE bottom-right unless explicitly moved/hidden by user in v4
   useEffect(() => {
     try {
+      // Clear legacy stale storage keys from prior buggy versions
+      localStorage.removeItem('finlabs_robot_position_v3');
+      localStorage.removeItem('finlabs_robot_position_v2');
+      localStorage.removeItem('finlabs_robot_position');
+
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        const maxX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
-        const maxY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
+        if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          const maxX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
+          const maxY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
+          const clampedX = Math.min(Math.max(MARGIN, parsed.x), maxX);
+          const clampedY = Math.min(Math.max(MARGIN, parsed.y), maxY);
 
-        const clampedX = Math.min(Math.max(MARGIN, parsed.x ?? maxX), maxX);
-        const clampedY = Math.min(Math.max(MARGIN, parsed.y ?? maxY), maxY);
-
-        setPosition({ x: clampedX, y: clampedY });
-        setIsHidden(Boolean(parsed.isHidden));
-        setHiddenEdge(parsed.hiddenEdge || (clampedX < window.innerWidth / 2 ? 'left' : 'right'));
-        setLastVisiblePos({
-          x: Math.min(Math.max(MARGIN, parsed.lastX ?? clampedX), maxX),
-          y: Math.min(Math.max(MARGIN, parsed.lastY ?? clampedY), maxY)
-        });
-      } else {
-        const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
-        const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
-        setPosition({ x: defaultX, y: defaultY });
-        setLastVisiblePos({ x: defaultX, y: defaultY });
-        setIsHidden(false);
+          setPosition({ x: clampedX, y: clampedY });
+          setIsHidden(Boolean(parsed.isHidden));
+          setHiddenEdge(parsed.hiddenEdge || (clampedX < window.innerWidth / 2 ? 'left' : 'right'));
+          setLastVisiblePos({
+            x: Math.min(Math.max(MARGIN, parsed.lastX ?? clampedX), maxX),
+            y: Math.min(Math.max(MARGIN, parsed.lastY ?? clampedY), maxY)
+          });
+          return;
+        }
       }
-    } catch {
-      const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
-      const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
-      setPosition({ x: defaultX, y: defaultY });
-      setLastVisiblePos({ x: defaultX, y: defaultY });
-      setIsHidden(false);
+    } catch (e) {
+      console.warn('Error reading robot state', e);
     }
+
+    // Default state: strictly visible at bottom-right
+    setPosition({ x: null, y: null });
+    setLastVisiblePos({ x: null, y: null });
+    setIsHidden(false);
   }, []);
 
-  // Clamp position on window resize
+  // 2. Clamp position on window resize so robot is never off-screen
   useEffect(() => {
     const handleResize = () => {
       setPosition((prev) => {
@@ -101,9 +103,27 @@ export default function FloatingAiWidget() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Persist State
+  // 3. Persist State
   const persistState = useCallback((newPos, hiddenState, edge, lastPos) => {
     try {
+      if (newPos.x === null || newPos.y === null) {
+        if (hiddenState) {
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              x: window.innerWidth - ROBOT_WIDTH - MARGIN,
+              y: window.innerHeight - ROBOT_HEIGHT - MARGIN,
+              isHidden: true,
+              hiddenEdge: edge,
+              lastX: window.innerWidth - ROBOT_WIDTH - MARGIN,
+              lastY: window.innerHeight - ROBOT_HEIGHT - MARGIN
+            })
+          );
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+        return;
+      }
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
@@ -116,15 +136,24 @@ export default function FloatingAiWidget() {
         })
       );
     } catch (e) {
-      console.warn('Failed to save robot position to localStorage', e);
+      console.warn('Failed to save robot state', e);
     }
   }, []);
 
-  // Close context menu & chat modal on outside click
+  // 4. Close context menu or chat on outside click or Escape
   useEffect(() => {
     const handleGlobalClick = (e) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
         setContextMenu(null);
+      }
+      if (
+        isChatOpen &&
+        chatModalRef.current &&
+        !chatModalRef.current.contains(e.target) &&
+        widgetRef.current &&
+        !widgetRef.current.contains(e.target)
+      ) {
+        setIsChatOpen(false);
       }
     };
 
@@ -136,10 +165,8 @@ export default function FloatingAiWidget() {
       }
     };
 
-    if (contextMenu || isChatOpen) {
-      document.addEventListener('mousedown', handleGlobalClick);
-      document.addEventListener('keydown', handleKeyDown);
-    }
+    document.addEventListener('mousedown', handleGlobalClick);
+    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       document.removeEventListener('mousedown', handleGlobalClick);
@@ -147,39 +174,14 @@ export default function FloatingAiWidget() {
     };
   }, [contextMenu, isChatOpen, isDragging]);
 
-  // Handle Robot / Speech Bubble Left Click -> Toggle AI Chat Modal
+  // Handle Left Click -> Open Inline Interactive Chatbox
   const handleClick = (e) => {
-    e?.stopPropagation?.();
     if (dragStartRef.current.hasMoved) {
-      dragStartRef.current.hasMoved = false;
+      e?.preventDefault?.();
       return;
     }
-
-    // Toggle Chatbox Modal
+    setContextMenu(null);
     setIsChatOpen((prev) => !prev);
-  };
-
-  // Send Message inside Chat Modal
-  const handleSendChatMessage = async (textToSend) => {
-    const text = textToSend || chatInput;
-    if (!text.trim() || chatLoading) return;
-
-    setChatMessages((prev) => [...prev, { sender: 'user', text }]);
-    if (!textToSend) setChatInput('');
-    setChatLoading(true);
-
-    try {
-      const response = await generateAiResponse(text, user?.id, profile);
-      setChatMessages((prev) => [...prev, { sender: 'ai', text: response }]);
-    } catch (err) {
-      console.error('Chat response error:', err);
-      setChatMessages((prev) => [
-        ...prev,
-        { sender: 'ai', text: 'Unable to analyze financial context right now. Please try again.' }
-      ]);
-    } finally {
-      setChatLoading(false);
-    }
   };
 
   // Handle Right Click -> Open Context Menu
@@ -197,11 +199,14 @@ export default function FloatingAiWidget() {
 
   // Dragging logic
   const startDrag = (clientX, clientY) => {
+    const currentX = position.x !== null ? position.x : (window.innerWidth - ROBOT_WIDTH - MARGIN);
+    const currentY = position.y !== null ? position.y : (window.innerHeight - ROBOT_HEIGHT - MARGIN);
+
     dragStartRef.current = {
       mouseX: clientX,
       mouseY: clientY,
-      posX: position.x ?? (window.innerWidth - ROBOT_WIDTH - MARGIN),
-      posY: position.y ?? (window.innerHeight - ROBOT_HEIGHT - MARGIN),
+      posX: currentX,
+      posY: currentY,
       hasMoved: false
     };
     setIsDragging(true);
@@ -227,7 +232,7 @@ export default function FloatingAiWidget() {
       const deltaX = e.clientX - dragStartRef.current.mouseX;
       const deltaY = e.clientY - dragStartRef.current.mouseY;
 
-      if (Math.hypot(deltaX, deltaY) > 8) {
+      if (Math.hypot(deltaX, deltaY) > 4) {
         dragStartRef.current.hasMoved = true;
       }
 
@@ -242,16 +247,16 @@ export default function FloatingAiWidget() {
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      setTimeout(() => {
-        dragStartRef.current.hasMoved = false;
-      }, 50);
-
       setPosition((currentPos) => {
-        setLastVisiblePos(currentPos);
-        const edge = currentPos.x < window.innerWidth / 2 ? 'left' : 'right';
+        const finalPos = currentPos.x !== null ? currentPos : {
+          x: window.innerWidth - ROBOT_WIDTH - MARGIN,
+          y: window.innerHeight - ROBOT_HEIGHT - MARGIN
+        };
+        setLastVisiblePos(finalPos);
+        const edge = finalPos.x < window.innerWidth / 2 ? 'left' : 'right';
         setHiddenEdge(edge);
-        persistState(currentPos, false, edge, currentPos);
-        return currentPos;
+        persistState(finalPos, false, edge, finalPos);
+        return finalPos;
       });
     };
 
@@ -279,11 +284,15 @@ export default function FloatingAiWidget() {
   const handleHideRobot = () => {
     setContextMenu(null);
     setIsChatOpen(false);
-    const edge = (position.x ?? window.innerWidth / 2) < window.innerWidth / 2 ? 'left' : 'right';
+    const currentX = position.x !== null ? position.x : (window.innerWidth - ROBOT_WIDTH - MARGIN);
+    const currentY = position.y !== null ? position.y : (window.innerHeight - ROBOT_HEIGHT - MARGIN);
+    const edge = currentX < window.innerWidth / 2 ? 'left' : 'right';
+    const posObj = { x: currentX, y: currentY };
+
     setHiddenEdge(edge);
-    setLastVisiblePos({ ...position });
+    setLastVisiblePos(posObj);
     setIsHidden(true);
-    persistState(position, true, edge, position);
+    persistState(posObj, true, edge, posObj);
   };
 
   const handleRestoreRobot = () => {
@@ -298,13 +307,52 @@ export default function FloatingAiWidget() {
 
   const handleResetPosition = () => {
     setContextMenu(null);
-    const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
-    const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
-    const defaultPos = { x: defaultX, y: defaultY };
-    setPosition(defaultPos);
-    setLastVisiblePos(defaultPos);
+    setPosition({ x: null, y: null });
+    setLastVisiblePos({ x: null, y: null });
     setIsHidden(false);
-    persistState(defaultPos, false, 'right', defaultPos);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  };
+
+  // Chat message submission
+  const handleSendChatMessage = async (presetText) => {
+    const textToSend = presetText || chatInput;
+    if (!textToSend.trim() || chatLoading) return;
+
+    const userMsg = { sender: 'user', text: textToSend.trim() };
+    setChatMessages((prev) => [...prev, userMsg]);
+    if (!presetText) setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const userContext = {
+        monthlyIncome: profile?.monthly_income || 50000,
+        fixedExpenses: profile?.fixed_expenses || 20000,
+        savings: profile?.current_savings || 100000,
+        riskScore: profile?.risk_score || 60,
+        knowledgeLevel: profile?.knowledge_level || 'Intermediate'
+      };
+
+      const history = chatMessages.map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: m.text }]
+      }));
+
+      const reply = await generateAiResponse(textToSend, userContext, history);
+      setChatMessages((prev) => [...prev, { sender: 'ai', text: reply }]);
+    } catch (e) {
+      console.error('Chat error:', e);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          sender: 'ai',
+          text: "I'm having a brief connection pause. Please try asking again in a moment or visit the full AI page!"
+        }
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   if (isAiPage) {
@@ -373,7 +421,7 @@ export default function FloatingAiWidget() {
         }
       `}</style>
 
-      {/* 1. Visible Robot Companion */}
+      {/* 1. Visible Robot Viewport Component (Defaults strictly to bottom-right: 24px) */}
       {!isHidden && (
         <aside
           ref={widgetRef}
@@ -383,10 +431,9 @@ export default function FloatingAiWidget() {
           onTouchStart={handleTouchStart}
           style={{
             position: 'fixed',
-            left: position.x !== null ? `${position.x}px` : undefined,
-            top: position.y !== null ? `${position.y}px` : undefined,
-            bottom: position.x === null ? '24px' : undefined,
-            right: position.x === null ? '24px' : undefined,
+            ...(position.x !== null && position.y !== null
+              ? { left: `${position.x}px`, top: `${position.y}px` }
+              : { right: '24px', bottom: '24px' }),
             zIndex: 45,
             touchAction: 'none'
           }}
@@ -408,7 +455,7 @@ export default function FloatingAiWidget() {
               tabIndex={0}
               onClick={handleClick}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') handleClick(e);
+                if (e.key === 'Enter' || e.key === ' ') handleClick();
               }}
               className="pointer-events-auto cursor-pointer relative max-w-[240px] sm:max-w-[270px] p-3 sm:p-3.5 rounded-2xl bg-slate-900/90 dark:bg-slate-900/95 backdrop-blur-md text-slate-100 border border-emerald-500/40 shadow-xl shadow-emerald-950/30 text-xs leading-relaxed transition-all hover:scale-102 hover:border-emerald-400 hover:shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mr-2"
             >
@@ -429,7 +476,7 @@ export default function FloatingAiWidget() {
                 <span className="tracking-tight font-extrabold text-[12px]">Hi! I'm FinLabs AI 👋</span>
               </div>
               <p className="text-[11px] text-slate-300 font-medium">
-                Click me to open live AI financial chat!
+                Click me to chat or ask any financial question!
               </p>
 
               {/* Speech bubble pointer arrow */}
@@ -441,7 +488,7 @@ export default function FloatingAiWidget() {
           <div className="pointer-events-auto relative flex flex-col items-center">
             <button
               type="button"
-              aria-label="Open FinLabs AI Copilot Chat"
+              aria-label="Open FinLabs AI Chat (Right-click to move/hide)"
               onClick={handleClick}
               className="group relative w-22 h-26 sm:w-26 sm:h-30 md:w-28 md:h-32 flex items-center justify-center transition-transform duration-200 hover:scale-106 active:scale-95 focus:outline-none cursor-pointer p-0 bg-transparent border-0"
             >
@@ -571,16 +618,18 @@ export default function FloatingAiWidget() {
 
                   {/* 7. Expressive Cybernetic Glowing Eyes */}
                   <g className="finlabs-eye">
+                    {/* Left Eye */}
                     <ellipse cx="32" cy="32" rx="4.2" ry="5" fill="#22d3ee" filter="url(#eyeCyanGlow)" />
                     <ellipse cx="32" cy="32" rx="2.2" ry="2.6" fill="#ffffff" />
                     <circle cx="33.8" cy="30.2" r="1.2" fill="#ffffff" />
 
+                    {/* Right Eye */}
                     <ellipse cx="48" cy="32" rx="4.2" ry="5" fill="#22d3ee" filter="url(#eyeCyanGlow)" />
                     <ellipse cx="48" cy="32" rx="2.2" ry="2.6" fill="#ffffff" />
                     <circle cx="49.8" cy="30.2" r="1.2" fill="#ffffff" />
                   </g>
 
-                  {/* 8. Friendly Digital Mouth */}
+                  {/* 8. Friendly Digital Mouth / Audio Wave Line */}
                   <path
                     d="M35 40 Q40 42.5 45 40"
                     fill="none"
@@ -591,7 +640,7 @@ export default function FloatingAiWidget() {
                     filter="url(#eyeCyanGlow)"
                   />
 
-                  {/* 9. Neck Joint */}
+                  {/* 9. Neck Articulation Joint */}
                   <rect x="36" y="50" width="8" height="4" rx="2" fill="#1e293b" stroke="#334155" strokeWidth="0.8" />
 
                   {/* 10. Magnetic Floating Arms */}
@@ -626,7 +675,7 @@ export default function FloatingAiWidget() {
                     strokeWidth="1.4"
                   />
 
-                  {/* 12. FinLabs "AI" Heart Core */}
+                  {/* 12. FinLabs "AI" Heart Core / Chest Emblem */}
                   <circle
                     cx="40"
                     cy="60"
@@ -649,7 +698,7 @@ export default function FloatingAiWidget() {
                     AI
                   </text>
 
-                  {/* 13. Thruster Glow Base */}
+                  {/* 13. Anti-Gravity Thruster Glow Base */}
                   <ellipse
                     cx="40"
                     cy="71"
@@ -670,22 +719,22 @@ export default function FloatingAiWidget() {
         </aside>
       )}
 
-      {/* 2. Interactive Floating AI Chatbox Popup Drawer */}
+      {/* 2. Interactive AI Chat Modal */}
       {isChatOpen && !isHidden && (
         <div
           ref={chatModalRef}
           style={{
             position: 'fixed',
-            right: position.x !== null ? `${Math.max(16, window.innerWidth - position.x - 320)}px` : '24px',
+            right: position.x !== null ? `${Math.max(16, window.innerWidth - position.x - ROBOT_WIDTH)}px` : '24px',
             bottom: position.y !== null ? `${Math.max(16, window.innerHeight - position.y + 10)}px` : '150px',
-            zIndex: 60
+            zIndex: 50
           }}
-          className="w-80 sm:w-96 h-[460px] max-h-[80vh] bg-slate-900/95 backdrop-blur-md rounded-3xl border border-emerald-500/40 shadow-2xl shadow-emerald-950/60 text-slate-100 flex flex-col justify-between p-4 animate-in fade-in zoom-in-95 duration-200"
+          className="w-[90vw] sm:w-[360px] md:w-[390px] h-[460px] max-h-[75vh] bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xl border border-emerald-500/40 rounded-3xl shadow-2xl shadow-emerald-950/50 flex flex-col p-4 animate-in fade-in zoom-in-95 duration-200"
         >
-          {/* Top Header */}
-          <div className="pb-3 border-b border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-500/20">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-xs">
                 <Sparkles className="w-4 h-4 text-white animate-pulse" />
               </div>
               <div>
