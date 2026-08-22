@@ -419,12 +419,20 @@ export async function fetchLiveStockQuote(symbol) {
  */
 export async function fetchLiveHistoricalCandles(symbol) {
   try {
+    const today = new Date();
+    const toDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')} 15:30`;
+    const fromDate = new Date(today);
+    fromDate.setFullYear(today.getFullYear() - 1);
+    const fromDateStr = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-${String(fromDate.getDate()).padStart(2, '0')} 09:15`;
+
     const response = await fetch('/api/broker/angelone/historical-candles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         symbol: symbol.toUpperCase(),
         interval: 'ONE_DAY',
+        fromDate: fromDateStr,
+        toDate: toDateStr,
         demo: false
       })
     });

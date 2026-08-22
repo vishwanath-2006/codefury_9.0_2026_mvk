@@ -77,6 +77,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
           symbol: item.symbol,
           displayName: item.displayName || item.name || item.symbol,
           color,
+          assetType: item.assetType || item.type || 'stock',
           isUnlisted: item.assetType === 'ipo' || item.type === 'ipo',
           hasData: false,
           gmpDisplay: item.returnDisplay || `${item.gmpPct}% GMP`,
@@ -105,6 +106,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         displayName: item.displayName || item.name || item.symbol,
         name: item.displayName || item.name || item.symbol,
         color,
+        assetType: item.assetType || item.type || 'stock',
         isUnlisted: false,
         hasData: true,
         points
@@ -345,7 +347,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
               <span className="text-slate-800 dark:text-slate-200 truncate max-w-[160px] sm:max-w-[200px]">{s.displayName}</span>
               <span className="text-[10px] text-slate-400 font-mono">
-                ({s.symbol}){s.isUnlisted ? ' · Primary GMP' : !s.hasData ? ' · Historical Series Pending' : ''}
+                ({s.symbol}){s.isUnlisted ? ' · Primary GMP' : !s.hasData ? (s.assetType === 'mf' ? ' · Historical NAV Unavailable' : ' · Historical Feed Unavailable') : ''}
               </span>
             </div>
           ))}

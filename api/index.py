@@ -318,26 +318,32 @@ async def get_historical_candles(payload: HistoricalCandleRequest):
         }
 
         candle_res = smart_api.getCandleData(historic_param)
-        if not candle_res.get('status'):
+        status_val = candle_res.get('status')
+        is_ok = (status_val is True) or (isinstance(status_val, str) and status_val.lower() in ['true', 'success'])
+
+        if not is_ok:
             return {
                 "status": "error",
                 "symbol": symbol,
-                "message": candle_res.get('message', 'Failed to retrieve candles'),
+                "message": str(candle_res.get('message', 'Failed to retrieve candles')),
                 "candles": []
             }
 
         raw_data = candle_res.get('data', [])
         candles = []
         for c in raw_data:
-            if isinstance(c, list) and len(c) >= 5:
-                date_str = str(c[0]).split('T')[0] if 'T' in str(c[0]) else str(c[0]).split(' ')[0]
+            if isinstance(c, (list, tuple)) and len(c) >= 5:
+                raw_ts = str(c[0])
+                date_str = raw_ts.split('T')[0] if 'T' in raw_ts else raw_ts.split(' ')[0]
+                close_price = float(c[4])
                 candles.append({
                     "date": date_str,
+                    "timestamp": raw_ts,
                     "open": float(c[1]),
                     "high": float(c[2]),
                     "low": float(c[3]),
-                    "close": float(c[4]),
-                    "price": float(c[4]),
+                    "close": close_price,
+                    "price": close_price,
                     "volume": int(c[5]) if len(c) > 5 else 0
                 })
 
