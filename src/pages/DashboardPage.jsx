@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
@@ -8,12 +8,33 @@ import StatCard from '../components/ui/StatCard';
 import ProgressIndicator from '../components/ui/ProgressIndicator';
 import Badge from '../components/ui/Badge';
 import { Wallet, TrendingUp, PiggyBank, Activity, Target, PieChart, Sparkles, ArrowRight, Settings2, ShieldCheck } from 'lucide-react';
-import { mockPrimaryInsight } from '../mock/finlabsMockData';
+import OnboardingEntryModal from '../components/onboarding/OnboardingEntryModal';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { profile, user } = useAuth();
-  const { formData, healthScore, riskProfile } = useOnboarding();
+  const { formData, healthScore, riskProfile, completedAt } = useOnboarding();
+
+  // Entry Modal Prompt State (Onboard vs Overview)
+  const [showEntryModal, setShowEntryModal] = useState(false);
+
+  useEffect(() => {
+    const isDismissed = sessionStorage.getItem('finlabs_entry_modal_dismissed');
+    if (!completedAt && !isDismissed) {
+      setShowEntryModal(true);
+    }
+  }, [completedAt]);
+
+  const handleCloseModal = () => {
+    sessionStorage.setItem('finlabs_entry_modal_dismissed', 'true');
+    setShowEntryModal(false);
+  };
+
+  const handleStartOnboarding = () => {
+    sessionStorage.setItem('finlabs_entry_modal_dismissed', 'true');
+    setShowEntryModal(false);
+    navigate('/onboarding');
+  };
 
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -106,7 +127,14 @@ export default function DashboardPage() {
   const goalProgressPct = Math.min(100, Math.max(15, Math.round((projectedAccumulated / targetCorpus) * 100)));
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <div className="space-y-6 animate-in fade-in duration-150 relative">
+      {/* ENTRY MODAL PROMPT */}
+      <OnboardingEntryModal
+        isOpen={showEntryModal}
+        onClose={handleCloseModal}
+        onStartOnboarding={handleStartOnboarding}
+      />
+
       {/* HEADER WITH USER PROFILE AVATAR & BLUEPRINT ACTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
