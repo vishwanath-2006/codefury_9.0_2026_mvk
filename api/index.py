@@ -1,26 +1,14 @@
 import os
+import pyotp
 import httpx
 import json
 import asyncio
 import time
 from datetime import datetime, timedelta
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from typing import Optional, List, Any
-
-try:
-    import pyotp
-except Exception:
-    pyotp = None
-
-try:
-    from fastapi import FastAPI, HTTPException
-    from fastapi.middleware.cors import CORSMiddleware
-    from pydantic import BaseModel
-except Exception:
-    FastAPI = None
-    HTTPException = Exception
-    CORSMiddleware = None
-    class BaseModel:
-        pass
 
 # Safe SmartConnect import fallback
 try:
@@ -28,29 +16,20 @@ try:
 except Exception:
     SmartConnect = None
 
-if FastAPI:
-    app = FastAPI(
-        title="Angel One SmartAPI Integration",
-        docs_url="/api/docs",
-        openapi_url="/api/openapi.json"
-    )
-    # Enable CORS for local development testing and production web client
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-else:
-    class DummyApp:
-        def get(self, *args, **kwargs):
-            return lambda fn: fn
-        def post(self, *args, **kwargs):
-            return lambda fn: fn
-        def add_middleware(self, *args, **kwargs):
-            pass
-    app = DummyApp()
+app = FastAPI(
+    title="Angel One SmartAPI Integration",
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json"
+)
+
+# Enable CORS for local development testing and production web client
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Server-side Session Cache with Concurrency Lock
 AUTH_LOCK = asyncio.Lock()
