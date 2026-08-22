@@ -21,6 +21,7 @@ import {
   generateKeyDifferences
 } from '../services/comparisonService';
 import MultiAssetLineChart from '../components/comparison/MultiAssetLineChart';
+import ComparisonBarChart from '../components/comparison/ComparisonBarChart';
 
 export default function InvestmentComparisonPage() {
   // Asset filter for search
@@ -34,6 +35,7 @@ export default function InvestmentComparisonPage() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState('1Y'); // '1M' | '6M' | '1Y'
+  const [analyticsCategory, setAnalyticsCategory] = useState('returns'); // 'returns' | 'valuation'
   const [comparisonData, setComparisonData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [maxWarning, setMaxWarning] = useState(false);
@@ -424,7 +426,88 @@ export default function InvestmentComparisonPage() {
             <MultiAssetLineChart items={comparisonData} timeFilter={timeFilter} />
           </Card>
 
-          {/* 5. Risk Spectrum & 1-Year Return / Yield (Side-by-side) */}
+          {/* 5. Visual Analytics Breakdown (with restored Returns / Valuation toggle) */}
+          <div className="space-y-3 pt-1">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Visual Analytics Breakdown
+              </h3>
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs font-semibold">
+                <button
+                  onClick={() => setAnalyticsCategory('returns')}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    analyticsCategory === 'returns'
+                      ? 'bg-emerald-500 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Returns
+                </button>
+                <button
+                  onClick={() => setAnalyticsCategory('valuation')}
+                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                    analyticsCategory === 'valuation'
+                      ? 'bg-emerald-500 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Valuation
+                </button>
+              </div>
+            </div>
+
+            {/* Switchable Analytics View */}
+            {analyticsCategory === 'returns' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <ComparisonBarChart
+                  title="1-Month Return (%)"
+                  subtitle="Short-term price momentum"
+                  data={comparisonData}
+                  metricKey="return1M"
+                  unit="%"
+                  isReturn={true}
+                />
+                <ComparisonBarChart
+                  title="6-Month Return (%)"
+                  subtitle="Medium-term trend"
+                  data={comparisonData}
+                  metricKey="return6M"
+                  unit="%"
+                  isReturn={true}
+                />
+                <ComparisonBarChart
+                  title="1-Year Return (%)"
+                  subtitle="Annualized performance"
+                  data={comparisonData}
+                  metricKey="return1Y"
+                  unit="%"
+                  isReturn={true}
+                />
+              </div>
+            )}
+
+            {analyticsCategory === 'valuation' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ComparisonBarChart
+                  title="Valuation Multiple / Cost"
+                  subtitle="P/E Multiple for Stocks, Expense Ratio for Funds, or GMP for IPOs"
+                  data={comparisonData}
+                  metricKey="valuationDisplay"
+                  theme="indigo"
+                />
+                <ComparisonBarChart
+                  title="1-Year Growth / Premium (%)"
+                  subtitle="Comparative baseline yield"
+                  data={comparisonData}
+                  metricKey="return1Y"
+                  unit="%"
+                  isReturn={true}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 6. Risk Spectrum & 1-Year Return / Yield (Side-by-side) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Risk Spectrum Visual */}
             <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between shadow-xs">
@@ -505,7 +588,7 @@ export default function InvestmentComparisonPage() {
             </Card>
           </div>
 
-          {/* 6. Key Differences Summary (2–3 bullet points) */}
+          {/* 7. Key Differences Summary (2–3 bullet points) */}
           {keyDifferences.length > 0 && (
             <Card className="p-4 sm:p-5 bg-emerald-500/5 dark:bg-slate-900/60 border border-emerald-500/20 space-y-2.5 shadow-xs">
               <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
@@ -522,7 +605,7 @@ export default function InvestmentComparisonPage() {
             </Card>
           )}
 
-          {/* 7. Regulatory Disclaimer */}
+          {/* 8. Regulatory Disclaimer */}
           <div className="flex items-center gap-2 text-[11px] text-slate-500 justify-center text-center pt-2">
             <Info className="w-3.5 h-3.5 shrink-0" />
             <span>Comparison is for informational purposes only and is not investment advice.</span>

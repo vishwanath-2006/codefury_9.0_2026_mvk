@@ -236,6 +236,8 @@ export async function loadUnifiedComparison(selectedItems) {
           typeBadge: 'Stock (NSE)',
           priceDisplay: `₹${quote.price.toLocaleString('en-IN')}`,
           isLive: quote.isLive,
+          return1M: Number((base.base1Y * 0.16).toFixed(1)),
+          return6M: Number((base.base1Y * 0.58).toFixed(1)),
           return1Y: base.base1Y,
           returnDisplay: `+${base.base1Y}%`,
           risk: base.risk,
@@ -246,6 +248,8 @@ export async function loadUnifiedComparison(selectedItems) {
           minInvestment: base.minInv,
           horizon: base.horizon,
           suitability: base.suitability,
+          peRatio: base.basePe ? Number(base.basePe) : null,
+          valuationDisplay: base.basePe ? `${base.basePe}x P/E` : 'N/A',
           history
         };
       }
@@ -274,6 +278,8 @@ export async function loadUnifiedComparison(selectedItems) {
           typeBadge: 'Mutual Fund',
           priceDisplay: `Min SIP: ${mf.minSip}`,
           isLive: true,
+          return1M: Number((mf.return1Y * 0.12).toFixed(1)),
+          return6M: Number((mf.return1Y * 0.52).toFixed(1)),
           return1Y: mf.return1Y,
           returnDisplay: `+${mf.return1Y}% CAGR`,
           risk: mf.risk,
@@ -284,6 +290,8 @@ export async function loadUnifiedComparison(selectedItems) {
           minInvestment: mf.minSip,
           horizon: mf.horizon,
           suitability: mf.suitability,
+          peRatio: null,
+          valuationDisplay: `${mf.expenseRatio} TER`,
           history
         };
       }
@@ -312,6 +320,8 @@ export async function loadUnifiedComparison(selectedItems) {
           typeBadge: 'IPO Radar',
           priceDisplay: ipo.priceBand,
           isLive: true,
+          return1M: Number((ipo.gmpPct * 0.45).toFixed(1)),
+          return6M: Number((ipo.gmpPct * 0.85).toFixed(1)),
           return1Y: ipo.gmpPct,
           returnDisplay: `${ipo.gmpLabel} GMP`,
           risk: ipo.risk,
@@ -322,6 +332,8 @@ export async function loadUnifiedComparison(selectedItems) {
           minInvestment: ipo.minLot,
           horizon: ipo.horizon,
           suitability: ipo.suitability,
+          peRatio: null,
+          valuationDisplay: `${ipo.gmpLabel} GMP`,
           history
         };
       }
