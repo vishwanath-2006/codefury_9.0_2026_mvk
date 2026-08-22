@@ -437,19 +437,37 @@ export async function fetchLiveHistoricalCandles(symbol) {
       })
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) {
+      return {
+        status: 'error',
+        candles: []
+      };
+    }
+
     const data = await response.json();
     if (data && data.status === 'success' && Array.isArray(data.candles)) {
-      return data.candles.map((c) => ({
-        date: c.date,
-        rawDate: new Date(c.date),
-        price: Number(c.price || c.close)
-      }));
+      return {
+        status: 'success',
+        candles: data.candles.map((c) => ({
+          date: c.date,
+          rawDate: new Date(c.date),
+          price: Number(c.price || c.close)
+        }))
+      };
     }
+
+    return {
+      status: data?.status || 'unavailable',
+      message: data?.message || 'Historical observations unavailable',
+      candles: []
+    };
   } catch (e) {
-    // Return empty array if backend historical endpoint is unavailable
+    return {
+      status: 'error',
+      message: e.message,
+      candles: []
+    };
   }
-  return [];
 }
 
 /**
@@ -578,7 +596,8 @@ export async function loadUnifiedComparison(selectedItems) {
         };
 
         const quote = await fetchLiveStockQuote(base.symbol);
-        const historyCandles = await fetchLiveHistoricalCandles(base.symbol);
+        const candleRes = await fetchLiveHistoricalCandles(base.symbol);
+        const historyCandles = Array.isArray(candleRes.candles) ? candleRes.candles : [];
 
         return {
           id: base.id || `stock-${base.symbol}`,
@@ -592,6 +611,7 @@ export async function loadUnifiedComparison(selectedItems) {
           priceDisplay: `₹${quote.price.toLocaleString('en-IN')}`,
           isLive: quote.isLive,
           dataSourceType: quote.isLive ? 'Live Angel One Market Data' : 'NSE Benchmark Reference',
+          feedStatus: candleRes.status || (historyCandles.length > 0 ? 'success' : 'unavailable'),
           return1M: base.return1M !== undefined ? Number(base.return1M) : null,
           return6M: base.return6M !== undefined ? Number(base.return6M) : null,
           return1Y: Number(base.return1Y),
@@ -610,7 +630,7 @@ export async function loadUnifiedComparison(selectedItems) {
           valuationDisplay: base.basePe ? `${base.basePe}x P/E` : 'N/A',
           valuationNumeric: base.basePe ? Number(base.basePe) : null,
           peRatio: base.basePe ? Number(base.basePe) : null,
-          history: historyCandles.length > 0 ? historyCandles : []
+          history: historyCandles
         };
       }
 
@@ -647,6 +667,7 @@ export async function loadUnifiedComparison(selectedItems) {
           priceDisplay: `Min SIP: ${mf.minSip}`,
           isLive: false,
           dataSourceType: 'AMFI Benchmark Reference',
+          feedStatus: 'nav_unavailable',
           return1M: mf.return1M !== undefined ? Number(mf.return1M) : null,
           return6M: mf.return6M !== undefined ? Number(mf.return6M) : null,
           return1Y: Number(mf.return1Y),
@@ -704,6 +725,7 @@ export async function loadUnifiedComparison(selectedItems) {
           priceDisplay: ipo.priceBand,
           isLive: false,
           dataSourceType: 'Primary Market Indicative Data',
+          feedStatus: 'unlisted_ipo',
           return1M: ipo.return1M !== undefined ? (ipo.return1M !== null ? Number(ipo.return1M) : null) : null,
           return6M: ipo.return6M !== undefined ? (ipo.return6M !== null ? Number(ipo.return6M) : null) : null,
           return1Y: ipo.return1Y !== undefined && ipo.return1Y !== null ? Number(ipo.return1Y) : (ipo.gmpPct || null),

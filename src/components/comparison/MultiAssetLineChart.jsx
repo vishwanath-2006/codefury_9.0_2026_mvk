@@ -81,6 +81,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
           isUnlisted: item.assetType === 'ipo' || item.type === 'ipo',
           hasData: false,
           gmpDisplay: item.returnDisplay || `${item.gmpPct}% GMP`,
+          feedStatus: item.feedStatus || 'unavailable',
           points: []
         };
       }
@@ -347,7 +348,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
               <span className="text-slate-800 dark:text-slate-200 truncate max-w-[160px] sm:max-w-[200px]">{s.displayName}</span>
               <span className="text-[10px] text-slate-400 font-mono">
-                ({s.symbol}){s.isUnlisted ? ' · Primary GMP' : !s.hasData ? (s.assetType === 'mf' ? ' · Historical NAV Unavailable' : ' · Historical Feed Unavailable') : ''}
+                ({s.symbol}){s.isUnlisted ? ' · Primary GMP' : ''}
               </span>
             </div>
           ))}
@@ -384,7 +385,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
                 Historical performance data unavailable
               </h4>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Real historical observations are required for this chart. No synthetic data is displayed. Trailing period metrics (1M, 6M, 1Y) remain accessible in the Quick Comparison and Visual Analytics Breakdown above.
+                Real historical observations from Angel One SmartAPI are required for this chart. Trailing period metrics (1M, 6M, 1Y) remain accessible in the Quick Comparison and Visual Analytics Breakdown above.
               </p>
             </div>
           )
