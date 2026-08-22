@@ -900,14 +900,18 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
         f"What would you like to explore?"
     )
 
-@app.post("/api/ai/chat")
-async def ai_chat_handler(payload: AiChatRequest):
-    query = payload.query.strip()
+@app.api_route("/api/ai/chat", methods=["GET", "POST"])
+async def ai_chat_handler(payload: Optional[AiChatRequest] = None, q: Optional[str] = None):
+    query = (payload.query if payload and payload.query else (q or "")).strip()
     if not query:
-        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+        return {
+            "status": "ok",
+            "service": "FinLabs AI Copilot API",
+            "message": "Send a POST request with {'query': '...'} to chat with FinLabs AI."
+        }
 
-    context = payload.context or {}
-    history = payload.conversationHistory or []
+    context = (payload.context if payload else None) or {}
+    history = (payload.conversationHistory if payload else None) or []
 
     # 1. Attempt External Gemini LLM if API Key is configured in environment
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
