@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth, resolveUserName } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import PlatformOverviewBanner from '../components/common/PlatformOverviewBanner';
-import { COMPLETE_FINANCIAL_TREE } from '../data/faqTreeData';
 import {
   Bot,
   Send,
@@ -19,10 +18,12 @@ import {
   ArrowLeft,
   RotateCcw,
   ExternalLink,
-  GitBranch,
-  ChevronRight
+  MessageSquare,
+  HelpCircle,
+  Layers
 } from 'lucide-react';
 import { generateAiResponse, buildUserFinancialContext } from '../services/aiService';
+import { BOT_ROOT_TREE } from '../data/botDecisionTree';
 
 export default function AiPage() {
   const { user, profile } = useAuth();
@@ -31,16 +32,15 @@ export default function AiPage() {
   const userName = resolveUserName(user, profile);
   const firstName = userName && userName !== 'Investor' ? userName.split(' ')[0] : null;
 
+  // Chat Transcript State
   const [messages, setMessages] = useState([]);
   const [inputQuery, setInputQuery] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Decision Tree Recursive State
-  const [treePath, setTreePath] = useState([]);
-
-  // Determine active branch options based on tree depth
-  const currentNode = treePath.length > 0 ? treePath[treePath.length - 1] : null;
-  const currentOptions = currentNode ? currentNode.followUps : COMPLETE_FINANCIAL_TREE;
+  // Decision Tree State Engine
+  const [activeTreeOptions, setActiveTreeOptions] = useState(BOT_ROOT_TREE);
+  const [historyStack, setHistoryStack] = useState([]);
+  const [isEscapeHatchMode, setIsEscapeHatchMode] = useState(false);
 
   // Chat scroll refs
   const messagesEndRef = useRef(null);
@@ -52,10 +52,7 @@ export default function AiPage() {
   // Auto-scroll to bottom of chat container
   const scrollToBottom = (behavior = 'smooth') => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior,
-        block: 'end'
-      });
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
     } else if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
@@ -63,9 +60,9 @@ export default function AiPage() {
 
   useEffect(() => {
     scrollToBottom('smooth');
-  }, [messages, loading]);
+  }, [messages, loading, activeTreeOptions]);
 
-  // Load user financial context for Action Plan on mount
+  // Load user financial context on mount
   useEffect(() => {
     let mounted = true;
     setUserAnalysis(null);
@@ -87,49 +84,73 @@ export default function AiPage() {
     };
   }, [user?.id, profile]);
 
-  // Initial greeting message
+  // Initial greeting
   useEffect(() => {
     const greetingText = firstName
-      ? `Hello ${firstName} 👋 I'm your FinLabs AI Copilot. Select any decision topic below to explore our guided financial tree, or type a custom question.`
-      : "Hello 👋 I'm your FinLabs AI Copilot. Select any decision topic below to explore our guided financial tree, or type a custom question.";
+      ? `Hello ${firstName} 👋 I'm your FinLabs Hybrid AI Copilot. Choose a topic from the quick-tap decision tree below, or type any custom question to activate NLP mode.`
+      : "Hello 👋 I'm your FinLabs Hybrid AI Copilot. Choose a topic from the quick-tap decision tree below, or type any custom question to activate NLP mode.";
 
     setMessages([
       {
+        id: 'init_msg',
         sender: 'ai',
         text: greetingText
       }
     ]);
   }, [firstName]);
 
-  // Decision Tree Option Selection Handler
-  const handleSelectNode = (node) => {
-    setTreePath((prev) => [...prev, node]);
+  // Handle Tree Node Option Selection
+  const handleSelectTreeNode = (node) => {
+    // 1. Append user's selection
+    const userMsg = {
+      id: `user_${Date.now()}`,
+      sender: 'user',
+      text: node.title
+    };
 
-    setMessages((prev) => [
-      ...prev,
-      { sender: 'user', text: node.label },
-      { sender: 'ai', text: node.answer, action: node.actionRoute }
-    ]);
-  };
+    // 2. Append deterministic bot response
+    const botMsg = {
+      id: `ai_${Date.now()}`,
+      sender: 'ai',
+      text: node.botResponse,
+      appAction: node.appAction
+    };
 
-  // Tree Navigation Back Handler
-  const handleBack = () => {
-    if (treePath.length > 0) {
-      setTreePath((prev) => prev.slice(0, -1));
+    setMessages((prev) => [...prev, userMsg, botMsg]);
+
+    // 3. Update Tree Navigation Stack
+    if (node.options && node.options.length > 0) {
+      setHistoryStack((prev) => [...prev, activeTreeOptions]);
+      setActiveTreeOptions(node.options);
+      setIsEscapeHatchMode(false);
+    } else {
+      // Leaf node reached
+      setIsEscapeHatchMode(true);
     }
   };
 
-  // Tree Navigation Reset Handler
-  const handleResetTree = () => {
-    setTreePath([]);
+  // Back Navigation
+  const handleGoBack = () => {
+    if (historyStack.length === 0) return;
+    const previousOptions = historyStack[historyStack.length - 1];
+    setHistoryStack((prev) => prev.slice(0, -1));
+    setActiveTreeOptions(previousOptions);
+    setIsEscapeHatchMode(false);
   };
 
-  // Free-Text Gemini AI Handler
-  const handleSend = async (textToSend) => {
+  // Main Menu Reset Navigation
+  const handleResetMainMenu = () => {
+    setHistoryStack([]);
+    setActiveTreeOptions(BOT_ROOT_TREE);
+    setIsEscapeHatchMode(false);
+  };
+
+  // Handle Free-Form Custom Prompt (Gemini API NLP Fallback)
+  const handleSendCustomPrompt = async (textToSend) => {
     const text = textToSend || inputQuery;
     if (!text.trim() || loading) return;
 
-    const userMessage = { sender: 'user', text };
+    const userMessage = { id: `user_${Date.now()}`, sender: 'user', text };
     setMessages((prev) => [...prev, userMessage]);
     if (!textToSend) setInputQuery('');
 
@@ -139,13 +160,14 @@ export default function AiPage() {
       const aiResponse = await generateAiResponse(text, user?.id, profile);
       setMessages((prev) => [
         ...prev,
-        { sender: 'ai', text: aiResponse }
+        { id: `ai_${Date.now()}`, sender: 'ai', text: aiResponse }
       ]);
     } catch (err) {
       console.error('AI response error:', err);
       setMessages((prev) => [
         ...prev,
         {
+          id: `ai_err_${Date.now()}`,
           sender: 'ai',
           text: 'Unable to analyze financial context right now. Please check your network connection and try again.'
         }
@@ -155,26 +177,17 @@ export default function AiPage() {
     }
   };
 
-  // Surplus allocation waterfall calculations
-  const monthlySurplus = userAnalysis?.cashFlow?.monthlySurplus || 0;
-  const isUnderfunded = userAnalysis?.emergency?.status === 'Critically Underfunded' || userAnalysis?.emergency?.status === 'Underfunded';
-  const primaryGoalRequired = userAnalysis?.goals && userAnalysis.goals.length > 0 ? (userAnalysis.goals[0].requiredMonthlyAmount || 0) : 0;
-
-  const emergencyAllocation = isUnderfunded ? Math.min(monthlySurplus, primaryGoalRequired > 0 ? primaryGoalRequired : Math.round(monthlySurplus * 0.5)) : 0;
-  const goalAllocation = Math.min(Math.max(0, monthlySurplus - emergencyAllocation), primaryGoalRequired);
-  const remainingForMutualFunds = Math.max(0, monthlySurplus - emergencyAllocation - goalAllocation);
-
   return (
     <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto pb-12">
       {!isOnboarded && <PlatformOverviewBanner />}
 
       <PageHeader
-        title="FinLabs AI Copilot & Decision Tree"
-        subtitle="Explore multi-tier financial decision trees or ask free-text queries to our Gemini AI financial engine."
-        tag="AI Intelligence"
+        title="FinLabs AI Copilot"
+        subtitle="Hybrid Decision Tree & Smart Gemini NLP Copilot. Tap structured topics or ask custom questions."
+        tag="Hybrid Intelligence"
       />
 
-      {/* PRIORITIZED ACTION PLAN */}
+      {/* PRIORITIZED ACTION PLAN BANNER */}
       {userAnalysis && (
         <Card className="p-5 border border-emerald-500/20 bg-slate-900/60 backdrop-blur-xs">
           <div className="flex items-center justify-between mb-4">
@@ -190,20 +203,18 @@ export default function AiPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            {/* Priority 1 */}
             <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 space-y-1.5">
               <div className="flex items-center gap-1.5 text-rose-400 font-bold uppercase tracking-wider text-[10px]">
                 <ShieldAlert className="w-3.5 h-3.5" />
                 <span>1. Emergency Reserve First</span>
               </div>
               <p className="text-slate-200 font-medium leading-relaxed">
-                {isUnderfunded
-                  ? `Allocate ₹${emergencyAllocation.toLocaleString('en-IN')}/mo to emergency reserve (currently ${userAnalysis.emergency.emergencyMonths || '0'} months vs 6 months target).`
+                {userAnalysis.emergency?.status === 'Critically Underfunded'
+                  ? `Allocate surplus to emergency reserve (currently ${userAnalysis.emergency.emergencyMonths || '0'} months vs 6 months target).`
                   : 'Emergency reserve is adequate (6+ months). Maintain in liquid account.'}
               </p>
             </div>
 
-            {/* Priority 2 */}
             <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1.5">
               <div className="flex items-center gap-1.5 text-amber-400 font-bold uppercase tracking-wider text-[10px]">
                 <Target className="w-3.5 h-3.5" />
@@ -211,108 +222,30 @@ export default function AiPage() {
               </div>
               <p className="text-slate-200 font-medium leading-relaxed">
                 {userAnalysis.goals && userAnalysis.goals.length > 0
-                  ? `Automate SIP of ₹${(userAnalysis.goals[0].requiredMonthlyAmount || 0).toLocaleString('en-IN')}/mo for ${userAnalysis.goals[0].goalName}.`
+                  ? `Automate monthly goal SIP of ₹${(userAnalysis.goals[0].requiredMonthlyAmount || 0).toLocaleString('en-IN')}/mo.`
                   : 'Add financial goals in Profile to compute required monthly SIPs.'}
               </p>
             </div>
 
-            {/* Priority 3 */}
             <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1.5">
               <div className="flex items-center gap-1.5 text-emerald-400 font-bold uppercase tracking-wider text-[10px]">
                 <TrendingUp className="w-3.5 h-3.5" />
-                <span>3. Remaining Surplus to Mutual Funds</span>
+                <span>3. Surplus to Mutual Funds</span>
               </div>
               <p className="text-slate-200 font-medium leading-relaxed">
-                {remainingForMutualFunds > 0
-                  ? `Invest remaining surplus (₹${remainingForMutualFunds.toLocaleString('en-IN')}/mo) into Direct Growth Large Cap & Flexi Cap funds.`
-                  : 'Focus monthly surplus on emergency fund & active goals before long-term equity mutual funds.'}
+                Invest remaining surplus into Index & Flexi Cap mutual funds for maximum compounding.
               </p>
             </div>
           </div>
         </Card>
       )}
 
-      {/* RECURSIVE DECISION TREE PILLS SECTION */}
-      <Card className="p-4 space-y-3 bg-slate-900/40 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 text-xs">
-          <div className="flex items-center gap-2">
-            <GitBranch className="w-4 h-4 text-emerald-500" />
-            <span className="font-extrabold text-slate-900 dark:text-slate-100">
-              {treePath.length === 0 ? '7 Core Financial Root Topics' : 'Branching Follow-Up Questions'}
-            </span>
-          </div>
-
-          {treePath.length > 0 && (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="flex items-center gap-1 text-slate-600 dark:text-slate-300 hover:text-emerald-500 font-bold transition cursor-pointer"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleResetTree}
-                className="flex items-center gap-1 text-slate-400 hover:text-rose-500 font-bold transition cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset to Root</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Tree Path Breadcrumb */}
-        {treePath.length > 0 && (
-          <div className="flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 overflow-x-auto py-1 custom-scrollbar">
-            <span className="cursor-pointer hover:underline" onClick={handleResetTree}>Root</span>
-            {treePath.map((node, i) => (
-              <React.Fragment key={node.id}>
-                <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
-                <span className="font-bold truncate max-w-[150px]">{node.label.replace(/^[^\w\s]+/, '').trim()}</span>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-
-        {/* Option Pills Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-56 overflow-y-auto custom-scrollbar">
-          {currentOptions.length > 0 ? (
-            currentOptions.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => handleSelectNode(opt)}
-                disabled={loading}
-                className="w-full text-left p-3 rounded-xl bg-slate-50 dark:bg-slate-900/80 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/15 border border-slate-200 dark:border-slate-800 hover:border-emerald-500/40 text-slate-800 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 text-xs font-semibold transition-all flex items-center justify-between group shadow-2xs"
-              >
-                <span className="truncate pr-2">{opt.label}</span>
-                <span className="text-emerald-500/40 group-hover:text-emerald-500 font-bold shrink-0">→</span>
-              </button>
-            ))
-          ) : (
-            <div className="col-span-full py-4 text-center space-y-2">
-              <p className="text-xs text-slate-400 font-medium">End of this decision branch reached.</p>
-              <button
-                type="button"
-                onClick={handleResetTree}
-                className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 font-bold text-xs hover:bg-emerald-500/20 transition cursor-pointer"
-              >
-                ↺ Return to All Root Topics
-              </button>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {/* CHAT MESSAGES CONTAINER */}
-      <Card className="min-h-[380px] max-h-[500px] flex flex-col justify-between p-4 overflow-hidden shadow-xl">
+      {/* MAIN CHAT CONVERSATION CONTAINER */}
+      <Card className="min-h-[420px] max-h-[550px] flex flex-col justify-between p-4 overflow-hidden border-slate-200 dark:border-slate-800">
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-          {messages.map((msg, idx) => (
+          {messages.map((msg) => (
             <div
-              key={idx}
+              key={msg.id}
               className={`flex items-start gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}
             >
               <div
@@ -325,26 +258,27 @@ export default function AiPage() {
                 {msg.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
               </div>
 
-              <div className="max-w-[85%] space-y-2">
+              <div className="space-y-2 max-w-[85%]">
                 <div
                   className={`p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
                     msg.sender === 'user'
                       ? 'bg-indigo-600 text-white rounded-tr-none'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-none border border-slate-200/60 dark:border-slate-700/60'
+                      : 'bg-slate-100 dark:bg-slate-850 text-slate-800 dark:text-slate-200 rounded-tl-none border border-slate-200/60 dark:border-slate-700/60'
                   }`}
                 >
                   {msg.text}
                 </div>
 
-                {/* Deep-link Action Button */}
-                {msg.action && (
-                  <Link
-                    to={msg.action.path}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white text-[11px] font-bold transition shadow-2xs"
+                {/* Direct App Action Launch Button */}
+                {msg.appAction && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(msg.appAction.route)}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition shadow-md shadow-emerald-500/20 cursor-pointer"
                   >
-                    <span>{msg.action.label}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
+                    <span>{msg.appAction.label}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
                 )}
               </div>
             </div>
@@ -356,9 +290,9 @@ export default function AiPage() {
               <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 text-xs font-bold shadow-md shadow-emerald-500/20">
                 <Bot className="w-4 h-4 animate-bounce" />
               </div>
-              <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-mono flex items-center gap-2 rounded-tl-none border border-slate-200/60 dark:border-slate-700/60">
+              <div className="p-3.5 rounded-2xl bg-slate-100 dark:bg-slate-850 text-slate-400 text-xs font-mono flex items-center gap-2 rounded-tl-none border border-slate-200/60 dark:border-slate-700/60">
                 <Loader2 className="w-3.5 h-3.5 text-emerald-500 animate-spin" />
-                <span>FinLabs AI is analyzing your financial context...</span>
+                <span>FinLabs Gemini NLP Engine is thinking...</span>
               </div>
             </div>
           )}
@@ -366,31 +300,104 @@ export default function AiPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Free-Text Input Bar */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-2"
-        >
-          <input
-            type="text"
-            placeholder="Ask FinLabs AI anything about your money, mutual funds, or action plan..."
-            value={inputQuery}
-            onChange={(e) => setInputQuery(e.target.value)}
-            disabled={loading}
-            className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 font-medium"
-          />
-          <button
-            type="submit"
-            disabled={loading || !inputQuery.trim()}
-            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer"
+        {/* DECISION TREE BUTTON TRAY & TOOLBAR */}
+        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+          {/* Navigation Toolbar (Back & Main Menu) */}
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                <Layers className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Flowchart Decision Tree</span>
+              </span>
+              {historyStack.length > 0 && (
+                <Badge variant="brand" className="text-[10px] font-mono">
+                  Depth: Level {historyStack.length + 1}
+                </Badge>
+              )}
+            </div>
+
+            {historyStack.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleGoBack}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-emerald-500 text-[11px] font-bold transition cursor-pointer"
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  <span>Back</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetMainMenu}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-emerald-500 text-[11px] font-bold transition cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Main Menu</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Quick-Tap Options Button Tray */}
+          <div className="flex flex-wrap gap-2">
+            {activeTreeOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => handleSelectTreeNode(option)}
+                className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-900 text-slate-100 border border-emerald-500/30 hover:bg-emerald-950/60 hover:border-emerald-400 transition shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <span>{option.title}</span>
+              </button>
+            ))}
+
+            {/* Smart Escape Hatch Option */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsEscapeHatchMode(true);
+                const inputEl = document.getElementById('nlp-custom-input');
+                if (inputEl) inputEl.focus();
+              }}
+              className="text-xs font-semibold px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>💬 Ask custom question</span>
+            </button>
+          </div>
+
+          {/* Text Input Bar (NLP Escape Hatch) */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendCustomPrompt();
+            }}
+            className="flex gap-2 pt-1"
           >
-            <span>Ask</span>
-            <Send className="w-3.5 h-3.5" />
-          </button>
-        </form>
+            <input
+              id="nlp-custom-input"
+              type="text"
+              placeholder={
+                isEscapeHatchMode
+                  ? "Type your custom financial question..."
+                  : "Type a question if not listed above..."
+              }
+              value={inputQuery}
+              onChange={(e) => setInputQuery(e.target.value)}
+              disabled={loading}
+              className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 font-medium"
+            />
+            <button
+              type="submit"
+              disabled={loading || !inputQuery.trim()}
+              className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50 cursor-pointer shrink-0"
+            >
+              <span>Ask</span>
+              <Send className="w-3.5 h-3.5" />
+            </button>
+          </form>
+        </div>
       </Card>
     </div>
   );
