@@ -4,8 +4,8 @@
 
 export type QueryIntent =
   | "CALCULATION_SIMULATION"
-  | "INVESTMENT_RECOMMENDATIONS"
   | "PROFILE_QUESTIONS"
+  | "INVESTMENT_RECOMMENDATIONS"
   | "GENERAL_EDUCATION"
   | "UNRELATED";
 
@@ -86,17 +86,23 @@ export function computeInvestmentSimulation(
 
 /**
  * Classifies query intent with strict boundaries to avoid false positives.
+ * Priority order:
+ * 1. CALCULATION_SIMULATION (Explicit numerical what-if / delta calculation)
+ * 2. PROFILE_QUESTIONS (Explicit personal financial figures for the authenticated user)
+ * 3. INVESTMENT_RECOMMENDATIONS (Explicit scheme/fund recommendation requests)
+ * 4. GENERAL_EDUCATION (Conceptual/definition/educational financial queries)
+ * 5. UNRELATED (Non-financial queries)
  */
 export function classifyQueryIntent(query: string): QueryIntent {
   const q = query.toLowerCase().trim();
 
-  // 1. Calculation & What-If Simulation Queries (Prioritized over generic keyword matches)
+  // 1. Priority 1: CALCULATION_SIMULATION
   const isSimulationOrCalculation =
     q.includes("what happens") ||
     q.includes("what if") ||
     q.includes("how much is left") ||
     q.includes("how much remains") ||
-    q.includes("calculate") ||
+    q.includes("calculate my") ||
     q.includes("calculation") ||
     q.includes("surplus if") ||
     q.includes("if i invest") ||
@@ -106,16 +112,46 @@ export function classifyQueryIntent(query: string): QueryIntent {
     q.includes("if i pay") ||
     q.includes("remaining surplus") ||
     q.includes("exact calculation") ||
-    (q.includes("surplus") && (q.includes("invest") || q.includes("monthly") || q.includes("reduce") || /\d+/.test(q)));
+    (q.includes("surplus") && (q.includes("invest") || /\d+/.test(q)));
 
   if (isSimulationOrCalculation) {
     return "CALCULATION_SIMULATION";
   }
 
-  // 2. Explicit Investment Recommendation Queries (Must be a request for scheme recommendations)
+  // 2. Priority 2: PROFILE_QUESTIONS (Must explicitly ask about personal data via "my", "i", "me")
+  const isPersonalProfileQuery =
+    q.includes("my score") ||
+    q.includes("my health score") ||
+    q.includes("my financial health") ||
+    q.includes("my income") ||
+    q.includes("how much do i earn") ||
+    q.includes("my expenses") ||
+    q.includes("how much do i spend") ||
+    q.includes("my emergency fund") ||
+    q.includes("my reserve") ||
+    q.includes("how many months of emergency") ||
+    q.includes("my goals") ||
+    q.includes("my goal") ||
+    q.includes("my debt") ||
+    q.includes("my emi") ||
+    q.includes("my loan") ||
+    q.includes("my savings") ||
+    q.includes("how much do i save") ||
+    q.includes("my surplus") ||
+    q.includes("my monthly surplus") ||
+    q.includes("my action plan") ||
+    q.includes("my summary") ||
+    q.includes("my financial summary") ||
+    q.includes("my profile");
+
+  if (isPersonalProfileQuery) {
+    return "PROFILE_QUESTIONS";
+  }
+
+  // 3. Priority 3: INVESTMENT_RECOMMENDATIONS (Explicit scheme recommendation requests)
   const isRecommendation =
-    (q.includes("which") && (q.includes("fund") || q.includes("stock") || q.includes("scheme") || q.includes("invest"))) ||
-    (q.includes("recommend") && (q.includes("fund") || q.includes("scheme") || q.includes("portfolio") || q.includes("stock") || q.includes("invest"))) ||
+    (q.includes("which") && (q.includes("fund") || q.includes("stock") || q.includes("scheme") || q.includes("invest in"))) ||
+    (q.includes("recommend") && (q.includes("fund") || q.includes("scheme") || q.includes("portfolio") || q.includes("stock") || q.includes("sip"))) ||
     (q.includes("suggest") && (q.includes("fund") || q.includes("scheme") || q.includes("stock") || q.includes("sip"))) ||
     (q.includes("best") && (q.includes("fund") || q.includes("scheme") || q.includes("mutual fund") || q.includes("sip"))) ||
     (q.includes("top") && (q.includes("fund") || q.includes("scheme") || q.includes("direct growth"))) ||
@@ -126,61 +162,111 @@ export function classifyQueryIntent(query: string): QueryIntent {
     return "INVESTMENT_RECOMMENDATIONS";
   }
 
-  // 3. User Profile Specific Queries
-  const isProfile =
-    q.includes("my score") ||
-    q.includes("health score") ||
-    q.includes("my income") ||
-    q.includes("how much do i earn") ||
-    q.includes("my expenses") ||
-    q.includes("how much do i spend") ||
-    q.includes("my emergency") ||
-    q.includes("emergency fund") ||
-    q.includes("my goals") ||
-    q.includes("my goal") ||
-    q.includes("my debt") ||
-    q.includes("my emi") ||
-    q.includes("my savings") ||
-    q.includes("how much do i save") ||
-    q.includes("my surplus") ||
-    q.includes("monthly surplus") ||
-    q.includes("summary") ||
-    q.includes("action plan") ||
-    q.includes("my profile");
-
-  if (isProfile) {
-    return "PROFILE_QUESTIONS";
-  }
-
-  // 4. General Educational / Conceptual Finance Queries
-  const isEducation =
+  // 4. Priority 4: GENERAL_EDUCATION (Conceptual/educational questions about financial terms)
+  const isEducationalConcept =
     q.includes("what is") ||
+    q.includes("what are") ||
     q.includes("explain") ||
     q.includes("how does") ||
+    q.includes("how do") ||
     q.includes("difference between") ||
+    q.includes("meaning of") ||
+    q.includes("define") ||
     q.includes("cagr") ||
+    q.includes("dti") ||
     q.includes("nav") ||
-    q.includes("sip vs lump") ||
     q.includes("index fund") ||
-    q.includes("mutual fund") ||
-    q.includes("equity") ||
-    q.includes("debt-to-income") ||
+    q.includes("active vs passive") ||
+    q.includes("passive fund") ||
+    q.includes("active fund") ||
+    q.includes("expense ratio") ||
+    q.includes("compound interest") ||
+    q.includes("compounding") ||
+    q.includes("sip vs") ||
+    q.includes("lump sum") ||
     q.includes("inflation") ||
-    q.includes("compounding");
+    q.includes("asset allocation");
 
-  if (isEducation) {
+  if (isEducationalConcept) {
     return "GENERAL_EDUCATION";
   }
 
-  // 5. General Financial Queries
+  // 5. Check if finance related at all
   const financeKeywords = [
-    "money", "finance", "bank", "tax", "budget", "salary", "expense", "saving", "loan", "asset", "wealth"
+    "money", "finance", "bank", "tax", "budget", "salary", "expense", "saving", "loan", "asset", "wealth", "stock", "fund", "equity", "debt", "invest"
   ];
   if (financeKeywords.some((k) => q.includes(k))) {
     return "GENERAL_EDUCATION";
   }
 
   return "UNRELATED";
+}
+
+/**
+ * Returns deterministic educational responses for financial concepts.
+ * Never dumps personal financial figures or recommendations.
+ */
+export function getEducationalExplanation(query: string): string {
+  const q = query.toLowerCase();
+
+  if (q.includes("cagr")) {
+    return `**CAGR (Compound Annual Growth Rate)** is the annualized rate of return on an investment over a period longer than one year. It measures the steady compounded growth rate as if the investment grew at a constant rate each year.
+
+**Formula:**
+$$\\text{CAGR} = \\left(\\frac{\\text{Ending Value}}{\\text{Beginning Value}}\\right)^{\\frac{1}{n}} - 1$$
+*(where $n$ is the number of years).*
+
+**How it works:**
+Unlike simple average returns, CAGR smooths out annual market volatility and accounts for the compounding effect of returns over time, making it the industry standard for evaluating mutual funds, stocks, and portfolios.`;
+  }
+
+  if (q.includes("dti") || q.includes("debt to income") || q.includes("debt-to-income")) {
+    return `**Debt-to-Income (DTI) Ratio** is the percentage of your monthly income that goes toward servicing recurring debt obligations and loan EMIs.
+
+**Formula:**
+$$\\text{DTI Ratio} = \\left(\\frac{\\text{Total Monthly Loan EMIs}}{\\text{Total Monthly Income}}\\right) \\times 100$$
+
+**Financial Guidelines:**
+- **< 20%**: Excellent debt health.
+- **20%–35%**: Manageable and within safe borrowing limits.
+- **> 40%**: High debt burden; reduces monthly savings and increases financial risk.`;
+  }
+
+  if (q.includes("compound") || q.includes("compounding")) {
+    return `**Compound Interest** is the interest calculated on the initial principal plus all accumulated interest from previous periods ("earning interest on interest").
+
+**Formula:**
+$$A = P \\left(1 + \\frac{r}{n}\\right)^{nt}$$
+*(where $P$ = principal, $r$ = annual interest rate, $n$ = compounding frequency per year, $t$ = time in years).*
+
+**Why it matters:**
+Compounding accelerates wealth exponentially over time. Starting investments early—even with smaller amounts via monthly SIPs—allows compounding to multiply capital significantly over 5, 10, or 20-year horizons.`;
+  }
+
+  if (q.includes("index fund") || q.includes("active vs passive") || q.includes("passive")) {
+    return `**An Index Fund** is a mutual fund or ETF designed to passively replicate the portfolio of a specific market index (such as the Nifty 50 or S&P BSE Sensex).
+
+**Active vs. Passive Funds:**
+- **Index / Passive Funds**: Passively mirror the index. They carry ultra-low expense ratios (often 0.1%–0.3%) and eliminate individual fund manager risk.
+- **Active Funds**: Managed by professional fund managers aiming to outperform the benchmark by picking stocks, incurring higher expense ratios (0.5%–1.5%).`;
+  }
+
+  if (q.includes("expense ratio")) {
+    return `**Expense Ratio** is the annual fee charged by mutual funds and Asset Management Companies (AMCs) to operate and manage a fund, expressed as a percentage of your total investment.
+
+**Key Insights:**
+- Covers fund management, administrative costs, and regulatory compliance.
+- **Direct Plans** have substantially lower expense ratios (often 0.5%–1.0% less) than **Regular Plans** because no distributor commissions are paid, allowing higher net compounded returns over time.`;
+  }
+
+  if (q.includes("emergency fund") || q.includes("reserve")) {
+    return `**An Emergency Fund** is a liquid cash reserve set aside to cover unexpected emergencies—such as medical crises, urgent home repairs, or temporary job loss—without liquidating long-term investments or incurring high-interest debt.
+
+**Rule of Thumb:**
+Financial planners recommend maintaining **3 to 6 months** of essential living expenses (rent, utilities, groceries, EMIs) in safe, liquid accounts such as high-yield savings accounts or liquid funds.`;
+  }
+
+  return `Financial education concepts are designed to build long-term wealth through disciplined investing, prudent debt management, and appropriate risk allocation. Let me know if you would like an explanation of specific financial metrics such as CAGR, DTI ratio, Index Funds, Expense Ratios, or Compound Interest.`;
 }
 
 export function computeEmergencyStatus(emergencyFund: number | null, totalExpenses: number | null, recommendedMonths = 6) {

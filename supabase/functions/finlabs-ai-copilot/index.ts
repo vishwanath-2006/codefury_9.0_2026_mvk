@@ -9,6 +9,7 @@ import {
   classifyQueryIntent,
   extractProposedAmount,
   computeInvestmentSimulation,
+  getEducationalExplanation,
   SimulationResult
 } from "./financialEngine.ts";
 import {
@@ -211,7 +212,11 @@ serve(async (req: Request) => {
 
 AUTHORITATIVE INTENT-BASED DIRECTIVES:
 1. QUERY INTENT: The query intent is classified as "${intent}".
-2. IF INTENT IS "CALCULATION_SIMULATION":
+2. IF INTENT IS "GENERAL_EDUCATION":
+   - Answer the educational/conceptual question directly, clearly, and concisely.
+   - DO NOT dump or recite the user's personal financial figures (income, expenses, EMI, surplus, savings, or health score) unless the user explicitly asked for personal numbers.
+   - DO NOT list mutual fund scheme recommendations unless explicitly requested.
+3. IF INTENT IS "CALCULATION_SIMULATION":
    - Answer the calculation or what-if scenario directly and mathematically.
    - If the user asks what happens to their surplus if they invest an amount (e.g. ₹${proposedAmount || 20000}), USE the pre-calculated "simulationResult" object:
      * Current Total Monthly Income: ₹${financialContext.totalMonthlyIncome ?? 0}
@@ -223,13 +228,11 @@ AUTHORITATIVE INTENT-BASED DIRECTIVES:
      * Effective Investment Rate: ${simulationResult?.investmentRateOfIncomePct ?? 0}% of monthly income.
    - Show the step-by-step arithmetic clearly.
    - DO NOT list mutual fund schemes or recommend funds when answering a calculation/simulation question.
-3. IF INTENT IS "INVESTMENT_RECOMMENDATIONS":
+4. IF INTENT IS "INVESTMENT_RECOMMENDATIONS":
    - Recommend Direct Growth mutual fund schemes matching the user's risk tolerance (${financialContext.riskTolerance}).
    - Use ONLY the schemes in "recommendedMutualFunds".
-4. IF INTENT IS "PROFILE_QUESTIONS":
+5. IF INTENT IS "PROFILE_QUESTIONS":
    - Answer the specific profile metric (Health Score, Income, Expenses, Emergency Reserve, Goals) directly using the context.
-5. IF INTENT IS "GENERAL_EDUCATION":
-   - Explain the concept clearly and educationally.
 6. IF INTENT IS "UNRELATED":
    - Politely explain that FinLabs AI is dedicated to personal finance, investments, savings, and wealth planning.
 
@@ -277,7 +280,9 @@ ${JSON.stringify(financialContext, null, 2)}`;
 
       const qLower = query.toLowerCase();
 
-      if (intent === "CALCULATION_SIMULATION" && simulationResult) {
+      if (intent === "GENERAL_EDUCATION") {
+        generatedAnswer = getEducationalExplanation(query);
+      } else if (intent === "CALCULATION_SIMULATION" && simulationResult) {
         const sim = simulationResult;
         generatedAnswer = `If you invest **${formatINR(sim.proposedInvestmentAmount)}** every month, your remaining monthly unallocated surplus will be **${formatINR(sim.remainingSurplusAfterInvestment)}**.\n\n**Exact Calculation Breakdown:**\n- **Total Monthly Inflow**: ${formatINR(sim.currentMonthlyIncome)}\n- **Monthly Expenses**: -${formatINR(sim.currentMonthlyExpenses)}\n- **Monthly Loan EMI / Debt**: -${formatINR(sim.currentMonthlyDebt)}\n- **Base Monthly Surplus**: **${formatINR(sim.currentMonthlySurplus)}**\n- **Proposed Monthly Investment**: -${formatINR(sim.proposedInvestmentAmount)}\n- **Remaining Unallocated Surplus**: **${formatINR(sim.remainingSurplusAfterInvestment)}**\n\n**Financial Assessment:**\n- You will be investing **${sim.surplusUtilizationPct}%** of your available monthly surplus.\n- Your effective investment rate will be **${sim.investmentRateOfIncomePct}%** of total monthly income.\n- ${sim.isDeficit ? `⚠️ This exceeds your current surplus by ${formatINR(sim.deficitAmount)}/month. Consider adjusting to stay within surplus.` : `✅ This investment is fully sustainable and leaves a liquid buffer of ${formatINR(sim.remainingSurplusAfterInvestment)}/month.`}`;
       } else if (intent === "INVESTMENT_RECOMMENDATIONS" && recommendedMutualFunds.length > 0) {

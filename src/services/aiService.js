@@ -9,7 +9,8 @@ import {
   computeHealthDiagnosticSummary,
   classifyQueryIntent,
   extractProposedAmount,
-  computeInvestmentSimulation
+  computeInvestmentSimulation,
+  getEducationalExplanation
 } from './aiFinancialEngine';
 
 /**
@@ -169,12 +170,19 @@ export async function generateAiResponse(query, userId, fallbackProfile = null) 
   const nameGreeting = ctx.fullName ? ctx.fullName.split(' ')[0] : 'there';
   const qLower = query.toLowerCase();
 
+  // Priority 1: Educational concept explanation
+  if (intent === 'GENERAL_EDUCATION') {
+    return getEducationalExplanation(query);
+  }
+
+  // Priority 2: Calculation / what-if simulation
   if (intent === 'CALCULATION_SIMULATION' && simulationResult) {
     const sim = simulationResult;
     return `If you invest **${formatINR(sim.proposedInvestmentAmount)}** every month, your remaining monthly unallocated surplus will be **${formatINR(sim.remainingSurplusAfterInvestment)}**.\n\n**Exact Calculation Breakdown:**\n- **Total Monthly Inflow**: ${formatINR(sim.currentMonthlyIncome)}\n- **Monthly Expenses**: -${formatINR(sim.currentMonthlyExpenses)}\n- **Monthly Loan EMI / Debt**: -${formatINR(sim.currentMonthlyDebt)}\n- **Base Monthly Surplus**: **${formatINR(sim.currentMonthlySurplus)}**\n- **Proposed Monthly Investment**: -${formatINR(sim.proposedInvestmentAmount)}\n- **Remaining Unallocated Surplus**: **${formatINR(sim.remainingSurplusAfterInvestment)}**\n\n**Financial Assessment:**\n- You will be investing **${sim.surplusUtilizationPct}%** of your available monthly surplus.\n- Your effective investment rate will be **${sim.investmentRateOfIncomePct}%** of total monthly income.\n- ${sim.isDeficit ? `⚠️ This exceeds your current surplus by ${formatINR(sim.deficitAmount)}/month. Consider adjusting to stay within surplus.` : `✅ This investment is fully sustainable and leaves a liquid buffer of ${formatINR(sim.remainingSurplusAfterInvestment)}/month.`}`;
   }
 
-  if (qLower.includes('score') || qLower.includes('health')) {
+  // Priority 3: Explicit profile questions
+  if (qLower.includes('my score') || qLower.includes('health score') || qLower.includes('financial health')) {
     if (ctx.overallHealthScore != null && ctx.overallHealthScore > 0) {
       let breakdown = `Your current FinLabs Health Score is **${ctx.overallHealthScore}/100**.`;
       if (ctx.savingsRatePct != null) {
@@ -193,7 +201,7 @@ export async function generateAiResponse(query, userId, fallbackProfile = null) 
     return `Hi ${nameGreeting}, your financial profile shows an active baseline. Complete onboarding to compute your precise score.`;
   }
 
-  if (qLower.includes('earn') || qLower.includes('income')) {
+  if (qLower.includes('earn') || qLower.includes('my income')) {
     if (ctx.monthlyIncome > 0) {
       return `You earn **${formatINR(ctx.monthlyIncome)}** every month. Your monthly expenses are ${formatINR(ctx.totalExpenses)} and loan EMI is ${formatINR(ctx.monthlyDebtPayments)}, leaving a net recurring surplus of **${formatINR(ctx.monthlySurplus)}** (${ctx.savingsRatePct}% savings rate).`;
     }
@@ -207,7 +215,7 @@ export async function generateAiResponse(query, userId, fallbackProfile = null) 
     return `Hi ${nameGreeting}, enter your income and expense figures in Onboarding to calculate your exact monthly surplus.`;
   }
 
-  if (qLower.includes('goal') || qLower.includes('downpayment') || qLower.includes('reach')) {
+  if (qLower.includes('my goal') || qLower.includes('downpayment')) {
     if (ctx.goalsBreakdown && ctx.goalsBreakdown.length > 0) {
       const primaryGoal = ctx.goalsBreakdown[0];
       return `Your primary goal **${primaryGoal.goalName}** has a target of ${formatINR(primaryGoal.targetAmount)} by ${primaryGoal.targetYear}. You have currently saved ${formatINR(primaryGoal.currentSaved)} (${primaryGoal.remainingAmount > 0 ? `${formatINR(primaryGoal.remainingAmount)} remaining` : 'Goal achieved!'}). Required monthly investment is **${formatINR(primaryGoal.requiredMonthlyAmount)}/month**.`;
@@ -215,12 +223,14 @@ export async function generateAiResponse(query, userId, fallbackProfile = null) 
     return `Hi ${nameGreeting}, you haven't added any specific financial goals yet. You can add goals under Onboarding Step 3 or Profile to track progress!`;
   }
 
-  if (intent === 'INVESTMENT_RECOMMENDATIONS' || qLower.includes('recommend') || qLower.includes('scheme') || qLower.includes('which fund')) {
+  // Priority 4: Investment recommendations
+  if (intent === 'INVESTMENT_RECOMMENDATIONS' || qLower.includes('recommend') || qLower.includes('which fund')) {
     const risk = ctx.riskTolerance || 'Moderate';
     const horizon = ctx.timeHorizon || '3–5 years';
     return `Based on your **${risk}** risk tolerance and **${horizon}** investment time horizon, a balanced portfolio of Large Cap Index Funds (e.g. Nifty 50 Index) and Flexi Cap Mutual Funds (e.g. Parag Parikh Flexi Cap) provides optimal growth with controlled volatility.`;
   }
 
+  // Priority 5: Unrelated
   if (intent === 'UNRELATED') {
     return `I am your FinLabs AI Financial Copilot. I specialize in personal financial planning, cash flow analysis, investment suitability, and goal tracking. How can I help with your financial goals or portfolio today?`;
   }
