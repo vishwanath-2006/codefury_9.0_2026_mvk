@@ -16,29 +16,6 @@ export default function DashboardPage() {
   const { profile, user } = useAuth();
   const { formData, userProfile, healthScore, riskProfile, isOnboarded } = useOnboarding();
 
-  // Entry Modal Prompt State (Onboard vs Overview)
-  const [showEntryModal, setShowEntryModal] = useState(false);
-
-  useEffect(() => {
-    const isCompleted = localStorage.getItem('finlabs_onboarding_completed') === 'true';
-    const isDismissedInSession = sessionStorage.getItem('finlabs_entry_modal_dismissed') === 'true';
-
-    if (!isCompleted && !isDismissedInSession) {
-      setShowEntryModal(true);
-    }
-  }, []);
-
-  const handleCloseModal = () => {
-    sessionStorage.setItem('finlabs_entry_modal_dismissed', 'true');
-    setShowEntryModal(false);
-  };
-
-  const handleStartOnboarding = () => {
-    sessionStorage.setItem('finlabs_entry_modal_dismissed', 'true');
-    setShowEntryModal(false);
-    navigate('/onboarding');
-  };
-
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val ?? 0);
 
@@ -112,13 +89,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-150 relative">
-      {/* ENTRY MODAL PROMPT */}
-      <OnboardingEntryModal
-        isOpen={showEntryModal}
-        onClose={handleCloseModal}
-        onStartOnboarding={handleStartOnboarding}
-      />
-
       {/* HEADER WITH USER PROFILE AVATAR & BLUEPRINT ACTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
