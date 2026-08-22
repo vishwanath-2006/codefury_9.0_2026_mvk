@@ -188,7 +188,7 @@ ${nextStep.questionText}`;
 
 **✅ I've completed your personalized analysis for ${domainObj ? domainObj.title : 'this area'}.**
 
-What would you like to explore next?`
+What would you like to work on next?`
     };
 
     setMessages((prev) => [...prev, planMessage]);
@@ -229,15 +229,16 @@ What would you like to explore next?`
       // Evaluate if we should ask next question or prompt for completion
       const nextStep = getNextAdvisorStep(activeDomain || 'my_profile', updatedFacts, newQuestionsAsked);
 
-      if (nextStep.isEnough || !nextStep.questionText || newQuestionsAsked.length >= 7) {
-        // Offer completion choice or generate plan
+      if (nextStep.isEnough || !nextStep.questionText || newQuestionsAsked.length >= 8) {
+        // Offer completion choice
         setIsReadyForPlanPrompt(true);
         setCurrentStep(null);
 
+        const domainObj = ADVISOR_DOMAINS.find((d) => d.id === activeDomain);
         const readyMsg = {
           id: `ai_ready_${Date.now()}`,
           sender: 'ai',
-          text: `Got it. I have collected comprehensive details to build your in-depth **${ADVISOR_DOMAINS.find((d) => d.id === activeDomain)?.title || 'Financial'} Diagnostic**.
+          text: `Got it. I have collected enough meaningful information to build your **${domainObj ? domainObj.title : 'Financial'} Diagnostic**.
 
 Would you like me to generate your complete analysis and action plan now?`
         };
@@ -290,6 +291,8 @@ What would you like to work on next?`
     ]);
   };
 
+  const activeDomainObj = ADVISOR_DOMAINS.find((d) => d.id === activeDomain);
+
   return (
     <div className="space-y-4 animate-in fade-in duration-150 max-w-4xl mx-auto pb-12">
       {/* HEADER SECTION */}
@@ -332,6 +335,20 @@ What would you like to work on next?`
 
       {/* CHAT CONTAINER CARD */}
       <Card className="flex flex-col h-[650px] sm:h-[700px] border-slate-200 dark:border-slate-800 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md shadow-2xl overflow-hidden">
+        {/* TOP STATUS BAR (When in Active Interview) */}
+        {activeDomainObj && !isPlanGenerated && (
+          <div className="px-4 py-2 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-base">{activeDomainObj.icon}</span>
+              <span className="font-bold text-emerald-400">{activeDomainObj.title}</span>
+              <span className="text-slate-400 text-[11px]">({activeDomainObj.tagline})</span>
+            </div>
+            <div className="text-[11px] font-mono text-slate-400">
+              Question {questionsAsked.length} of ~8
+            </div>
+          </div>
+        )}
+
         {/* MESSAGES VIEWPORT */}
         <div
           ref={chatContainerRef}
@@ -455,7 +472,7 @@ What would you like to work on next?`
             <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 space-y-2.5">
               <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Ready to generate your diagnostic & personalized action plan!</span>
+                <span>Ready to generate your complete diagnostic & personalized action plan!</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button

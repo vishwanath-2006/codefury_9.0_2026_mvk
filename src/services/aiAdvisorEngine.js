@@ -44,7 +44,7 @@ export function isUserRequestingStop(text) {
 }
 
 /**
- * Loads the active session from sessionStorage
+ * Loads active session from sessionStorage
  */
 export function loadAdvisorSession(userId) {
   try {
@@ -318,6 +318,11 @@ export function extractFactsFromAnswer(questionKey, userInput, knownFacts = {}) 
       break;
     }
 
+    case 'largestStockConcentration': {
+      if (extractedAmount != null) updated.largestStockConcentration = extractedAmount;
+      break;
+    }
+
     case 'stockSharePct': {
       const pctMatch = lower.match(/(\d+)\s*%/);
       if (pctMatch) {
@@ -334,6 +339,14 @@ export function extractFactsFromAnswer(questionKey, userInput, knownFacts = {}) 
       else updated.stockSymbol = raw;
       break;
     }
+
+    case 'stepUpPreference':
+      updated.stepUpPreference = raw;
+      break;
+
+    case 'deploymentSpeed':
+      updated.deploymentSpeed = raw;
+      break;
 
     default:
       if (extractedAmount != null) {
@@ -366,7 +379,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
   const asked = new Set(questionsAsked);
 
   // =========================================================================
-  // DOMAIN 1: MY PROFILE (In-Depth Adaptive Interview)
+  // DOMAIN 1: MY PROFILE (Deep Multi-Stage Adaptive Interview)
   // =========================================================================
   if (domainId === 'my_profile') {
     // 1. Income
@@ -381,10 +394,10 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
 
     // 2. Income Stability
     if (!knownFacts.incomeStability && !asked.has('incomeStability')) {
-      const incomeAck = knownFacts.monthlyIncome ? `I have your monthly income recorded as **${formatINR(knownFacts.monthlyIncome)}**.\n\n` : '';
+      const incomeAck = knownFacts.monthlyIncome ? `I already have your monthly income as **${formatINR(knownFacts.monthlyIncome)}**. I'll use that as your current figure.\n\n` : '';
       return {
         questionKey: 'incomeStability',
-        questionText: `${incomeAck}How would you describe the **stability and consistency** of your monthly income?`,
+        questionText: `${incomeAck}First, how stable and predictable is your monthly income?`,
         options: ['Very Stable (Salaried Corporate)', 'Mostly Stable (Salaried/Professional)', 'Variable (Freelance / Commission)', 'Business / Entrepreneurial Inflow'],
         isEnough: false
       };
@@ -402,7 +415,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
 
     // 4. Discretionary Spending
     if (!knownFacts.discretionarySpending && !asked.has('discretionarySpending')) {
-      const expAck = knownFacts.totalExpenses ? `Recorded living expenses at **${formatINR(knownFacts.totalExpenses)}/mo**.\n\n` : '';
+      const expAck = knownFacts.totalExpenses ? `Recorded essential living expenses at **${formatINR(knownFacts.totalExpenses)}/mo**.\n\n` : '';
       return {
         questionKey: 'discretionarySpending',
         questionText: `${expAck}What portion of your overall spending goes toward **discretionary / lifestyle choices** (dining out, travel, shopping)?`,
@@ -421,17 +434,27 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       };
     }
 
-    // 6. Debt Follow-Up (Only if user has debt)
+    // 6. Debt Follow-Up: Outstanding Balance (Only if user has debt)
     if (knownFacts.hasDebt && !knownFacts.debtBalance && !asked.has('debtBalance')) {
       return {
         questionKey: 'debtBalance',
-        questionText: `Approximately what is your **total remaining loan balance**?`,
+        questionText: `Approximately what is your **total remaining loan balance** across your debt?`,
         options: ['Under ₹5,00,000', '₹5,00,000 – ₹15,00,000', '₹25,00,000 (Home Loan)', '₹50,00,000+'],
         isEnough: false
       };
     }
 
-    // 7. Emergency Fund
+    // 7. Debt Follow-Up: Interest Rate (Only if user has debt)
+    if (knownFacts.hasDebt && !knownFacts.debtInterestRate && !asked.has('debtInterestRate')) {
+      return {
+        questionKey: 'debtInterestRate',
+        questionText: `Do you know the approximate **interest rate** on your highest loan?`,
+        options: ['Low (<9% Home/Edu Loan)', 'Moderate (9–13% Car Loan)', 'High (>14% Personal Loan / Card)'],
+        isEnough: false
+      };
+    }
+
+    // 8. Emergency Fund
     if (knownFacts.emergencyFund === undefined && !asked.has('emergencyFund')) {
       return {
         questionKey: 'emergencyFund',
@@ -441,7 +464,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       };
     }
 
-    // 8. Emergency Storage
+    // 9. Emergency Storage
     if (knownFacts.emergencyFund > 0 && !knownFacts.emergencyStorage && !asked.has('emergencyStorage')) {
       return {
         questionKey: 'emergencyStorage',
@@ -451,7 +474,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       };
     }
 
-    // 9. Investment Footprint
+    // 10. Investment Footprint
     if (knownFacts.previousInvestmentAmount === undefined && !asked.has('previousInvestmentAmount')) {
       return {
         questionKey: 'previousInvestmentAmount',
@@ -461,7 +484,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       };
     }
 
-    // 10. Asset Allocation Split (if has investments)
+    // 11. Asset Allocation Split (if has investments)
     if (knownFacts.previousInvestmentAmount > 0 && !knownFacts.assetAllocationSplit && !asked.has('assetAllocationSplit')) {
       return {
         questionKey: 'assetAllocationSplit',
@@ -471,7 +494,17 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       };
     }
 
-    // 11. Market Reaction & Volatility Tolerance
+    // 12. Stock Concentration Risk (if heavy in direct stocks)
+    if (knownFacts.assetAllocationSplit && String(knownFacts.assetAllocationSplit).includes('Heavy in Direct Stocks') && !knownFacts.numberOfStocks && !asked.has('numberOfStocks')) {
+      return {
+        questionKey: 'numberOfStocks',
+        questionText: `Approximately how many **individual stocks** make up that direct stock holding?`,
+        options: ['1–3 stocks (High concentration)', '4–8 stocks (Moderate)', '10–20 stocks (Diversified)'],
+        isEnough: false
+      };
+    }
+
+    // 13. Market Reaction & Volatility Tolerance
     if (!knownFacts.marketReactionTolerance && !asked.has('marketReactionTolerance')) {
       return {
         questionKey: 'marketReactionTolerance',
@@ -481,7 +514,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       };
     }
 
-    // 12. Dependents & Family Responsibilities
+    // 14. Dependents & Family Responsibilities
     if (knownFacts.dependentsCount === undefined && !asked.has('dependentsCount')) {
       return {
         questionKey: 'dependentsCount',
@@ -491,7 +524,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       };
     }
 
-    // 13. Term Insurance Protection (if has dependents)
+    // 15. Term Insurance Protection (if has dependents)
     if (knownFacts.dependentsCount > 0 && !knownFacts.hasTermInsurance && !asked.has('hasTermInsurance')) {
       return {
         questionKey: 'hasTermInsurance',
@@ -501,7 +534,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       };
     }
 
-    // 14. Primary Goal Milestone
+    // 16. Primary Goal Milestone
     if (!knownFacts.primaryGoalName && !asked.has('primaryGoalName')) {
       return {
         questionKey: 'primaryGoalName',
@@ -527,7 +560,7 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
       return {
         questionKey: 'availableSipAmount',
         questionText: `How much capital can you comfortably commit to a **monthly SIP**?`,
-        options: ['₹5,00,0 / month', '₹10,000 / month', '₹20,000 / month', '₹35,000 / month', '₹50,000+ / month'],
+        options: ['₹5,000 / month', '₹10,000 / month', '₹20,000 / month', '₹35,000 / month', '₹50,000+ / month'],
         isEnough: false
       };
     }
@@ -553,6 +586,14 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
         questionKey: 'riskTolerance',
         questionText: `What fund volatility profile aligns best with your comfort?`,
         options: COMMON_OPTION_PRESETS.riskTolerance,
+        isEnough: false
+      };
+    }
+    if (!knownFacts.stepUpPreference && !asked.has('stepUpPreference')) {
+      return {
+        questionKey: 'stepUpPreference',
+        questionText: `Would you like to include an **annual Step-Up** (e.g. 10% each year with salary hikes) to supercharge compounding?`,
+        options: COMMON_OPTION_PRESETS.stepUp,
         isEnough: false
       };
     }
@@ -587,6 +628,14 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
         isEnough: false
       };
     }
+    if (!knownFacts.deploymentSpeed && !asked.has('deploymentSpeed')) {
+      return {
+        questionKey: 'deploymentSpeed',
+        questionText: `Do you prefer deploying via a **3-to-6 month Systematic Transfer Plan (STP)** to average market volatility, or direct lump sum?`,
+        options: ['3-Month STP (Recommended)', '6-Month STP (Conservative)', 'One-time Lump Sum'],
+        isEnough: false
+      };
+    }
     return { questionKey: null, questionText: null, isEnough: true };
   }
 
@@ -615,6 +664,14 @@ export function getNextAdvisorStep(domainId, knownFacts = {}, questionsAsked = [
         questionKey: 'numberOfStocks',
         questionText: `How many **individual company stocks** do you currently hold?`,
         options: ['1–3 stocks (High concentration)', '4–8 stocks (Moderate)', '10–20 stocks (Diversified)', '25+ stocks (Over-diversified)'],
+        isEnough: false
+      };
+    }
+    if (knownFacts.stockSharePct > 0 && !knownFacts.largestStockConcentration && !asked.has('largestStockConcentration')) {
+      return {
+        questionKey: 'largestStockConcentration',
+        questionText: `Roughly what percentage (or amount) is concentrated in your **single largest stock holding**?`,
+        options: ['Under 10% of portfolio (Healthy)', '10%–25% (Moderate Risk)', 'Over 30% (High Single-Stock Risk)'],
         isEnough: false
       };
     }
@@ -746,71 +803,82 @@ export function generateDomainPlan(domainId, knownFacts = {}) {
   const portfolio = knownFacts.previousInvestmentAmount || knownFacts.availableCapital || 0;
   const savingsRate = inc > 0 ? Math.round((surplus / inc) * 100) : 0;
   const stability = knownFacts.incomeStability || 'Standard Salaried';
-  const dependents = knownFacts.dependentsCount ?? 'Not specified';
+  const dependents = knownFacts.dependentsCount !== undefined ? knownFacts.dependentsCount : 'Not provided yet';
   const insurance = knownFacts.hasTermInsurance || 'Review required';
   const primaryGoal = knownFacts.primaryGoalName || 'Wealth Creation';
 
   // 1. MY PROFILE Plan
   if (domainId === 'my_profile' || domainId === 'financial_health') {
-    return `### 📊 FINLABS AI — MY PROFILE POSITION SNAPSHOT
+    return `### 📊 FINLABS AI — MY PROFILE DIAGNOSTIC
 
-**1. Financial Position & Cash Flow:**
-- **Monthly Inflow**: ${inc > 0 ? formatINR(inc) : 'Not specified'} (${stability})
-- **Essential Living Costs**: ${exp > 0 ? `-${formatINR(exp)}` : 'Not specified'} (${knownFacts.discretionarySpending || 'Standard discretionary'})
+**1. FINANCIAL POSITION:**
+- **Monthly Inflow**: ${inc > 0 ? formatINR(inc) : 'Not provided yet'} (${stability})
+- **Living Expenses**: ${exp > 0 ? `-${formatINR(exp)}` : 'Not provided yet'} (${knownFacts.discretionarySpending || 'Standard discretionary'})
 - **Monthly Debt / EMIs**: ${debt > 0 ? `-${formatINR(debt)}` : '₹0 (Debt Free 🎉)'} ${knownFacts.debtType ? `(${knownFacts.debtType})` : ''}
 - **Net Monthly Surplus**: **${formatINR(surplus)}** (${savingsRate}% savings rate)
-
-**2. Emergency Reserve & Safety:**
 - **Liquid Emergency Reserve**: ${formatINR(emergency)} (${emergencyMonths} months of essential expenses)
-- **Emergency Holding Venue**: ${knownFacts.emergencyStorage || 'Savings Account / Liquid Reserves'}
+- **Active Investment Portfolio**: ${portfolio > 0 ? formatINR(portfolio) : '₹0 (Starting fresh)'}
 
-**3. Investment Footprint & Risk Profile:**
-- **Total Investment Portfolio**: ${portfolio > 0 ? formatINR(portfolio) : '₹0 (Starting fresh)'}
-- **Asset Allocation Profile**: ${knownFacts.assetAllocationSplit || 'Diversified Mutual Funds & Equity'}
-- **Risk Tolerance Profile**: **${risk}** (${knownFacts.marketReactionTolerance || 'Standard volatility tolerance'})
+**2. INCOME & CASH FLOW:**
+- **Income Stability**: ${stability}
+- **Savings Rate**: **${savingsRate}%** of monthly income
+- **Cash Flow Posture**: ${surplus > 0 ? `Positive recurring surplus of ${formatINR(surplus)}/month available for systematic wealth building.` : 'Tight cash flow; focus on expense reduction.'}
 
-**4. Family Responsibilities & Protection:**
+**3. DEBT POSITION:**
+- **Debt Status**: ${debt === 0 ? 'Completely debt-free 🎉' : `Active loan EMIs of ${formatINR(debt)}/month (${Math.round((debt / (inc || 1)) * 100)}% of income).`}
+- **Debt Balances & Interest**: ${knownFacts.debtBalance ? `Outstanding balance of ~${formatINR(knownFacts.debtBalance)}` : 'Managed within standard credit limits.'} ${knownFacts.debtInterestRate ? `(${knownFacts.debtInterestRate})` : ''}
+
+**4. EMERGENCY FUND:**
+- **Current Reserve**: ${formatINR(emergency)} (${emergencyMonths} months of living buffer)
+- **Holding Venue**: ${knownFacts.emergencyStorage || 'Savings Account / High-yield Liquid Reserves'}
+- **Safety Assessment**: ${parseFloat(emergencyMonths) >= 6 ? 'Fully funded 6-month buffer provides solid shock insulation.' : `Underfunded: Recommended target is ${formatINR(exp * 6)} (6 months buffer).`}
+
+**5. INVESTMENT POSITION & DIVERSIFICATION:**
+- **Total Footprint**: ${portfolio > 0 ? formatINR(portfolio) : '₹0 (Starting fresh)'}
+- **Asset Split**: ${knownFacts.assetAllocationSplit || 'Diversified Mutual Funds & Equity'}
+- **Stock Concentration**: ${knownFacts.numberOfStocks ? `${knownFacts.numberOfStocks} company holdings` : 'Standard index spread'}
+
+**6. PROTECTION & RESPONSIBILITIES:**
 - **Financial Dependents**: **${dependents}**
-- **Term Life Protection**: **${insurance}**
-- **Primary Milestone Goal**: **${primaryGoal}**
+- **Life / Term Insurance**: **${insurance}**
+- **Protection Gaps**: ${dependents > 0 && String(insurance).includes('No') ? '⚠️ High Priority Gap: Dependents exist without active pure term insurance.' : 'Protection structure is aligned.'}
+
+**7. GOALS & HORIZON:**
+- **Primary Milestone**: **${primaryGoal}**
+- **Target Time Horizon**: **${knownFacts.timeHorizon || '5–10+ Years'}**
+
+**8. RISK & BEHAVIORAL POSTURE:**
+- **Risk Tolerance**: **${risk}**
+- **Market Downturn Reaction**: ${knownFacts.marketReactionTolerance || 'Balanced long-term perspective'}
 
 ---
 
-### 🔎 KEY DIAGNOSTIC FINDINGS
-1. **Savings Discipline**: Your net recurring surplus of **${formatINR(surplus)}/month** delivers a healthy **${savingsRate}%** savings rate.
-2. **Emergency Runway**: Your liquid reserve provides **${emergencyMonths} months** of living buffer. ${parseFloat(emergencyMonths) < 6 ? 'Target is 6 months to shield investments against unexpected emergencies.' : 'Your 6-month buffer is securely funded.'}
-3. **Debt Exposure**: ${debt > 0 ? `Debt-to-income is ${Math.round((debt / inc) * 100)}% (${formatINR(debt)}/mo). Keep total EMIs under 35% of income.` : 'You are completely debt-free, maximizing capital available for compounding.'}
-4. **Protection Balance**: ${dependents > 0 && String(insurance).includes('No') ? '⚠️ Protection Gap: You have dependents but no active term life cover. Securing term insurance is high priority.' : 'Protection structure matches family responsibilities.'}
+### 🌟 KEY STRENGTHS
+1. **Cash Flow Surplus**: Reliable surplus of **${formatINR(surplus)}/month** ready for automated wealth compounding.
+2. **Debt Control**: ${debt === 0 ? 'Zero interest-bearing liabilities.' : 'Debt burden remains within serviceable range.'}
 
 ---
 
-### ⚠️ IDENTIFIED RISKS & GAPS
-- **Emergency Buffer**: ${parseFloat(emergencyMonths) < 3 ? 'Critical Underfunding: Under 3 months runway forces premature equity liquidation during shocks.' : 'Adequate buffer maintained.'}
-- **Single Asset Concentration**: ${knownFacts.assetAllocationSplit && String(knownFacts.assetAllocationSplit).includes('Heavy in Direct Stocks') ? 'High equity volatility risk. Ensure individual stocks do not exceed 10% of total wealth.' : 'Standard diversification.'}
+### ⚠️ KEY RISKS / GAPS
+1. **Safety Runway**: ${parseFloat(emergencyMonths) < 6 ? `Liquid reserve is ${emergencyMonths} months (target 6 months). A sudden emergency could force distress liquidation of equities.` : 'Emergency buffer is solid.'}
+2. **Protection Cover**: ${dependents > 0 && String(insurance).includes('No') ? 'Lack of term insurance exposes dependents to income-loss risk.' : 'No major protection gaps identified.'}
 
 ---
 
-### 🌟 FINANCIAL STRENGTHS
-- **Debt Health**: ${debt === 0 ? 'Zero high-interest debt liabilities.' : 'Debt is structured within manageable limits.'}
-- **Deployable Surplus**: Predictable monthly surplus of **${formatINR(surplus)}** ready for automated wealth compounding.
-
----
-
-### 🎯 PERSONALIZED ACTION PLAN
-
-1. **Step 1 — Build 6-Month Liquid Reserve (${formatINR(Math.max(0, exp * 6 - emergency))} gap)**:
-   - Route ${formatINR(surplus * 0.25)}/month into high-yield sweep-in FDs or Liquid Mutual Funds until 6 months of expenses (${formatINR(exp * 6)}) is secured.
+### 🎯 PRIORITY ACTION PLAN
+1. **Step 1 — Secure 6-Month Emergency Runway (${formatINR(Math.max(0, exp * 6 - emergency))} gap)**:
+   - Direct ${formatINR(surplus * 0.25)}/month into high-yield sweep-in FDs or Liquid Mutual Funds.
 2. **Step 2 — Automate Core Wealth SIP (${formatINR(surplus * 0.50)}/mo)**:
    - Deploy 50% of surplus into low-cost Nifty 50 Index Funds (30%) and Flexi Cap Funds (20%).
 3. **Step 3 — Satellite Growth & Inflation Hedge (${formatINR(surplus * 0.25)}/mo)**:
    - Deploy remaining 25% across mid-cap equity growth funds and Sovereign Gold Bonds.
-4. **Step 4 — Annual Review & Rebalancing**:
+4. **Step 4 — 10% Annual Step-Up**:
    - Step up your monthly SIPs by 10% annually with salary increments to accelerate milestone achievement by 30%.
 
 ---
 
 ### 💡 WHY THESE RECOMMENDATIONS
-These recommendations are calibrated directly to your authentic cash flow of **${formatINR(inc)}/mo**, **${risk}** risk persona, and **${primaryGoal}** milestone.`;
+Calibrated strictly to your authentic cash flow of **${formatINR(inc)}/mo**, **${risk}** risk persona, and **${primaryGoal}** milestone.`;
   }
 
   // 2. SIP PLAN
