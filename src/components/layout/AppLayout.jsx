@@ -5,6 +5,7 @@ import Header from './Header';
 import { useOnboarding } from '../../context/OnboardingContext';
 import OnboardingEntryModal from '../onboarding/OnboardingEntryModal';
 import FloatingAiWidget from '../common/FloatingAiWidget';
+import FloatingBottomDock from './FloatingBottomDock';
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -55,13 +56,16 @@ export default function AppLayout() {
       {/* Main Application Content Container */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-0 transition-all duration-300">
         <Header onOpenSidebar={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24">
           <Outlet />
         </main>
       </div>
 
       {/* Floating FinLabs AI Robot Widget */}
       <FloatingAiWidget />
+
+      {/* Floating Glassmorphism Quick-Access Bottom Dock */}
+      <FloatingBottomDock />
 
       {/* Universal Onboarding Entry Modal Popup */}
       <OnboardingEntryModal
