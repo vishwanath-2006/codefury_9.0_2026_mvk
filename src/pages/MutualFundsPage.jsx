@@ -135,11 +135,13 @@ const POPULAR_FUNDS = [
 ];
 
 export default function MutualFundsPage() {
-  const { userProfile } = useOnboarding();
+  const { userProfile, isOnboarded } = useOnboarding();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [searchLoading, setSearchLoading] = useState(false);
   const [liveApiResults, setLiveApiResults] = useState([]);
+  const [showRiskDrawer, setShowRiskDrawer] = useState(false);
 
   // Modal tracking
   const [selectedScheme, setSelectedScheme] = useState(null);
@@ -383,9 +385,19 @@ export default function MutualFundsPage() {
                         </div>
                         <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2">{fund.name}</h3>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${matchBadge.bg}`}>
-                        {matchBadge.label}
-                      </span>
+                      {isOnboarded ? (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${matchBadge.bg}`}>
+                          {matchBadge.label}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setShowRiskDrawer(true)}
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 transition cursor-pointer"
+                          title="Click to learn how risk matching works"
+                        >
+                          Profile Required (Click to Match)
+                        </button>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 my-4 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs">
@@ -480,6 +492,49 @@ export default function MutualFundsPage() {
           schemeCode={selectedScheme.schemeCode}
           schemeName={selectedScheme.schemeName}
         />
+      )}
+
+      {/* Risk Suitability Explainer Modal */}
+      {showRiskDrawer && (
+        <Modal
+          isOpen={showRiskDrawer}
+          onClose={() => setShowRiskDrawer(false)}
+          title="Personalized Risk Suitability Engine"
+        >
+          <div className="space-y-4 text-xs">
+            <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+              FinLabs cross-references each fund's historical standard deviation & market risk rating against your survey risk appetite:
+            </p>
+
+            <div className="space-y-2">
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <strong className="text-emerald-500 font-bold block mb-0.5">High Growth Match</strong>
+                <span className="text-slate-600 dark:text-slate-300">Assigned to Aggressive investors seeking equity alpha via Small Cap & Sectoral funds.</span>
+              </div>
+              <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                <strong className="text-indigo-400 font-bold block mb-0.5">Optimal Match (Balanced)</strong>
+                <span className="text-slate-600 dark:text-slate-300">Assigned to Moderate investors balancing Flexi Cap & Index funds.</span>
+              </div>
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <strong className="text-rose-500 font-bold block mb-0.5">Low Suitability (High Volatility)</strong>
+                <span className="text-slate-600 dark:text-slate-300">Flagged when a Conservative profile evaluates high-beta or small-cap equities.</span>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setShowRiskDrawer(false);
+                  navigate('/onboarding');
+                }}
+              >
+                Complete Onboarding to Match Profile
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

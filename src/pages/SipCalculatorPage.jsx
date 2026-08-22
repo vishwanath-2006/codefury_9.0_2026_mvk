@@ -2,12 +2,18 @@ import React from 'react';
 import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import SipCalculator from '../components/ui/SipCalculator';
+import BenchmarkFooterBanner from '../components/common/BenchmarkFooterBanner';
 
 export default function SipCalculatorPage() {
-  const { userProfile } = useOnboarding();
+  const { userProfile, isOnboarded } = useOnboarding();
 
-  const initialSurplus = userProfile.primaryGoal.monthlyCommitmentAmount || userProfile.netMonthlySurplus || 15000;
-  const initialTenure = userProfile.primaryGoal.timeframeYears || 5;
+  const initialSurplus = isOnboarded
+    ? (userProfile.primaryGoal.monthlyCommitmentAmount || userProfile.netMonthlySurplus || 15000)
+    : 5000;
+
+  const initialTenure = isOnboarded
+    ? (userProfile.primaryGoal.timeframeYears || 5)
+    : 10;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-150">
@@ -24,6 +30,11 @@ export default function SipCalculatorPage() {
           initialTenureYears={initialTenure}
         />
       </div>
+
+      {/* SUBTLE BENCHMARK FOOTER CTA */}
+      {!isOnboarded && (
+        <BenchmarkFooterBanner message="Want this auto-tuned to your monthly surplus? Complete onboarding." />
+      )}
     </div>
   );
 }

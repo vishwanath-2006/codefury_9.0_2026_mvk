@@ -4,9 +4,8 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
 import Badge from '../components/ui/Badge';
-import PlatformOverviewBanner from '../components/common/PlatformOverviewBanner';
-import FeatureOverviewCard from '../components/common/FeatureOverviewCard';
-import { PieChart, TrendingUp, LineChart, ShieldCheck, RefreshCw, Lock } from 'lucide-react';
+import BenchmarkFooterBanner from '../components/common/BenchmarkFooterBanner';
+import { PieChart, TrendingUp, LineChart, ShieldCheck, RefreshCw } from 'lucide-react';
 
 export default function PortfolioPage() {
   const { userProfile, isOnboarded } = useOnboarding();
@@ -16,16 +15,17 @@ export default function PortfolioPage() {
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val ?? 0);
 
-  // Dynamic Deterministic Portfolio Calculations (Zero-Division Safe)
-  const portfolio = userProfile.portfolio || { mutualFunds: 175000, stocks: 105000, fixedDeposits: 35000, gold: 35000, cashBuffer: 150000 };
-  const totalNetWorth = (portfolio.mutualFunds + portfolio.stocks + portfolio.fixedDeposits + portfolio.gold + portfolio.cashBuffer) || 1;
+  const portfolio = isOnboarded
+    ? (userProfile.portfolio || { mutualFunds: 175000, stocks: 105000, fixedDeposits: 35000, gold: 35000, cashBuffer: 150000 })
+    : { mutualFunds: 210000, stocks: 87500, fixedDeposits: 35000, gold: 17500, cashBuffer: 0 };
+
+  const totalNetWorth = (portfolio.mutualFunds + portfolio.stocks + portfolio.fixedDeposits + portfolio.gold + (portfolio.cashBuffer || 0)) || 350000;
 
   const dynamicAllocation = [
-    { name: 'Equity Mutual Funds', value: portfolio.mutualFunds, percentage: Math.round(((portfolio.mutualFunds) / totalNetWorth) * 100) || 0, color: '#10b981' },
-    { name: 'Direct Equities / Stocks', value: portfolio.stocks, percentage: Math.round(((portfolio.stocks) / totalNetWorth) * 100) || 0, color: '#6366f1' },
-    { name: 'Fixed Income / FDs', value: portfolio.fixedDeposits, percentage: Math.round(((portfolio.fixedDeposits) / totalNetWorth) * 100) || 0, color: '#f59e0b' },
-    { name: 'Gold Reserves', value: portfolio.gold, percentage: Math.round(((portfolio.gold) / totalNetWorth) * 100) || 0, color: '#eab308' },
-    { name: 'Liquid Cash Buffer', value: portfolio.cashBuffer, percentage: Math.round(((portfolio.cashBuffer) / totalNetWorth) * 100) || 0, color: '#06b6d4' },
+    { name: 'Equity Mutual Funds', value: portfolio.mutualFunds, percentage: Math.round(((portfolio.mutualFunds) / totalNetWorth) * 100) || 60, color: '#10b981' },
+    { name: 'Direct Equities / Stocks', value: portfolio.stocks, percentage: Math.round(((portfolio.stocks) / totalNetWorth) * 100) || 25, color: '#6366f1' },
+    { name: 'Fixed Income / FDs', value: portfolio.fixedDeposits, percentage: Math.round(((portfolio.fixedDeposits) / totalNetWorth) * 100) || 10, color: '#f59e0b' },
+    { name: 'Gold Reserves', value: portfolio.gold, percentage: Math.round(((portfolio.gold) / totalNetWorth) * 100) || 5, color: '#eab308' },
   ].filter(item => item.value > 0 || item.percentage > 0);
 
   const fallbackHoldings = [
@@ -50,191 +50,164 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-150">
-      {/* Global Overview Mode Banner */}
-      {!isOnboarded && <PlatformOverviewBanner />}
-
       <PageHeader
         title="Integrated Portfolio Workspace"
         subtitle="Unified view of your mutual funds, equity holdings, debt instruments, and net worth trajectory."
         tag="Asset Management"
       />
 
-      {!isOnboarded ? (
-        <FeatureOverviewCard
-          moduleName="Integrated Asset Allocation Portfolio"
-          subtitle="Consolidates mutual fund SIPs, direct equities, fixed deposits, and physical assets into a single multi-class net worth dashboard with live broker API sync."
-          capabilities={[
-            'Audits Portfolio Concentration Risk across equities vs. fixed income.',
-            'Direct Angel One SmartAPI Demat integration for real-time stock holdings.',
-            'Calculates total CAGR growth trajectory and asset class balance.'
-          ]}
-          whyItMatters={[
-            'Over-concentrating in a single asset class (e.g. 80%+ in equity) exposes wealth to severe drawdowns.',
-            'Broadening asset classes reduces overall volatility while preserving long-term CAGR compounding.',
-            'Automated broker sync eliminates manual spreadsheet logging mistakes.'
-          ]}
-          ctaLabel="Add Portfolio Details in Onboarding"
-          stepTarget="/onboarding"
-        >
-          {/* Mock Portfolio Visual */}
-          <div className="p-6 bg-slate-900 rounded-3xl text-white space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-emerald-400">Net Worth: ₹{totalNetWorth.toLocaleString('en-IN')}</p></div>
-              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-indigo-400">Mutual Funds: 50%</p></div>
-              <div className="p-3 bg-slate-800 rounded-xl text-xs"><p className="font-bold text-amber-400">Stocks: 30%</p></div>
-            </div>
-            <div className="w-full h-3 bg-emerald-500 rounded-full"></div>
-          </div>
-        </FeatureOverviewCard>
-      ) : (
-        /* LIVE PORTFOLIO MODE */
-        <>
-          {/* Portfolio Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard
-              title="Total Net Worth"
-              value={formatINR(totalNetWorth)}
-              icon={TrendingUp}
-              change={`${dynamicAllocation.length} Active Asset Classes`}
-              changeType="positive"
-              description="Consolidated Net Holdings"
-            />
+      {/* Portfolio Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard
+          title="Total Net Worth"
+          value={formatINR(totalNetWorth)}
+          icon={TrendingUp}
+          change={`${dynamicAllocation.length} Active Asset Classes`}
+          changeType="positive"
+          description={isOnboarded ? "Consolidated Net Holdings" : "Early Career Model Portfolio"}
+        />
 
-            <StatCard
-              title="Primary Asset Class"
-              value={dynamicAllocation[0]?.name || 'Equity Mutual Funds'}
-              icon={PieChart}
-              change={`${dynamicAllocation[0]?.percentage || 0}% Allocation`}
-              changeType="positive"
-              description="Core holdings"
-            />
+        <StatCard
+          title="Primary Asset Class"
+          value={dynamicAllocation[0]?.name || 'Equity Mutual Funds'}
+          icon={PieChart}
+          change={`${dynamicAllocation[0]?.percentage || 60}% Allocation`}
+          changeType="positive"
+          description="Core growth holdings"
+        />
 
-            <StatCard
-              title="Broker Integration"
-              value="Angel One API"
-              icon={LineChart}
-              change="Ready for Sync"
-              changeType="neutral"
-              description="Live Demat Integration"
-            />
+        <StatCard
+          title="Broker Integration"
+          value="Angel One API"
+          icon={LineChart}
+          change="Ready for Sync"
+          changeType="neutral"
+          description="Live Demat Integration"
+        />
+      </div>
+
+      {/* Allocation Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <PieChart className="w-4 h-4 text-emerald-500" />
+            Asset Class Allocation Guide
+          </CardTitle>
+          <CardDescription>
+            {isOnboarded ? 'Live asset class distribution of your holdings' : 'Standard balanced asset distribution for long-term CAGR compounding'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="w-full h-4 rounded-full overflow-hidden flex mb-6 bg-slate-100 dark:bg-slate-800">
+            {dynamicAllocation.map((item, idx) => (
+              <div
+                key={idx}
+                className="h-full transition-all"
+                style={{ width: `${item.percentage}%`, backgroundColor: item.color }}
+              />
+            ))}
           </div>
 
-          {/* Allocation Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <PieChart className="w-4 h-4 text-emerald-500" />
-                Asset Class Allocation
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="w-full h-4 rounded-full overflow-hidden flex mb-6 bg-slate-100 dark:bg-slate-800">
-                {dynamicAllocation.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="h-full transition-all"
-                    style={{ width: `${item.percentage}%`, backgroundColor: item.color }}
-                  />
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {dynamicAllocation.map((item, idx) => (
-                  <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="font-bold text-sm">{item.name}</span>
-                    </div>
-                    <p className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mb-1">{formatINR(item.value)}</p>
-                    <Badge variant="neutral">{item.percentage}% of portfolio</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Angel One SmartAPI Integration Widget */}
-          <Card className="mt-6">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  Angel One SmartAPI Portfolio Sync
-                </CardTitle>
-                <CardDescription>
-                  Connect your Angel One demat account to sync stock holdings in real-time.
-                </CardDescription>
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                <button
-                  disabled={syncing}
-                  onClick={connectAngelOne}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50 text-white text-xs font-bold transition shadow-md shadow-emerald-500/10"
-                >
-                  {syncing ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Syncing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Connect Angel One Account</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  disabled={syncing}
-                  onClick={syncWithToken}
-                  className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 text-xs font-bold transition"
-                >
-                  Load Demo Holdings
-                </button>
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              {holdings ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-bold uppercase">
-                        <th className="py-2">Symbol</th>
-                        <th className="py-2 text-right">Qty</th>
-                        <th className="py-2 text-right">Avg Price</th>
-                        <th className="py-2 text-right">LTP</th>
-                        <th className="py-2 text-right">Invested</th>
-                        <th className="py-2 text-right">Current</th>
-                        <th className="py-2 text-right">P&L (%)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-semibold font-mono">
-                      {holdings.map((h, idx) => (
-                        <tr key={idx}>
-                          <td className="py-3 font-sans font-bold text-slate-800 dark:text-slate-200">{h.symbol}</td>
-                          <td className="py-3 text-right">{h.quantity}</td>
-                          <td className="py-3 text-right">₹{h.averagePrice}</td>
-                          <td className="py-3 text-right">₹{h.ltp}</td>
-                          <td className="py-3 text-right">₹{h.investedValue.toLocaleString('en-IN')}</td>
-                          <td className="py-3 text-right text-emerald-500">₹{h.currentValue.toLocaleString('en-IN')}</td>
-                          <td className="py-3 text-right text-emerald-500">+{h.pnlPercentage}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            {dynamicAllocation.map((item, idx) => (
+              <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="font-bold text-sm">{item.name}</span>
                 </div>
+                <p className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mb-1">{formatINR(item.value)}</p>
+                <Badge variant="neutral">{item.percentage}% of portfolio</Badge>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Angel One SmartAPI Integration Widget */}
+      <Card className="mt-6">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              Angel One SmartAPI Portfolio Sync
+            </CardTitle>
+            <CardDescription>
+              Connect your Angel One demat account to sync stock holdings in real-time.
+            </CardDescription>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <button
+              disabled={syncing}
+              onClick={connectAngelOne}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50 text-white text-xs font-bold transition shadow-md shadow-emerald-500/10"
+            >
+              {syncing ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Syncing...</span>
+                </>
               ) : (
-                <div className="py-8 text-center flex flex-col items-center justify-center gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/40 dark:bg-slate-900/10">
-                  <ShieldCheck className="w-8 h-8 text-slate-300 dark:text-slate-700" />
-                  <p className="text-xs text-slate-400 font-medium max-w-sm">
-                    Connect your Angel One demat account or click "Load Demo Holdings" to sync live broker positions.
-                  </p>
-                </div>
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Connect Angel One Account</span>
+                </>
               )}
-            </CardContent>
-          </Card>
-        </>
+            </button>
+            <button
+              disabled={syncing}
+              onClick={syncWithToken}
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 text-xs font-bold transition"
+            >
+              Load Demo Holdings
+            </button>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {holdings ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-bold uppercase">
+                    <th className="py-2">Symbol</th>
+                    <th className="py-2 text-right">Qty</th>
+                    <th className="py-2 text-right">Avg Price</th>
+                    <th className="py-2 text-right">LTP</th>
+                    <th className="py-2 text-right">Invested</th>
+                    <th className="py-2 text-right">Current</th>
+                    <th className="py-2 text-right">P&L (%)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-semibold font-mono">
+                  {holdings.map((h, idx) => (
+                    <tr key={idx}>
+                      <td className="py-3 font-sans font-bold text-slate-800 dark:text-slate-200">{h.symbol}</td>
+                      <td className="py-3 text-right">{h.quantity}</td>
+                      <td className="py-3 text-right">₹{h.averagePrice}</td>
+                      <td className="py-3 text-right">₹{h.ltp}</td>
+                      <td className="py-3 text-right">₹{h.investedValue.toLocaleString('en-IN')}</td>
+                      <td className="py-3 text-right text-emerald-500">₹{h.currentValue.toLocaleString('en-IN')}</td>
+                      <td className="py-3 text-right text-emerald-500">+{h.pnlPercentage}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center flex flex-col items-center justify-center gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/40 dark:bg-slate-900/10">
+              <ShieldCheck className="w-8 h-8 text-slate-300 dark:text-slate-700" />
+              <p className="text-xs text-slate-400 font-medium max-w-sm">
+                Connect your Angel One demat account or click "Load Demo Holdings" to sync live broker positions.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SUBTLE BENCHMARK FOOTER CTA */}
+      {!isOnboarded && (
+        <BenchmarkFooterBanner message="Enter your active holdings to compute your live portfolio allocation." />
       )}
     </div>
   );
