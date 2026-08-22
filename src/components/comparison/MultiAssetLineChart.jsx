@@ -57,14 +57,18 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
 
       // Filter by real calendar date timestamp
       const filtered = rawHistory.filter((pt) => {
-        if (pt.rawDate instanceof Date) {
+        if (pt.rawDate instanceof Date && !isNaN(pt.rawDate.getTime())) {
           return pt.rawDate.getTime() >= cutoffTimestamp;
         }
-        if (pt.date && pt.date.includes('-')) {
+        if (pt.date && typeof pt.date === 'string' && pt.date.includes('-')) {
           const parts = pt.date.split('-');
           if (parts.length === 3) {
-            const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-            return d.getTime() >= cutoffTimestamp;
+            const d = parts[0].length === 4
+              ? new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+              : new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+            if (!isNaN(d.getTime())) {
+              return d.getTime() >= cutoffTimestamp;
+            }
           }
         }
         return true;
