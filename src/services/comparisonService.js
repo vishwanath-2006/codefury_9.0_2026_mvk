@@ -572,185 +572,185 @@ export function getRiskScore(riskStr) {
 export async function loadUnifiedComparison(selectedItems) {
   if (!Array.isArray(selectedItems) || selectedItems.length === 0) return [];
 
-  const results = await Promise.all(
-    selectedItems.map(async (item) => {
-      // 1. Stock Data Resolution
-      if (item.type === 'stock') {
-        const base = STOCKS_UNIVERSE.find((s) => s.symbol === item.key || s.id === item.key) || item.rawItem || {
-          id: `stock-${item.key}`,
-          symbol: item.key,
-          displayName: item.name || item.key,
-          basePrice: 1000,
-          return1M: 2.0,
-          return6M: 8.0,
-          return1Y: 15.0,
-          returnLabelType: 'Historical Return',
-          basePe: '20.0',
-          risk: 'High',
-          minInv: '1 Share',
-          minInvestmentNum: 1000,
-          horizon: '3–5+ Years',
-          suitability: 'Direct Equity Growth',
-          diversification: 'Single Company (Concentrated)',
-          history: []
-        };
+  const results = [];
+  for (const item of selectedItems) {
+    // 1. Stock Data Resolution
+    if (item.type === 'stock') {
+      const base = STOCKS_UNIVERSE.find((s) => s.symbol === item.key || s.id === item.key) || item.rawItem || {
+        id: `stock-${item.key}`,
+        symbol: item.key,
+        displayName: item.name || item.key,
+        basePrice: 1000,
+        return1M: 2.0,
+        return6M: 8.0,
+        return1Y: 15.0,
+        returnLabelType: 'Historical Return',
+        basePe: '20.0',
+        risk: 'High',
+        minInv: '1 Share',
+        minInvestmentNum: 1000,
+        horizon: '3–5+ Years',
+        suitability: 'Direct Equity Growth',
+        diversification: 'Single Company (Concentrated)',
+        history: []
+      };
 
-        const quote = await fetchLiveStockQuote(base.symbol);
-        const candleRes = await fetchLiveHistoricalCandles(base.symbol);
-        const historyCandles = Array.isArray(candleRes.candles) ? candleRes.candles : [];
+      const quote = await fetchLiveStockQuote(base.symbol);
+      const candleRes = await fetchLiveHistoricalCandles(base.symbol);
+      const historyCandles = Array.isArray(candleRes.candles) ? candleRes.candles : [];
 
-        return {
-          id: base.id || `stock-${base.symbol}`,
-          type: 'stock',
-          assetType: 'stock',
-          key: base.symbol,
-          symbol: base.symbol,
-          displayName: base.displayName || base.name,
-          name: base.displayName || base.name,
-          typeBadge: 'Stock (NSE)',
-          priceDisplay: `₹${quote.price.toLocaleString('en-IN')}`,
-          isLive: quote.isLive,
-          dataSourceType: quote.isLive ? 'Live Angel One Market Data' : 'NSE Benchmark Reference',
-          feedStatus: candleRes.status || (historyCandles.length > 0 ? 'success' : 'unavailable'),
-          return1M: base.return1M !== undefined ? Number(base.return1M) : null,
-          return6M: base.return6M !== undefined ? Number(base.return6M) : null,
-          return1Y: Number(base.return1Y),
-          returnDisplay: `+${base.return1Y}%`,
-          returnLabelType: base.returnLabelType || 'Historical Return',
-          risk: base.risk,
-          riskScore: getRiskScore(base.risk),
-          cost: 'Zero Brokerage / STT only',
-          liquidity: 'High (T+1 Instant Trading)',
-          diversification: base.diversification || 'Single Company (Concentrated)',
-          minInvestment: base.minInv,
-          minInvestmentNum: quote.isLive ? quote.price : (base.minInvestmentNum || 1000),
-          horizon: base.horizon,
-          suitability: base.suitability,
-          valuationType: 'P/E Multiple',
-          valuationDisplay: base.basePe ? `${base.basePe}x P/E` : 'N/A',
-          valuationNumeric: base.basePe ? Number(base.basePe) : null,
-          peRatio: base.basePe ? Number(base.basePe) : null,
-          history: historyCandles
-        };
-      }
+      results.push({
+        id: base.id || `stock-${base.symbol}`,
+        type: 'stock',
+        assetType: 'stock',
+        key: base.symbol,
+        symbol: base.symbol,
+        displayName: base.displayName || base.name,
+        name: base.displayName || base.name,
+        typeBadge: 'Stock (NSE)',
+        priceDisplay: `₹${quote.price.toLocaleString('en-IN')}`,
+        isLive: quote.isLive,
+        dataSourceType: quote.isLive ? 'Live Angel One Market Data' : 'NSE Benchmark Reference',
+        feedStatus: candleRes.status || (historyCandles.length > 0 ? 'success' : 'unavailable'),
+        return1M: base.return1M !== undefined ? Number(base.return1M) : null,
+        return6M: base.return6M !== undefined ? Number(base.return6M) : null,
+        return1Y: Number(base.return1Y),
+        returnDisplay: `+${base.return1Y}%`,
+        returnLabelType: base.returnLabelType || 'Historical Return',
+        risk: base.risk,
+        riskScore: getRiskScore(base.risk),
+        cost: 'Zero Brokerage / STT only',
+        liquidity: 'High (T+1 Instant Trading)',
+        diversification: base.diversification || 'Single Company (Concentrated)',
+        minInvestment: base.minInv,
+        minInvestmentNum: quote.isLive ? quote.price : (base.minInvestmentNum || 1000),
+        horizon: base.horizon,
+        suitability: base.suitability,
+        valuationType: 'P/E Multiple',
+        valuationDisplay: base.basePe ? `${base.basePe}x P/E` : 'N/A',
+        valuationNumeric: base.basePe ? Number(base.basePe) : null,
+        peRatio: base.basePe ? Number(base.basePe) : null,
+        history: historyCandles
+      });
 
-      // 2. Mutual Fund Data Resolution
-      if (item.type === 'mf') {
-        const mf = MUTUAL_FUNDS_UNIVERSE.find((m) => m.id === item.key || m.symbol === item.key) || item.rawItem || {
-          id: item.key,
-          displayName: item.name || 'Mutual Fund',
-          symbol: item.symbol || 'MF',
-          return1M: 2.0,
-          return6M: 8.0,
-          return1Y: 16.0,
-          returnLabelType: 'CAGR',
-          expenseRatio: '0.50%',
-          expenseRatioNum: 0.5,
-          risk: 'Moderate',
-          minSip: '₹500 / mo',
-          minInvestmentNum: 500,
-          horizon: '5+ Years',
-          suitability: 'Diversified Investing',
-          diversification: '30–50 Stocks',
-          history: []
-        };
+      // 100ms throttle between stocks to ensure gateway token reuse
+      await new Promise((r) => setTimeout(r, 100));
+    }
 
-        return {
-          id: mf.id,
-          type: 'mf',
-          assetType: 'mf',
-          key: mf.id,
-          symbol: mf.symbol,
-          displayName: mf.displayName || mf.name,
-          name: mf.displayName || mf.name,
-          typeBadge: 'Mutual Fund',
-          priceDisplay: `Min SIP: ${mf.minSip}`,
-          isLive: false,
-          dataSourceType: 'AMFI Benchmark Reference',
-          feedStatus: 'nav_unavailable',
-          return1M: mf.return1M !== undefined ? Number(mf.return1M) : null,
-          return6M: mf.return6M !== undefined ? Number(mf.return6M) : null,
-          return1Y: Number(mf.return1Y),
-          returnDisplay: `+${mf.return1Y}% CAGR`,
-          returnLabelType: mf.returnLabelType || 'CAGR',
-          risk: mf.risk,
-          riskScore: getRiskScore(mf.risk),
-          cost: `${mf.expenseRatio} Expense Ratio`,
-          liquidity: 'High (T+2 NAV Settlement)',
-          diversification: mf.diversification || '35–50 Diversified Stocks',
-          minInvestment: mf.minSip,
-          minInvestmentNum: mf.minInvestmentNum || 500,
-          horizon: mf.horizon,
-          suitability: mf.suitability,
-          valuationType: 'Expense Ratio (TER)',
-          valuationDisplay: `${mf.expenseRatio} TER`,
-          valuationNumeric: mf.expenseRatioNum || 0.5,
-          peRatio: null,
-          history: []
-        };
-      }
+    // 2. Mutual Fund Data Resolution
+    else if (item.type === 'mf') {
+      const mf = MUTUAL_FUNDS_UNIVERSE.find((m) => m.id === item.key || m.symbol === item.key) || item.rawItem || {
+        id: item.key,
+        displayName: item.name || 'Mutual Fund',
+        symbol: item.symbol || 'MF',
+        return1M: 2.0,
+        return6M: 8.0,
+        return1Y: 16.0,
+        returnLabelType: 'CAGR',
+        expenseRatio: '0.50%',
+        expenseRatioNum: 0.5,
+        risk: 'Moderate',
+        minSip: '₹500 / mo',
+        minInvestmentNum: 500,
+        horizon: '5+ Years',
+        suitability: 'Diversified Investing',
+        diversification: '30–50 Stocks',
+        history: []
+      };
 
-      // 3. IPO Data Resolution
-      if (item.type === 'ipo') {
-        const ipo = IPOS_UNIVERSE.find((i) => i.id === item.key || i.symbol === item.key) || item.rawItem || {
-          id: item.key,
-          displayName: item.name || 'IPO Enterprise',
-          symbol: item.symbol || 'IPO',
-          priceBand: '₹400 - ₹450',
-          isListed: false,
-          return1M: null,
-          return6M: null,
-          return1Y: null,
-          returnLabelType: 'Estimated IPO Premium / GMP',
-          gmpPct: 30.0,
-          gmpLabel: '+30.0% GMP',
-          minLot: '1 Lot',
-          minInvestmentNum: 14000,
-          risk: 'High',
-          horizon: 'Listing Gain',
-          suitability: 'Primary Market Alpha',
-          diversification: 'Single Enterprise',
-          history: []
-        };
+      results.push({
+        id: mf.id,
+        type: 'mf',
+        assetType: 'mf',
+        key: mf.id,
+        symbol: mf.symbol,
+        displayName: mf.displayName || mf.name,
+        name: mf.displayName || mf.name,
+        typeBadge: 'Mutual Fund',
+        priceDisplay: `Min SIP: ${mf.minSip}`,
+        isLive: false,
+        dataSourceType: 'AMFI Benchmark Reference',
+        feedStatus: 'nav_unavailable',
+        return1M: mf.return1M !== undefined ? Number(mf.return1M) : null,
+        return6M: mf.return6M !== undefined ? Number(mf.return6M) : null,
+        return1Y: Number(mf.return1Y),
+        returnDisplay: `+${mf.return1Y}% CAGR`,
+        returnLabelType: mf.returnLabelType || 'CAGR',
+        risk: mf.risk,
+        riskScore: getRiskScore(mf.risk),
+        cost: `${mf.expenseRatio} Expense Ratio`,
+        liquidity: 'High (T+2 NAV Settlement)',
+        diversification: mf.diversification || '35–50 Diversified Stocks',
+        minInvestment: mf.minSip,
+        minInvestmentNum: mf.minInvestmentNum || 500,
+        horizon: mf.horizon,
+        suitability: mf.suitability,
+        valuationType: 'Expense Ratio (TER)',
+        valuationDisplay: `${mf.expenseRatio} TER`,
+        valuationNumeric: mf.expenseRatioNum || 0.5,
+        peRatio: null,
+        history: []
+      });
+    }
 
-        return {
-          id: ipo.id,
-          type: 'ipo',
-          assetType: 'ipo',
-          key: ipo.id,
-          symbol: ipo.symbol,
-          displayName: ipo.displayName || ipo.name,
-          name: ipo.displayName || ipo.name,
-          typeBadge: 'IPO Radar',
-          priceDisplay: ipo.priceBand,
-          isLive: false,
-          dataSourceType: 'Primary Market Indicative Data',
-          feedStatus: 'unlisted_ipo',
-          return1M: ipo.return1M !== undefined ? (ipo.return1M !== null ? Number(ipo.return1M) : null) : null,
-          return6M: ipo.return6M !== undefined ? (ipo.return6M !== null ? Number(ipo.return6M) : null) : null,
-          return1Y: ipo.return1Y !== undefined && ipo.return1Y !== null ? Number(ipo.return1Y) : (ipo.gmpPct || null),
-          returnDisplay: ipo.gmpLabel || `${ipo.gmpPct}% GMP`,
-          returnLabelType: ipo.returnLabelType || 'Estimated IPO Premium / GMP',
-          risk: ipo.risk,
-          riskScore: getRiskScore(ipo.risk),
-          cost: 'Nil Entry / Brokerage',
-          liquidity: 'Locked until Listing (T+3)',
-          diversification: ipo.diversification || 'Single Enterprise',
-          minInvestment: ipo.minLot,
-          minInvestmentNum: ipo.minInvestmentNum || 14000,
-          horizon: ipo.horizon,
-          suitability: ipo.suitability,
-          valuationType: 'GMP / Issue Valuation',
-          valuationDisplay: ipo.gmpLabel || `${ipo.gmpPct}% GMP`,
-          valuationNumeric: ipo.gmpPct || null,
-          peRatio: null,
-          history: []
-        };
-      }
+    // 3. IPO Data Resolution
+    else if (item.type === 'ipo') {
+      const ipo = IPOS_UNIVERSE.find((i) => i.id === item.key || i.symbol === item.key) || item.rawItem || {
+        id: item.key,
+        displayName: item.name || 'IPO Enterprise',
+        symbol: item.symbol || 'IPO',
+        priceBand: '₹400 - ₹450',
+        isListed: false,
+        return1M: null,
+        return6M: null,
+        return1Y: null,
+        returnLabelType: 'Estimated IPO Premium / GMP',
+        gmpPct: 30.0,
+        gmpLabel: '+30.0% GMP',
+        minLot: '1 Lot',
+        minInvestmentNum: 14000,
+        risk: 'High',
+        horizon: 'Listing Gain',
+        suitability: 'Primary Market Alpha',
+        diversification: 'Single Enterprise',
+        history: []
+      };
 
-      return null;
-    })
-  );
+      results.push({
+        id: ipo.id,
+        type: 'ipo',
+        assetType: 'ipo',
+        key: ipo.id,
+        symbol: ipo.symbol,
+        displayName: ipo.displayName || ipo.name,
+        name: ipo.displayName || ipo.name,
+        typeBadge: 'IPO Radar',
+        priceDisplay: ipo.priceBand,
+        isLive: false,
+        dataSourceType: 'Primary Market Indicative Data',
+        feedStatus: 'unlisted_ipo',
+        return1M: ipo.return1M !== undefined ? (ipo.return1M !== null ? Number(ipo.return1M) : null) : null,
+        return6M: ipo.return6M !== undefined ? (ipo.return6M !== null ? Number(ipo.return6M) : null) : null,
+        return1Y: ipo.return1Y !== undefined && ipo.return1Y !== null ? Number(ipo.return1Y) : (ipo.gmpPct || null),
+        returnDisplay: ipo.gmpLabel || `${ipo.gmpPct}% GMP`,
+        returnLabelType: ipo.returnLabelType || 'Estimated IPO Premium / GMP',
+        risk: ipo.risk,
+        riskScore: getRiskScore(ipo.risk),
+        cost: 'Nil Entry / Brokerage',
+        liquidity: 'Locked until Listing (T+3)',
+        diversification: ipo.diversification || 'Single Enterprise',
+        minInvestment: ipo.minLot,
+        minInvestmentNum: ipo.minInvestmentNum || 14000,
+        horizon: ipo.horizon,
+        suitability: ipo.suitability,
+        valuationType: 'GMP / Issue Valuation',
+        valuationDisplay: ipo.gmpLabel || `${ipo.gmpPct}% GMP`,
+        valuationNumeric: ipo.gmpPct || null,
+        peRatio: null,
+        history: []
+      });
+    }
+  }
 
   return results.filter(Boolean);
 }
