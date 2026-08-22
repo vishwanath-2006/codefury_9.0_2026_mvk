@@ -63,11 +63,18 @@ export function getUserFinancialProfile(raw) {
   const isFD = assetClasses.some(a => a.includes('Fixed') || a.includes('FD'));
   const isGold = assetClasses.some(a => a.includes('Gold'));
 
+  const mfVal = Number(d.portfolioMutualFunds ?? 0);
+  const stockVal = Number(d.portfolioStocks ?? 0);
+  const fdVal = Number(d.portfolioFDs ?? 0);
+  const goldVal = Number(d.portfolioGold ?? 0);
+
+  const breakdownSum = mfVal + stockVal + fdVal + goldVal;
+
   const portfolio = {
-    mutualFunds: isMF ? Math.round(rawTotalValue * 0.5) : 0,
-    stocks: isStocks ? Math.round(rawTotalValue * 0.3) : 0,
-    fixedDeposits: isFD ? Math.round(rawTotalValue * 0.1) : 0,
-    gold: isGold ? Math.round(rawTotalValue * 0.1) : 0,
+    mutualFunds: breakdownSum > 0 ? mfVal : (isMF ? Math.round(rawTotalValue * 0.5) : 0),
+    stocks: breakdownSum > 0 ? stockVal : (isStocks ? Math.round(rawTotalValue * 0.3) : 0),
+    fixedDeposits: breakdownSum > 0 ? fdVal : (isFD ? Math.round(rawTotalValue * 0.1) : 0),
+    gold: breakdownSum > 0 ? goldVal : (isGold ? Math.round(rawTotalValue * 0.1) : 0),
     cashBuffer: bankSavings,
   };
 

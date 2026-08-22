@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -15,18 +16,20 @@ import {
   CheckCircle2,
   Shield,
   Target,
-  Plus,
   Trash2,
   Sparkles,
   PieChart,
   Activity,
   Lock,
-  Check
+  Check,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { getFinancialProfile, saveFinancialProfile } from '../services/onboardingService';
 
 export default function OnboardingPage() {
   const { user, profile } = useAuth();
+  const { updateProfile, setIsOnboarded } = useOnboarding();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const stepParam = parseInt(searchParams.get('step'), 10);
@@ -34,6 +37,7 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (stepParam >= 1 && stepParam <= 3) {
@@ -43,7 +47,8 @@ export default function OnboardingPage() {
 
   // Form State preserving all fields
   const [formData, setFormData] = useState({
-    // Step 1: About You
+    // Step 1: About You & Avatar
+    profilePhoto: profile?.avatar_url || user?.user_metadata?.avatar_url || '',
     fullName: profile?.full_name || user?.user_metadata?.full_name || '',
     age: '28',
     employmentStatus: 'Employed',
@@ -51,25 +56,29 @@ export default function OnboardingPage() {
     dependents: '0',
     incomeStability: 'Stable',
 
-    // Step 2: Money Snapshot
-    monthlyIncome: '50000',
+    // Step 2: Money Snapshot & Debt
+    monthlyIncome: '75000',
     otherIncome: '0',
-    monthlyEssentialExpenses: '25000',
-    monthlyDiscretionaryExpenses: '10000',
+    monthlyEssentialExpenses: '30000',
+    monthlyDiscretionaryExpenses: '15000',
     currentSavings: '150000',
-    emergencyFund: '100000',
-    monthlySavings: '15000',
+    emergencyFund: '150000',
+    monthlySavings: '20000',
     hasDebt: false,
     totalDebt: '0',
     monthlyDebtPayments: '0',
     debtType: 'Home',
 
-    // Step 3: Goals, Investments & Risk
+    // Step 3: Goals, Portfolio Breakdown & Risk
     goals: [
       { id: 'g1', title: 'Emergency Reserve Fund', targetAmount: 200000, currentAmount: 100000, deadline: '2026', priority: 'High' },
-      { id: 'g2', title: 'Home Downpayment', targetAmount: 1000000, currentAmount: 300000, deadline: '2028', priority: 'Medium' }
+      { id: 'g2', title: 'Home Down Payment', targetAmount: 1500000, currentAmount: 450000, deadline: '2028', priority: 'Medium' }
     ],
     hasInvestments: true,
+    portfolioMutualFunds: '175000',
+    portfolioStocks: '105000',
+    portfolioFDs: '35000',
+    portfolioGold: '35000',
     investmentCategories: ['Mutual Funds', 'Stocks'],
     investmentExperience: 'Some Experience',
     hasHealthInsurance: true,
@@ -88,6 +97,7 @@ export default function OnboardingPage() {
         if (existing) {
           setFormData((prev) => ({
             ...prev,
+            profilePhoto: existing.profile_photo || prev.profilePhoto,
             fullName: existing.full_name || prev.fullName,
             age: existing.age ? String(existing.age) : prev.age,
             employmentStatus: existing.employment_status || prev.employmentStatus,
@@ -107,6 +117,10 @@ export default function OnboardingPage() {
             debtType: existing.debt_type || prev.debtType,
             goals: existing.goals?.length ? existing.goals : prev.goals,
             hasInvestments: Boolean(existing.has_investments),
+            portfolioMutualFunds: existing.portfolio_mutual_funds ? String(existing.portfolio_mutual_funds) : prev.portfolioMutualFunds,
+            portfolioStocks: existing.portfolio_stocks ? String(existing.portfolio_stocks) : prev.portfolioStocks,
+            portfolioFDs: existing.portfolio_fds ? String(existing.portfolio_fds) : prev.portfolioFDs,
+            portfolioGold: existing.portfolio_gold ? String(existing.portfolio_gold) : prev.portfolioGold,
             investmentCategories: existing.investment_categories?.length ? existing.investment_categories : prev.investmentCategories,
             investmentExperience: existing.investment_experience || prev.investmentExperience,
             hasHealthInsurance: Boolean(existing.has_health_insurance),
@@ -127,10 +141,28 @@ export default function OnboardingPage() {
     setFormData((prev) => ({ ...prev, [field]: val }));
   };
 
+  // Avatar Photo Handler
+  const handlePhotoCapture = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData((prev) => ({ ...prev, profilePhoto: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Calculations
   const totalIncome = (Number(formData.monthlyIncome) || 0) + (Number(formData.otherIncome) || 0);
   const totalExpenses = (Number(formData.monthlyEssentialExpenses) || 0) + (Number(formData.monthlyDiscretionaryExpenses) || 0);
-  const monthlySurplus = totalIncome - totalExpenses;
+  const monthlyEmis = formData.hasDebt ? (Number(formData.monthlyDebtPayments) || 0) : 0;
+  const monthlySurplus = Math.max(0, totalIncome - totalExpenses - monthlyEmis);
+
+  const portfolioSum = (Number(formData.portfolioMutualFunds) || 0) +
+                       (Number(formData.portfolioStocks) || 0) +
+                       (Number(formData.portfolioFDs) || 0) +
+                       (Number(formData.portfolioGold) || 0);
 
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
@@ -212,14 +244,22 @@ export default function OnboardingPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setErrorMsg('');
     setSaving(true);
 
     try {
-      await saveFinancialProfile(user?.id, formData);
-      localStorage.setItem('finlabs_onboarding_completed', 'true');
-      navigate('/dashboard', { replace: true });
+      // Auto-set 0 debt if hasDebt is false
+      const finalPayload = {
+        ...formData,
+        monthlyDebtPayments: formData.hasDebt ? formData.monthlyDebtPayments : '0',
+        totalDebt: formData.hasDebt ? formData.totalDebt : '0',
+        totalInvestmentValue: portfolioSum > 0 ? String(portfolioSum) : '350000'
+      };
+
+      await updateProfile(finalPayload);
+      setIsOnboarded(true);
+      navigate('/financial-health', { replace: true });
     } catch (err) {
       setErrorMsg(err.message || 'Failed to save financial profile.');
     } finally {
@@ -255,13 +295,13 @@ export default function OnboardingPage() {
             Step {currentStep} of 3
           </span>
           <span className="text-slate-400 font-mono font-semibold">
-            {currentStep === 1 && '👤 About You'}
-            {currentStep === 2 && '💰 Money Snapshot'}
-            {currentStep === 3 && '🎯 Goals, Investments & Risk'}
+            {currentStep === 1 && '👤 Identity & Photo Avatar'}
+            {currentStep === 2 && '💰 Cash Flow & Debt EMIs'}
+            {currentStep === 3 && '🎯 Goals & Portfolio Allocation Grid'}
           </span>
         </div>
 
-        {/* Visual Progress Dots & Bar */}
+        {/* Visual Progress Bar */}
         <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex mb-3">
           <div
             className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
@@ -270,11 +310,11 @@ export default function OnboardingPage() {
         </div>
 
         <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-400">
-          <span className={currentStep >= 1 ? 'text-emerald-500 cursor-pointer' : 'cursor-pointer'} onClick={() => setCurrentStep(1)}>● Step 1</span>
+          <span className={currentStep >= 1 ? 'text-emerald-500 cursor-pointer' : 'cursor-pointer'} onClick={() => setCurrentStep(1)}>● Step 1 (Identity)</span>
           <span className="text-slate-300 dark:text-slate-700">───────</span>
-          <span className={currentStep >= 2 ? 'text-emerald-500 cursor-pointer' : 'cursor-pointer'} onClick={() => setCurrentStep(2)}>{currentStep >= 2 ? '●' : '○'} Step 2</span>
+          <span className={currentStep >= 2 ? 'text-emerald-500 cursor-pointer' : 'cursor-pointer'} onClick={() => setCurrentStep(2)}>{currentStep >= 2 ? '●' : '○'} Step 2 (Cash Flow)</span>
           <span className="text-slate-300 dark:text-slate-700">───────</span>
-          <span className={currentStep >= 3 ? 'text-emerald-500 cursor-pointer' : 'cursor-pointer'} onClick={() => setCurrentStep(3)}>{currentStep >= 3 ? '●' : '○'} Step 3</span>
+          <span className={currentStep >= 3 ? 'text-emerald-500 cursor-pointer' : 'cursor-pointer'} onClick={() => setCurrentStep(3)}>{currentStep >= 3 ? '●' : '○'} Step 3 (Portfolio & Risk)</span>
         </div>
       </Card>
 
@@ -287,18 +327,71 @@ export default function OnboardingPage() {
         )}
 
         {/* =========================================================================
-            STEP 1 — 👤 ABOUT YOU
+            STEP 1 — 👤 IDENTITY, PHOTO AVATAR & DEMOGRAPHICS
            ========================================================================= */}
         {currentStep === 1 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <User className="w-5 h-5 text-emerald-500" />
-                Let's understand you first
+                Step 1: Baseline Identity & Profile Photo
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Tell us about your background, age, and household life stage.
+                Set up your personal avatar and baseline career demographics.
               </p>
+            </div>
+
+            {/* Avatar Photo Capture Header Trigger */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 flex flex-col sm:flex-row items-center gap-4">
+              <div className="relative group shrink-0">
+                {formData.profilePhoto ? (
+                  <img
+                    src={formData.profilePhoto}
+                    alt="Profile Avatar"
+                    className="w-20 h-20 rounded-full object-cover border-4 border-emerald-500 shadow-md"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-emerald-500/20 text-emerald-500 border-2 border-emerald-500/30 flex items-center justify-center text-2xl font-extrabold shadow-sm">
+                    {formData.fullName ? formData.fullName.charAt(0).toUpperCase() : 'FL'}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-0 right-0 p-2 rounded-full bg-emerald-500 text-white shadow-md hover:bg-emerald-600 transition"
+                  title="Take Photo or Upload Avatar"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1 text-center sm:text-left">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 justify-center sm:justify-start">
+                  <span>Profile Photo / Verification Avatar</span>
+                  <Badge variant="brand" className="text-[9px]">Optional</Badge>
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Upload an avatar or take a live camera snapshot. Updates top-right navbar instantly.
+                </p>
+                <div className="pt-1 flex flex-wrap gap-2 justify-center sm:justify-start">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-emerald-500 transition flex items-center gap-1.5"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Choose File / Take Snapshot</span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    onChange={handlePhotoCapture}
+                    className="hidden"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -424,17 +517,17 @@ export default function OnboardingPage() {
         )}
 
         {/* =========================================================================
-            STEP 2 — 💰 YOUR MONEY SNAPSHOT
+            STEP 2 — 💰 MONEY SNAPSHOT, DEBT & EMIs
            ========================================================================= */}
         {currentStep === 2 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Wallet className="w-5 h-5 text-emerald-500" />
-                Let's understand your monthly money flow
+                Step 2: Monthly Cash Flow & Debt Commitments
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Enter your cash flow, savings reserves, and loan commitments.
+                Enter your monthly inflows, living expenses, and loan EMI obligations.
               </p>
             </div>
 
@@ -446,7 +539,7 @@ export default function OnboardingPage() {
                 min="0"
                 value={formData.monthlyIncome}
                 onChange={(e) => handleChange('monthlyIncome', e.target.value)}
-                placeholder="50000"
+                placeholder="75000"
               />
 
               <Input
@@ -464,7 +557,7 @@ export default function OnboardingPage() {
                 min="0"
                 value={formData.monthlyEssentialExpenses}
                 onChange={(e) => handleChange('monthlyEssentialExpenses', e.target.value)}
-                placeholder="25000 (Rent, Groceries, Bills)"
+                placeholder="30000 (Rent, Groceries, Bills)"
               />
 
               <Input
@@ -473,7 +566,7 @@ export default function OnboardingPage() {
                 min="0"
                 value={formData.monthlyDiscretionaryExpenses}
                 onChange={(e) => handleChange('monthlyDiscretionaryExpenses', e.target.value)}
-                placeholder="10000 (Dining, Subscriptions)"
+                placeholder="15000 (Dining, Subscriptions)"
               />
             </div>
 
@@ -482,26 +575,30 @@ export default function OnboardingPage() {
               <div className="flex items-center justify-between text-xs mb-2 border-b border-slate-800 pb-2">
                 <span className="text-slate-400 flex items-center gap-1.5 font-semibold">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                  Your Estimated Monthly Surplus
+                  Your Estimated Monthly Net Surplus
                 </span>
                 <Badge variant={monthlySurplus > 0 ? 'success' : 'warning'} className="text-[10px]">
                   {monthlySurplus > 0 ? 'Positive Margin' : 'Surplus Alert'}
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
+              <div className="grid grid-cols-4 gap-2 text-center text-xs pt-1 font-mono">
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Monthly Income</span>
-                  <span className="font-mono font-bold">{formatINR(totalIncome)}</span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-sans block">Income</span>
+                  <span className="font-bold text-white">{formatINR(totalIncome)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Monthly Expenses</span>
-                  <span className="font-mono font-bold">{formatINR(totalExpenses)}</span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-sans block">Expenses</span>
+                  <span className="font-bold text-white">{formatINR(totalExpenses)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-bold block">Estimated Surplus</span>
-                  <span className="font-mono font-extrabold text-sm text-emerald-400">
-                    {formatINR(monthlySurplus)} / mo
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-sans block">Loan EMIs</span>
+                  <span className="font-bold text-amber-400">{formatINR(monthlyEmis)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-sans font-bold block">Net Surplus</span>
+                  <span className="font-extrabold text-sm text-emerald-400">
+                    {formatINR(monthlySurplus)}/mo
                   </span>
                 </div>
               </div>
@@ -513,7 +610,7 @@ export default function OnboardingPage() {
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2 flex items-center gap-2">
                 <PiggyBank className="w-4 h-4 text-emerald-500" />
-                Savings & Emergency Reserve
+                Savings & Emergency Cushion
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Input
@@ -526,12 +623,12 @@ export default function OnboardingPage() {
                 />
 
                 <Input
-                  label="Emergency Reserve (₹)"
+                  label="Emergency Buffer (₹)"
                   type="number"
                   min="0"
                   value={formData.emergencyFund}
                   onChange={(e) => handleChange('emergencyFund', e.target.value)}
-                  placeholder="100000"
+                  placeholder="150000"
                 />
 
                 <Input
@@ -540,27 +637,31 @@ export default function OnboardingPage() {
                   min="0"
                   value={formData.monthlySavings}
                   onChange={(e) => handleChange('monthlySavings', e.target.value)}
-                  placeholder="15000"
+                  placeholder="20000"
                 />
               </div>
             </div>
 
             <hr className="border-slate-100 dark:border-slate-800 my-6" />
 
-            {/* Progressive Disclosure Debt Section */}
+            {/* Refined Conditional Debt / Loan EMIs Section */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Do you currently have active debt or loans?</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Do you currently have active debt or loan EMIs?</label>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <button
                   type="button"
-                  onClick={() => handleChange('hasDebt', false)}
+                  onClick={() => {
+                    handleChange('hasDebt', false);
+                    handleChange('totalDebt', '0');
+                    handleChange('monthlyDebtPayments', '0');
+                  }}
                   className={`p-3.5 rounded-xl text-xs font-bold transition border flex items-center justify-between ${
                     formData.hasDebt === false
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500 font-extrabold'
                       : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-800/50 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  <span>🟢 No Debt ("I have zero active loans")</span>
+                  <span>🟢 No Debt ("Zero active loans")</span>
                   {formData.hasDebt === false && <Check className="w-3.5 h-3.5 text-emerald-500" />}
                 </button>
 
@@ -573,14 +674,24 @@ export default function OnboardingPage() {
                       : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-800/50 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  <span>🔴 Yes, I Have Debt ("I have active loans / EMIs")</span>
+                  <span>🔴 Yes, I Have Debt ("Active loans / EMIs")</span>
                   {formData.hasDebt === true && <Check className="w-3.5 h-3.5 text-emerald-500" />}
                 </button>
               </div>
 
-              {/* Conditional Debt Fields */}
+              {/* Refined Conditional Debt Fields */}
               {formData.hasDebt && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 animate-in fade-in">
+                  <Input
+                    label="Total Monthly EMI Outflow (₹)"
+                    type="number"
+                    min="0"
+                    required
+                    value={formData.monthlyDebtPayments}
+                    onChange={(e) => handleChange('monthlyDebtPayments', e.target.value)}
+                    placeholder="12000"
+                  />
+
                   <Input
                     label="Total Outstanding Debt (₹)"
                     type="number"
@@ -590,15 +701,6 @@ export default function OnboardingPage() {
                     placeholder="500000"
                   />
 
-                  <Input
-                    label="Monthly Debt Payment / EMI (₹)"
-                    type="number"
-                    min="0"
-                    value={formData.monthlyDebtPayments}
-                    onChange={(e) => handleChange('monthlyDebtPayments', e.target.value)}
-                    placeholder="12000"
-                  />
-
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Primary Debt Type</label>
                     <select
@@ -606,8 +708,8 @@ export default function OnboardingPage() {
                       value={formData.debtType}
                       onChange={(e) => handleChange('debtType', e.target.value)}
                     >
-                      <option value="Education">Education Loan</option>
                       <option value="Home">Home Loan</option>
+                      <option value="Education">Education Loan</option>
                       <option value="Vehicle">Vehicle Loan</option>
                       <option value="Personal">Personal Loan</option>
                       <option value="Credit Card">Credit Card Debt</option>
@@ -621,17 +723,17 @@ export default function OnboardingPage() {
         )}
 
         {/* =========================================================================
-            STEP 3 — 🎯 GOALS, INVESTMENTS & RISK
+            STEP 3 — 🎯 GOALS, PORTFOLIO ASSET BREAKDOWN & RISK BASELINE
            ========================================================================= */}
         {currentStep === 3 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Target className="w-5 h-5 text-emerald-500" />
-                Let's understand what you're working towards
+                Step 3: Goals, Portfolio Allocation & Risk Profile
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Select your financial goals, asset allocation preferences, and risk baseline.
+                Enter your target milestones, active portfolio breakdown, and risk tolerance.
               </p>
             </div>
 
@@ -705,57 +807,9 @@ export default function OnboardingPage() {
 
             <hr className="border-slate-100 dark:border-slate-800 my-6" />
 
-            {/* NEW QUESTION: WHAT IS YOUR INVESTING EXPERIENCE? */}
+            {/* Investments & Portfolio Breakdown Grid */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                What is your investing experience?
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-                {[
-                  {
-                    id: 'Beginner',
-                    title: '🔰 Beginner',
-                    subtitle: "I'm new to investing"
-                  },
-                  {
-                    id: 'Some Experience',
-                    title: '📈 Some Experience',
-                    subtitle: "I've been investing for a while"
-                  },
-                  {
-                    id: 'Experienced',
-                    title: '🚀 Experienced',
-                    subtitle: 'I understand investing and manage my investments confidently'
-                  }
-                ].map((item) => {
-                  const active =
-                    formData.investmentExperience === item.id ||
-                    (item.id === 'Some Experience' && formData.investmentExperience === 'Some experience');
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => handleChange('investmentExperience', item.id)}
-                      className={`p-3.5 rounded-xl text-xs font-bold transition border text-left flex flex-col justify-between ${
-                        active
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500 font-extrabold shadow-xs'
-                          : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-extrabold">{item.title}</span>
-                        {active && <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-normal leading-relaxed">{item.subtitle}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Investments Progressive Disclosure */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Do you currently invest?</label>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Do you currently have active investments?</label>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <button
                   type="button"
@@ -784,29 +838,60 @@ export default function OnboardingPage() {
                 </button>
               </div>
 
+              {/* 4-Field Portfolio Breakdown Grid */}
               {formData.hasInvestments && (
-                <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 animate-in fade-in">
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 space-y-4 animate-in fade-in">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Select Active Investment Categories</label>
-                    <div className="flex flex-wrap gap-2">
-                      {['Mutual Funds', 'Stocks', 'Fixed Deposits', 'Gold', 'Bonds', 'Real Estate', 'Other'].map((cat) => {
-                        const active = formData.investmentCategories.includes(cat);
-                        return (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => toggleCategory(cat)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border ${
-                              active
-                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-xs'
-                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'
-                            }`}
-                          >
-                            {active ? '✓ ' : '+ '}{cat}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-1">
+                      <PieChart className="w-4 h-4 text-emerald-500" />
+                      Active Portfolio Asset Breakdown (Current Capital Deployment)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Enter the current valuation of your deployed assets. Feeds directly into your `/portfolio` workspace.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Input
+                      label="Mutual Funds / SIPs (₹)"
+                      type="number"
+                      min="0"
+                      value={formData.portfolioMutualFunds}
+                      onChange={(e) => handleChange('portfolioMutualFunds', e.target.value)}
+                      placeholder="175000"
+                    />
+
+                    <Input
+                      label="Direct Stocks / Equity (₹)"
+                      type="number"
+                      min="0"
+                      value={formData.portfolioStocks}
+                      onChange={(e) => handleChange('portfolioStocks', e.target.value)}
+                      placeholder="105000"
+                    />
+
+                    <Input
+                      label="Fixed Deposits / Bonds (₹)"
+                      type="number"
+                      min="0"
+                      value={formData.portfolioFDs}
+                      onChange={(e) => handleChange('portfolioFDs', e.target.value)}
+                      placeholder="35000"
+                    />
+
+                    <Input
+                      label="Gold / Sovereign Assets (₹)"
+                      type="number"
+                      min="0"
+                      value={formData.portfolioGold}
+                      onChange={(e) => handleChange('portfolioGold', e.target.value)}
+                      placeholder="35000"
+                    />
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-slate-900 text-white flex items-center justify-between text-xs font-mono">
+                    <span className="text-slate-400 font-sans font-bold">Total Portfolio Net Worth:</span>
+                    <span className="font-extrabold text-emerald-400 text-sm">{formatINR(portfolioSum)}</span>
                   </div>
                 </div>
               )}
@@ -814,7 +899,7 @@ export default function OnboardingPage() {
 
             <hr className="border-slate-100 dark:border-slate-800 my-6" />
 
-            {/* Human-Friendly Risk Profile Wording */}
+            {/* Risk Baseline & Horizon */}
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-emerald-500" />
@@ -884,7 +969,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                {/* Volatility Comfort 5-Level Selector */}
+                {/* Volatility Comfort Selector */}
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                     How comfortable are you when your investments go up and down?
@@ -961,31 +1046,31 @@ export default function OnboardingPage() {
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h4 className="font-extrabold text-sm text-emerald-400 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  You're almost done!
+                  You're ready to build your profile!
                 </h4>
-                <Badge variant="brand" className="text-[10px]">Profile Summary Review</Badge>
+                <Badge variant="brand" className="text-[10px]">3-Step Onboarding Complete</Badge>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs pt-1 text-center font-mono">
                 <div className="p-2 rounded-xl bg-slate-800/60">
-                  <span className="text-[10px] text-slate-400 block uppercase font-sans">Monthly Income</span>
+                  <span className="text-[10px] text-slate-400 block uppercase font-sans">Income</span>
                   <span className="font-bold text-white">{formatINR(totalIncome)}</span>
                 </div>
                 <div className="p-2 rounded-xl bg-slate-800/60">
-                  <span className="text-[10px] text-slate-400 block uppercase font-sans">Monthly Expenses</span>
+                  <span className="text-[10px] text-slate-400 block uppercase font-sans">Expenses</span>
                   <span className="font-bold text-white">{formatINR(totalExpenses)}</span>
                 </div>
                 <div className="p-2 rounded-xl bg-slate-800/60">
-                  <span className="text-[10px] text-slate-400 block uppercase font-sans">Total Savings</span>
-                  <span className="font-bold text-white">{formatINR(Number(formData.currentSavings) || 0)}</span>
+                  <span className="text-[10px] text-slate-400 block uppercase font-sans">Loan EMIs</span>
+                  <span className="font-bold text-amber-400">{formatINR(monthlyEmis)}</span>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-800/60">
+                  <span className="text-[10px] text-slate-400 block uppercase font-sans">Portfolio</span>
+                  <span className="font-bold text-emerald-400">{formatINR(portfolioSum)}</span>
                 </div>
                 <div className="p-2 rounded-xl bg-slate-800/60">
                   <span className="text-[10px] text-slate-400 block uppercase font-sans">Active Goals</span>
                   <span className="font-bold text-emerald-400">{formData.goals.length} selected</span>
-                </div>
-                <div className="p-2 rounded-xl bg-slate-800/60">
-                  <span className="text-[10px] text-slate-400 block uppercase font-sans">Active Investor</span>
-                  <span className="font-bold text-emerald-400">{formData.hasInvestments ? 'Yes' : 'Not yet'}</span>
                 </div>
               </div>
             </div>
