@@ -2,38 +2,53 @@ import { supabase } from '../lib/supabaseClient';
 import { calculateFinancialHealthScore } from './financialHealth/engine';
 import { saveFinancialHealthScore } from './financialHealth/adapter';
 
-export const initialOnboardingData = {
-  fullName: '',
-  age: '28',
+/**
+ * Returns a clean, blank onboarding data structure for fresh users.
+ * Never pre-fills demo or other users' financial data.
+ */
+export const createEmptyOnboardingData = (user = null, profile = null) => ({
+  user_id: user?.id || null,
+  fullName: profile?.full_name || user?.user_metadata?.full_name || '',
+  age: '',
   employmentStatus: 'Employed',
-  occupation: 'Software Engineer',
+  occupation: '',
   dependents: '0',
   incomeStability: 'Stable',
-  monthlyIncome: '50000',
-  otherIncome: '0',
-  monthlyEssentialExpenses: '25000',
-  monthlyDiscretionaryExpenses: '10000',
-  currentSavings: '150000',
-  emergencyFund: '100000',
-  monthlySavings: '15000',
+  monthlyIncome: '',
+  otherIncome: '',
+  monthlyEssentialExpenses: '',
+  monthlyDiscretionaryExpenses: '',
+  currentSavings: '',
+  emergencyFund: '',
+  monthlySavings: '',
   hasDebt: false,
-  totalDebt: '0',
-  monthlyDebtPayments: '0',
+  totalDebt: '',
+  monthlyDebtPayments: '',
   debtType: 'Home',
-  goals: [
-    { id: 'g1', title: 'Emergency Reserve Fund', targetAmount: 200000, currentAmount: 100000, deadline: '2026', priority: 'High' },
-    { id: 'g2', title: 'Home Downpayment', targetAmount: 1000000, currentAmount: 300000, deadline: '2028', priority: 'Medium' }
-  ],
-  hasInvestments: true,
-  investmentCategories: ['Mutual Funds', 'Stocks'],
-  investmentExperience: 'some_experience',
-  hasHealthInsurance: true,
-  hasLifeInsurance: true,
-  hasEmergencyFund: true,
+  goals: [],
+  hasInvestments: false,
+  investmentCategories: [],
+  investmentExperience: '',
+  hasHealthInsurance: false,
+  hasLifeInsurance: false,
+  hasEmergencyFund: false,
   timeHorizon: '5–10 years',
   riskResponseFall20: 'Hold',
   investmentPriority: 'Balanced growth',
   riskTolerance: 'Moderate'
+});
+
+export const initialOnboardingData = createEmptyOnboardingData();
+
+/**
+ * Returns a user-isolated LocalStorage key.
+ * Strictly requires an authenticated user ID.
+ */
+export const getStorageKey = (userId) => {
+  if (!userId || userId === 'dev-test-user-id-99999' || userId === 'dev-local-user') {
+    return null;
+  }
+  return `finlabs_onboarding_profile_${userId}`;
 };
 
 /**
@@ -49,21 +64,16 @@ export function normalizeInvestmentExperience(exp) {
 }
 
 /**
- * Fetch financial profile, relational goals, and responses for authenticated user
+ * Fetch financial profile, relational goals, and responses for authenticated user.
+ * Strictly isolated by userId.
  */
 export async function getFinancialProfile(userId) {
   if (!userId || userId === 'dev-test-user-id-99999' || userId === 'dev-local-user') {
-    try {
-      const stored = localStorage.getItem('finlabs_dev_onboarding_profile');
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.warn('LocalStorage parse error:', e);
-    }
     return null;
   }
 
   try {
-    // 1. Fetch main financial_profile
+    // 1. Fetch main financial_profile for the specific authenticated user ID
     const { data: finData, error: finErr } = await supabase
       .from('financial_profiles')
       .select('*')
@@ -74,14 +84,19 @@ export async function getFinancialProfile(userId) {
       console.warn('Fetch financial profile notice:', finErr.message);
     }
 
-    // 2. Fetch relational financial_goals
+    // Strict runtime guard: ensure returned record matches the authenticated user ID
+    if (finData && finData.user_id && finData.user_id !== userId) {
+      console.error('Security violation: profile record user_id does not match authenticated user.');
+      return null;
+    }
+
+    // 2. Fetch relational financial_goals for this user
     const { data: goalsData } = await supabase
       .from('financial_goals')
       .select('*')
       .eq('user_id', userId);
 
     if (finData) {
-      // Map relational goals if present
       if (goalsData && goalsData.length > 0) {
         finData.goals = goalsData.map((g) => ({
           id: g.id,
@@ -92,13 +107,25 @@ export async function getFinancialProfile(userId) {
           deadline: g.target_year || '2027',
           priority: g.priority || 'Medium'
         }));
+      } else {
+        finData.goals = [];
       }
       return finData;
     }
 
-    // 3. Fallback check for local storage
-    const stored = localStorage.getItem('finlabs_dev_onboarding_profile');
-    if (stored) return JSON.parse(stored);
+    // 3. User-isolated LocalStorage fallback (ONLY for this user's unique key)
+    const userStorageKey = getStorageKey(userId);
+    if (userStorageKey) {
+      const stored = localStorage.getItem(userStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.user_id && parsed.user_id !== userId) {
+          localStorage.removeItem(userStorageKey);
+          return null;
+        }
+        return parsed;
+      }
+    }
     return null;
   } catch (err) {
     console.error('Error fetching complete financial profile:', err);
@@ -108,22 +135,38 @@ export async function getFinancialProfile(userId) {
 
 /**
  * AUTHORITATIVE SINGLE SOURCE OF TRUTH RESOLVER
- * RULE 1: If authenticated user has a saved completed financial_profiles record in Supabase -> USE IT.
- * RULE 2: If user does NOT have a saved completed profile -> USE initialOnboardingData fallback.
+ * RULE 1: If authenticated user has a saved completed financial_profiles record -> USE IT.
+ * RULE 2: If user does NOT have a saved completed profile -> Return zeroed baseline with onboardingCompleted: false.
  */
 export async function getNormalizedFinancialProfile(userId) {
+  if (!userId) {
+    return {
+      monthlyIncome: 0,
+      monthlyExpenses: 0,
+      monthlyEssentialExpenses: 0,
+      monthlyDiscretionaryExpenses: 0,
+      monthlyDebtPayments: 0,
+      emergencyFund: 0,
+      currentSavings: 0,
+      riskProfile: 'Not Set',
+      goals: [],
+      onboardingCompleted: false,
+      raw: null
+    };
+  }
+
   const raw = await getFinancialProfile(userId);
 
-  if (raw && (raw.onboarding_completed || raw.monthly_income != null || raw.monthlyIncome != null)) {
-    const monthlyIncome = Number(raw.monthly_income ?? raw.monthlyIncome) || 50000;
-    const monthlyEssentialExpenses = Number(raw.monthly_essential_expenses ?? raw.monthlyEssentialExpenses) || 25000;
-    const monthlyDiscretionaryExpenses = Number(raw.monthly_discretionary_expenses ?? raw.monthlyDiscretionaryExpenses) || 10000;
-    const monthlyExpenses = Number(raw.monthly_expenses ?? raw.monthlyExpenses) || (monthlyEssentialExpenses + monthlyDiscretionaryExpenses);
-    const monthlyDebtPayments = Number(raw.monthly_debt_payments ?? raw.monthlyDebtPayments) || 0;
-    const emergencyFund = Number(raw.emergency_fund ?? raw.emergencyFund) || 100000;
-    const currentSavings = Number(raw.current_savings ?? raw.currentSavings) || 150000;
+  if (raw && (raw.onboarding_completed || raw.onboardingCompleted || raw.monthly_income != null || raw.monthlyIncome != null)) {
+    const monthlyIncome = Number(raw.monthly_income ?? raw.monthlyIncome ?? 0);
+    const monthlyEssentialExpenses = Number(raw.monthly_essential_expenses ?? raw.monthlyEssentialExpenses ?? 0);
+    const monthlyDiscretionaryExpenses = Number(raw.monthly_discretionary_expenses ?? raw.monthlyDiscretionaryExpenses ?? 0);
+    const monthlyExpenses = Number(raw.monthly_expenses ?? raw.monthlyExpenses ?? (monthlyEssentialExpenses + monthlyDiscretionaryExpenses));
+    const monthlyDebtPayments = Number(raw.monthly_debt_payments ?? raw.monthlyDebtPayments ?? 0);
+    const emergencyFund = Number(raw.emergency_fund ?? raw.emergencyFund ?? 0);
+    const currentSavings = Number(raw.current_savings ?? raw.currentSavings ?? 0);
     const riskProfile = raw.risk_tolerance || raw.riskTolerance || 'Moderate';
-    const onboardingCompleted = Boolean(raw.onboarding_completed || raw.onboardingCompleted);
+    const onboardingCompleted = Boolean(raw.onboarding_completed ?? raw.onboardingCompleted ?? false);
 
     return {
       monthlyIncome,
@@ -134,28 +177,23 @@ export async function getNormalizedFinancialProfile(userId) {
       emergencyFund,
       currentSavings,
       riskProfile,
-      goals: raw.goals || initialOnboardingData.goals,
+      goals: raw.goals || [],
       onboardingCompleted,
       raw
     };
   }
 
-  // Baseline Fallback: Use initialOnboardingData
-  const fallbackIncome = Number(initialOnboardingData.monthlyIncome) || 50000;
-  const fallbackEssential = Number(initialOnboardingData.monthlyEssentialExpenses) || 25000;
-  const fallbackDiscretionary = Number(initialOnboardingData.monthlyDiscretionaryExpenses) || 10000;
-  const fallbackExpenses = fallbackEssential + fallbackDiscretionary; // 35000
-
+  // Baseline for fresh/unsubmitted profile: All zeroes, NO mock defaults
   return {
-    monthlyIncome: fallbackIncome,
-    monthlyExpenses: fallbackExpenses,
-    monthlyEssentialExpenses: fallbackEssential,
-    monthlyDiscretionaryExpenses: fallbackDiscretionary,
+    monthlyIncome: 0,
+    monthlyExpenses: 0,
+    monthlyEssentialExpenses: 0,
+    monthlyDiscretionaryExpenses: 0,
     monthlyDebtPayments: 0,
-    emergencyFund: Number(initialOnboardingData.emergencyFund) || 100000,
-    currentSavings: Number(initialOnboardingData.currentSavings) || 150000,
-    riskProfile: initialOnboardingData.riskTolerance || 'Moderate',
-    goals: initialOnboardingData.goals,
+    emergencyFund: 0,
+    currentSavings: 0,
+    riskProfile: 'Not Set',
+    goals: [],
     onboardingCompleted: false,
     raw: null
   };
@@ -166,16 +204,30 @@ export async function getNormalizedFinancialProfile(userId) {
  * - public.profiles
  * - public.financial_profiles
  * - public.financial_goals
- * - public.onboarding_responses
  */
 export async function saveFinancialProfile(userId, formData) {
+  // 1. Verify against authenticated Supabase user session
+  let authenticatedUserId = userId;
+  try {
+    const { data: authData } = await supabase.auth.getUser();
+    if (authData?.user?.id) {
+      authenticatedUserId = authData.user.id;
+    }
+  } catch (e) {
+    console.warn('Auth check notice:', e);
+  }
+
+  if (!authenticatedUserId || authenticatedUserId === 'dev-test-user-id-99999' || authenticatedUserId === 'dev-local-user') {
+    throw new Error('Cannot save onboarding profile without an authenticated Supabase user.');
+  }
+
   const monthlyEssential = Number(formData.monthlyEssentialExpenses) || 0;
   const monthlyDiscretionary = Number(formData.monthlyDiscretionaryExpenses) || 0;
   const computedMonthlyExpenses = monthlyEssential + monthlyDiscretionary;
   const expEnum = normalizeInvestmentExperience(formData.investmentExperience);
 
   const payload = {
-    user_id: userId || 'dev-local-user',
+    user_id: authenticatedUserId,
     onboarding_completed: true,
 
     // Step 1: Identity & Personal Details
@@ -208,15 +260,31 @@ export async function saveFinancialProfile(userId, formData) {
     updated_at: new Date().toISOString()
   };
 
+  const completedFormData = {
+    ...formData,
+    user_id: authenticatedUserId,
+    onboarding_completed: true,
+    onboardingCompleted: true
+  };
+
+  const userStorageKey = getStorageKey(authenticatedUserId);
+  if (userStorageKey) {
+    try {
+      localStorage.setItem(userStorageKey, JSON.stringify(completedFormData));
+    } catch (e) {
+      console.warn('LocalStorage save error:', e);
+    }
+  }
+
   try {
     // 1. Update profiles table full_name
-    if (userId && formData.fullName) {
+    if (formData.fullName) {
       await supabase
         .from('profiles')
-        .upsert({ id: userId, full_name: formData.fullName, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+        .upsert({ id: authenticatedUserId, full_name: formData.fullName, updated_at: new Date().toISOString() }, { onConflict: 'id' });
     }
 
-    // 2. Upsert financial_profiles
+    // 2. Upsert financial_profiles into Supabase
     const { data: finData, error: finErr } = await supabase
       .from('financial_profiles')
       .upsert(payload, { onConflict: 'user_id' })
@@ -224,13 +292,14 @@ export async function saveFinancialProfile(userId, formData) {
       .single();
 
     if (finErr) {
-      console.warn('Upsert financial profile notice:', finErr.message);
+      console.error('Explicit Supabase financial_profiles upsert error:', finErr.message, finErr);
+      throw new Error(`Failed to save financial profile to database: ${finErr.message}`);
     }
 
     // 3. Upsert relational financial_goals
-    if (userId && Array.isArray(formData.goals)) {
+    if (Array.isArray(formData.goals)) {
       const goalsPayload = formData.goals.map((g) => ({
-        user_id: userId,
+        user_id: authenticatedUserId,
         goal_name: g.title || g.goal_name || 'Financial Goal',
         category: g.category || 'General',
         target_amount: Number(g.targetAmount || g.target_amount) || 0,
@@ -239,20 +308,15 @@ export async function saveFinancialProfile(userId, formData) {
         priority: g.priority || 'Medium'
       }));
 
-      const { error: goalsErr } = await supabase
-        .from('financial_goals')
-        .upsert(goalsPayload, { onConflict: 'user_id, goal_name' });
+      if (goalsPayload.length > 0) {
+        const { error: goalsErr } = await supabase
+          .from('financial_goals')
+          .upsert(goalsPayload, { onConflict: 'user_id, goal_name' });
 
-      if (goalsErr) {
-        console.warn('Upsert goals notice:', goalsErr.message);
+        if (goalsErr) {
+          console.warn('Upsert goals notice:', goalsErr.message);
+        }
       }
-    }
-
-    // Save to local storage as fallback
-    try {
-      localStorage.setItem('finlabs_dev_onboarding_profile', JSON.stringify(formData));
-    } catch (e) {
-      console.warn('LocalStorage save error:', e);
     }
 
     // Calculate and persist updated score
@@ -270,56 +334,78 @@ export async function saveFinancialProfile(userId, formData) {
       }
     });
 
-    if (userId) {
-      await saveFinancialHealthScore(userId, diagnostic);
-    }
+    await saveFinancialHealthScore(authenticatedUserId, diagnostic);
 
     return {
-      formData,
+      formData: completedFormData,
       healthScore: diagnostic.overallScore,
       riskProfile: formData.riskTolerance || 'Moderate',
       completedAt: new Date().toISOString()
     };
   } catch (err) {
-    console.error('Error saving financial profile:', err);
+    console.error('Error in saveFinancialProfile:', err);
     throw err;
   }
 }
 
-export function getSavedOnboardingProfile() {
-  try {
-    const stored = localStorage.getItem('finlabs_dev_onboarding_profile');
-    if (stored) {
-      const formData = JSON.parse(stored);
-      const diagnostic = calculateFinancialHealthScore({
-        monthlyIncome: Number(formData.monthlyIncome) || 50000,
-        monthlyExpenses: (Number(formData.monthlyEssentialExpenses) || 25000) + (Number(formData.monthlyDiscretionaryExpenses) || 10000),
-        monthlyEssentialExpenses: Number(formData.monthlyEssentialExpenses) || 25000,
-        emergencyFund: Number(formData.emergencyFund) || 100000,
-        monthlyDebtPayments: Number(formData.monthlyDebtPayments) || 0,
-        goals: formData.goals || [],
-        portfolioAllocation: [],
-        safetyData: {
-          hasHealthInsurance: Boolean(formData.hasHealthInsurance),
-          hasLifeInsurance: Boolean(formData.hasLifeInsurance)
-        }
-      });
+export function getSavedOnboardingProfile(userId = null) {
+  if (!userId || userId === 'dev-test-user-id-99999' || userId === 'dev-local-user') {
+    return {
+      formData: createEmptyOnboardingData(),
+      healthScore: 0,
+      riskProfile: 'Not Set',
+      completedAt: null
+    };
+  }
 
-      return {
-        formData,
-        healthScore: diagnostic.overallScore,
-        riskProfile: formData.riskTolerance || 'Moderate',
-        completedAt: new Date().toISOString()
-      };
+  try {
+    const userStorageKey = getStorageKey(userId);
+    if (userStorageKey) {
+      const stored = localStorage.getItem(userStorageKey);
+      if (stored) {
+        const formData = JSON.parse(stored);
+        if (formData.user_id && formData.user_id !== userId) {
+          localStorage.removeItem(userStorageKey);
+          return {
+            formData: createEmptyOnboardingData(),
+            healthScore: 0,
+            riskProfile: 'Not Set',
+            completedAt: null
+          };
+        }
+
+        const isDone = Boolean(formData.onboarding_completed || formData.onboardingCompleted);
+
+        const diagnostic = calculateFinancialHealthScore({
+          monthlyIncome: Number(formData.monthlyIncome) || 0,
+          monthlyExpenses: (Number(formData.monthlyEssentialExpenses) || 0) + (Number(formData.monthlyDiscretionaryExpenses) || 0),
+          monthlyEssentialExpenses: Number(formData.monthlyEssentialExpenses) || 0,
+          emergencyFund: Number(formData.emergencyFund) || 0,
+          monthlyDebtPayments: Number(formData.monthlyDebtPayments) || 0,
+          goals: formData.goals || [],
+          portfolioAllocation: [],
+          safetyData: {
+            hasHealthInsurance: Boolean(formData.hasHealthInsurance),
+            hasLifeInsurance: Boolean(formData.hasLifeInsurance)
+          }
+        });
+
+        return {
+          formData,
+          healthScore: isDone ? diagnostic.overallScore : 0,
+          riskProfile: formData.riskTolerance || 'Moderate',
+          completedAt: isDone ? (formData.updated_at || new Date().toISOString()) : null
+        };
+      }
     }
   } catch (e) {
     console.warn('LocalStorage load error:', e);
   }
 
   return {
-    formData: initialOnboardingData,
-    healthScore: 74,
-    riskProfile: 'Moderate',
+    formData: createEmptyOnboardingData(),
+    healthScore: 0,
+    riskProfile: 'Not Set',
     completedAt: null
   };
 }

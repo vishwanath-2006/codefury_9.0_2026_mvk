@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -21,19 +22,27 @@ import {
   PieChart,
   Activity,
   Lock,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
-import { getFinancialProfile, saveFinancialProfile } from '../services/onboardingService';
+import { getFinancialProfile, saveFinancialProfile, createEmptyOnboardingData } from '../services/onboardingService';
 
 export default function OnboardingPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile, loading: authLoading } = useAuth();
+  const { updateProfile, refreshOnboardingState } = useOnboarding();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const stepParam = parseInt(searchParams.get('step'), 10);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const currentUserIdRef = useRef(user?.id);
+
+  // Form State initialized to clean empty structure
+  const [formData, setFormData] = useState(() => createEmptyOnboardingData(user, profile));
 
   useEffect(() => {
     if (stepParam >= 1 && stepParam <= 3) {
@@ -41,87 +50,70 @@ export default function OnboardingPage() {
     }
   }, [stepParam]);
 
-  // Form State preserving all fields
-  const [formData, setFormData] = useState({
-    // Step 1: About You
-    fullName: profile?.full_name || user?.user_metadata?.full_name || '',
-    age: '28',
-    employmentStatus: 'Employed',
-    occupation: 'Software Engineer',
-    dependents: '0',
-    incomeStability: 'Stable',
-
-    // Step 2: Money Snapshot
-    monthlyIncome: '50000',
-    otherIncome: '0',
-    monthlyEssentialExpenses: '25000',
-    monthlyDiscretionaryExpenses: '10000',
-    currentSavings: '150000',
-    emergencyFund: '100000',
-    monthlySavings: '15000',
-    hasDebt: false,
-    totalDebt: '0',
-    monthlyDebtPayments: '0',
-    debtType: 'Home',
-
-    // Step 3: Goals, Investments & Risk
-    goals: [
-      { id: 'g1', title: 'Emergency Reserve Fund', targetAmount: 200000, currentAmount: 100000, deadline: '2026', priority: 'High' },
-      { id: 'g2', title: 'Home Downpayment', targetAmount: 1000000, currentAmount: 300000, deadline: '2028', priority: 'Medium' }
-    ],
-    hasInvestments: true,
-    investmentCategories: ['Mutual Funds', 'Stocks'],
-    investmentExperience: 'Some Experience',
-    hasHealthInsurance: true,
-    hasLifeInsurance: true,
-    hasEmergencyFund: true,
-    timeHorizon: '5–10 years',
-    riskResponseFall20: 'Hold',
-    investmentPriority: 'Balanced growth',
-    riskTolerance: 'Moderate'
-  });
-
+  // Load existing profile strictly for the authenticated user, or present fresh blank form
   useEffect(() => {
+    currentUserIdRef.current = user?.id;
+    let isMounted = true;
+
     async function loadExisting() {
-      if (user?.id) {
-        const existing = await getFinancialProfile(user.id);
-        if (existing) {
-          setFormData((prev) => ({
-            ...prev,
-            fullName: existing.full_name ?? prev.fullName,
-            age: existing.age !== null && existing.age !== undefined ? String(existing.age) : prev.age,
-            employmentStatus: existing.employment_status || prev.employmentStatus,
-            occupation: existing.occupation || prev.occupation,
-            dependents: existing.dependents !== null && existing.dependents !== undefined ? String(existing.dependents) : prev.dependents,
-            monthlyIncome: existing.monthly_income !== null && existing.monthly_income !== undefined ? String(existing.monthly_income) : prev.monthlyIncome,
-            otherIncome: existing.other_income !== null && existing.other_income !== undefined ? String(existing.other_income) : prev.otherIncome,
-            incomeStability: existing.income_stability || prev.incomeStability,
-            monthlyEssentialExpenses: existing.monthly_essential_expenses !== null && existing.monthly_essential_expenses !== undefined ? String(existing.monthly_essential_expenses) : prev.monthlyEssentialExpenses,
-            monthlyDiscretionaryExpenses: existing.monthly_discretionary_expenses !== null && existing.monthly_discretionary_expenses !== undefined ? String(existing.monthly_discretionary_expenses) : prev.monthlyDiscretionaryExpenses,
-            currentSavings: existing.current_savings !== null && existing.current_savings !== undefined ? String(existing.current_savings) : prev.currentSavings,
-            emergencyFund: existing.emergency_fund !== null && existing.emergency_fund !== undefined ? String(existing.emergency_fund) : prev.emergencyFund,
-            monthlySavings: existing.monthly_savings !== null && existing.monthly_savings !== undefined ? String(existing.monthlySavings) : prev.monthlySavings,
-            hasDebt: Boolean(existing.has_debt),
-            totalDebt: existing.total_debt !== null && existing.total_debt !== undefined ? String(existing.total_debt) : prev.totalDebt,
-            monthlyDebtPayments: existing.monthly_debt_payments !== null && existing.monthly_debt_payments !== undefined ? String(existing.monthly_debt_payments) : prev.monthlyDebtPayments,
-            debtType: existing.debt_type || prev.debtType,
-            goals: Array.isArray(existing.goals) ? existing.goals : prev.goals,
-            hasInvestments: Boolean(existing.has_investments),
-            investmentCategories: Array.isArray(existing.investment_categories) ? existing.investment_categories : prev.investmentCategories,
-            investmentExperience: existing.investment_experience || prev.investmentExperience,
-            hasHealthInsurance: Boolean(existing.has_health_insurance),
-            hasLifeInsurance: Boolean(existing.has_life_insurance),
-            hasEmergencyFund: Boolean(existing.has_emergency_fund),
-            timeHorizon: existing.time_horizon || prev.timeHorizon,
-            riskResponseFall20: existing.risk_response_fall_20 || prev.riskResponseFall20,
-            investmentPriority: existing.investment_priority || prev.investmentPriority,
-            riskTolerance: existing.risk_tolerance || prev.riskTolerance
-          }));
-        }
+      if (authLoading) return;
+
+      if (!user?.id) {
+        setFormData(createEmptyOnboardingData());
+        setLoadingProfile(false);
+        return;
       }
+
+      setLoadingProfile(true);
+      const activeUserId = user.id;
+      const existing = await getFinancialProfile(activeUserId);
+
+      if (!isMounted || currentUserIdRef.current !== activeUserId) return;
+
+      if (existing && (existing.onboarding_completed || existing.onboardingCompleted || existing.monthly_income != null || existing.monthlyIncome != null)) {
+        setFormData({
+          fullName: existing.full_name ?? (profile?.full_name || user?.user_metadata?.full_name || ''),
+          age: existing.age !== null && existing.age !== undefined ? String(existing.age) : '',
+          employmentStatus: existing.employment_status || 'Employed',
+          occupation: existing.occupation || '',
+          dependents: existing.dependents !== null && existing.dependents !== undefined ? String(existing.dependents) : '0',
+          incomeStability: existing.income_stability || 'Stable',
+          monthlyIncome: existing.monthly_income !== null && existing.monthly_income !== undefined ? String(existing.monthly_income) : (existing.monthlyIncome !== null && existing.monthlyIncome !== undefined ? String(existing.monthlyIncome) : ''),
+          otherIncome: existing.other_income !== null && existing.other_income !== undefined ? String(existing.other_income) : (existing.otherIncome !== null && existing.otherIncome !== undefined ? String(existing.otherIncome) : ''),
+          monthlyEssentialExpenses: existing.monthly_essential_expenses !== null && existing.monthly_essential_expenses !== undefined ? String(existing.monthly_essential_expenses) : (existing.monthlyEssentialExpenses !== null && existing.monthlyEssentialExpenses !== undefined ? String(existing.monthlyEssentialExpenses) : ''),
+          monthlyDiscretionaryExpenses: existing.monthly_discretionary_expenses !== null && existing.monthly_discretionary_expenses !== undefined ? String(existing.monthly_discretionary_expenses) : (existing.monthlyDiscretionaryExpenses !== null && existing.monthlyDiscretionaryExpenses !== undefined ? String(existing.monthlyDiscretionaryExpenses) : ''),
+          currentSavings: existing.current_savings !== null && existing.current_savings !== undefined ? String(existing.current_savings) : (existing.currentSavings !== null && existing.currentSavings !== undefined ? String(existing.currentSavings) : ''),
+          emergencyFund: existing.emergency_fund !== null && existing.emergency_fund !== undefined ? String(existing.emergency_fund) : (existing.emergencyFund !== null && existing.emergencyFund !== undefined ? String(existing.emergencyFund) : ''),
+          monthlySavings: existing.monthly_savings !== null && existing.monthly_savings !== undefined ? String(existing.monthly_savings) : (existing.monthlySavings !== null && existing.monthlySavings !== undefined ? String(existing.monthlySavings) : ''),
+          hasDebt: Boolean(existing.has_debt ?? existing.hasDebt),
+          totalDebt: existing.total_debt !== null && existing.total_debt !== undefined ? String(existing.total_debt) : (existing.totalDebt !== null && existing.totalDebt !== undefined ? String(existing.totalDebt) : ''),
+          monthlyDebtPayments: existing.monthly_debt_payments !== null && existing.monthly_debt_payments !== undefined ? String(existing.monthly_debt_payments) : (existing.monthlyDebtPayments !== null && existing.monthlyDebtPayments !== undefined ? String(existing.monthlyDebtPayments) : ''),
+          debtType: existing.debt_type || existing.debtType || 'Home',
+          goals: Array.isArray(existing.goals) ? existing.goals : [],
+          hasInvestments: Boolean(existing.has_investments ?? existing.hasInvestments),
+          investmentCategories: Array.isArray(existing.investment_categories || existing.investmentCategories) ? (existing.investment_categories || existing.investmentCategories) : [],
+          investmentExperience: existing.investment_experience || existing.investmentExperience || '',
+          hasHealthInsurance: Boolean(existing.has_health_insurance ?? existing.hasHealthInsurance),
+          hasLifeInsurance: Boolean(existing.has_life_insurance ?? existing.hasLifeInsurance),
+          hasEmergencyFund: Boolean(existing.has_emergency_fund ?? existing.hasEmergencyFund),
+          timeHorizon: existing.time_horizon || existing.timeHorizon || '5–10 years',
+          riskResponseFall20: existing.risk_response_fall_20 || existing.riskResponseFall20 || 'Hold',
+          investmentPriority: existing.investment_priority || existing.investmentPriority || 'Balanced growth',
+          riskTolerance: existing.risk_tolerance || existing.riskTolerance || 'Moderate'
+        });
+      } else {
+        // Fresh blank questionnaire for new user
+        setFormData(createEmptyOnboardingData(user, profile));
+      }
+      setLoadingProfile(false);
     }
+
     loadExisting();
-  }, [user?.id]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, profile, authLoading]);
 
   const handleChange = (field, val) => {
     setFormData((prev) => ({ ...prev, [field]: val }));
@@ -133,15 +125,15 @@ export default function OnboardingPage() {
   const monthlySurplus = totalIncome - totalExpenses;
 
   const formatINR = (val) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
 
   // Goal Helpers
   const handleAddGoal = (presetTitle = 'Custom Goal') => {
     const newGoal = {
       id: `g_${Date.now()}`,
       title: presetTitle,
-      targetAmount: 500000,
-      currentAmount: 50000,
+      targetAmount: '',
+      currentAmount: '',
       deadline: '2027',
       priority: 'Medium'
     };
@@ -218,6 +210,15 @@ export default function OnboardingPage() {
 
     try {
       await saveFinancialProfile(user?.id, formData);
+      if (updateProfile) {
+        await updateProfile(formData, user?.id);
+      }
+      if (refreshOnboardingState) {
+        await refreshOnboardingState();
+      }
+      if (refreshProfile) {
+        await refreshProfile();
+      }
       navigate('/profile', { replace: true });
     } catch (err) {
       setErrorMsg(err.message || 'Failed to save financial profile.');
@@ -225,6 +226,15 @@ export default function OnboardingPage() {
       setSaving(false);
     }
   };
+
+  if (loadingProfile) {
+    return (
+      <div className="max-w-4xl mx-auto py-20 text-center flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        <p className="text-xs font-mono text-slate-500 dark:text-slate-400">Loading your financial questionnaire...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-150 py-4">
@@ -307,7 +317,7 @@ export default function OnboardingPage() {
                 required
                 value={formData.fullName}
                 onChange={(e) => handleChange('fullName', e.target.value)}
-                placeholder="Alex Dev"
+                placeholder="Your Full Name"
               />
 
               <Input
@@ -445,7 +455,7 @@ export default function OnboardingPage() {
                 min="0"
                 value={formData.monthlyIncome}
                 onChange={(e) => handleChange('monthlyIncome', e.target.value)}
-                placeholder="50000"
+                placeholder="e.g. 75000"
               />
 
               <Input
@@ -463,7 +473,7 @@ export default function OnboardingPage() {
                 min="0"
                 value={formData.monthlyEssentialExpenses}
                 onChange={(e) => handleChange('monthlyEssentialExpenses', e.target.value)}
-                placeholder="25000 (Rent, Groceries, Bills)"
+                placeholder="e.g. 25000 (Rent, Groceries, Bills)"
               />
 
               <Input
@@ -472,7 +482,7 @@ export default function OnboardingPage() {
                 min="0"
                 value={formData.monthlyDiscretionaryExpenses}
                 onChange={(e) => handleChange('monthlyDiscretionaryExpenses', e.target.value)}
-                placeholder="10000 (Dining, Subscriptions)"
+                placeholder="e.g. 10000 (Dining, Subscriptions)"
               />
             </div>
 
@@ -521,7 +531,7 @@ export default function OnboardingPage() {
                   min="0"
                   value={formData.currentSavings}
                   onChange={(e) => handleChange('currentSavings', e.target.value)}
-                  placeholder="150000"
+                  placeholder="e.g. 150000"
                 />
 
                 <Input
@@ -530,7 +540,7 @@ export default function OnboardingPage() {
                   min="0"
                   value={formData.emergencyFund}
                   onChange={(e) => handleChange('emergencyFund', e.target.value)}
-                  placeholder="100000"
+                  placeholder="e.g. 100000"
                 />
 
                 <Input
@@ -539,7 +549,7 @@ export default function OnboardingPage() {
                   min="0"
                   value={formData.monthlySavings}
                   onChange={(e) => handleChange('monthlySavings', e.target.value)}
-                  placeholder="15000"
+                  placeholder="e.g. 15000"
                 />
               </div>
             </div>
@@ -586,7 +596,7 @@ export default function OnboardingPage() {
                     min="0"
                     value={formData.totalDebt}
                     onChange={(e) => handleChange('totalDebt', e.target.value)}
-                    placeholder="500000"
+                    placeholder="e.g. 500000"
                   />
 
                   <Input
@@ -595,7 +605,7 @@ export default function OnboardingPage() {
                     min="0"
                     value={formData.monthlyDebtPayments}
                     onChange={(e) => handleChange('monthlyDebtPayments', e.target.value)}
-                    placeholder="12000"
+                    placeholder="e.g. 12000"
                   />
 
                   <div>
@@ -704,7 +714,7 @@ export default function OnboardingPage() {
 
             <hr className="border-slate-100 dark:border-slate-800 my-6" />
 
-            {/* NEW QUESTION: WHAT IS YOUR INVESTING EXPERIENCE? */}
+            {/* Investing Experience */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
                 What is your investing experience?
@@ -813,7 +823,7 @@ export default function OnboardingPage() {
 
             <hr className="border-slate-100 dark:border-slate-800 my-6" />
 
-            {/* Human-Friendly Risk Profile Wording */}
+            {/* Risk Profile & Time Horizon */}
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-emerald-500" />

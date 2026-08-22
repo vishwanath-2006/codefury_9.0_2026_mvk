@@ -1,11 +1,10 @@
 import { supabase } from '../../lib/supabaseClient';
 import { calculateFinancialHealthScore } from './engine';
 import { getNormalizedFinancialProfile } from '../onboardingService';
-import { mockTopGoals, mockPortfolioAllocation } from '../../mock/finlabsMockData';
 
 /**
  * Data Access Adapter for Financial Health Engine.
- * Isolates data fetching and delegates to single source of truth resolver.
+ * Single source of truth resolver delegating directly to getNormalizedFinancialProfile.
  */
 
 /**
@@ -20,8 +19,8 @@ export async function getFinancialProfileInputs(userId) {
     monthlyEssentialExpenses: normProfile.monthlyEssentialExpenses,
     emergencyFund: normProfile.emergencyFund,
     monthlyDebtPayments: normProfile.monthlyDebtPayments,
-    goals: normProfile.goals || mockTopGoals,
-    portfolioAllocation: mockPortfolioAllocation,
+    goals: normProfile.goals || [],
+    portfolioAllocation: [],
     safetyData: {
       hasHealthInsurance: true,
       hasLifeInsurance: true,

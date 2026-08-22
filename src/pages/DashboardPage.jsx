@@ -21,8 +21,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let mounted = true;
+    setNormProfile(null);
     async function loadNormProfile() {
-      const data = await getNormalizedFinancialProfile(user?.id);
+      if (!user?.id) {
+        setNormProfile(null);
+        return;
+      }
+      const data = await getNormalizedFinancialProfile(user.id);
       if (mounted) {
         setNormProfile(data);
       }
@@ -41,8 +46,9 @@ export default function DashboardPage() {
   const avatarUrl = formData.profilePhoto || profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
 
   // Single Source of Truth Metrics
-  const totalIncome = normProfile?.monthlyIncome ?? 50000;
-  const totalExpenses = normProfile?.monthlyExpenses ?? 35000;
+  const isCompleted = Boolean(normProfile?.onboardingCompleted);
+  const totalIncome = normProfile?.monthlyIncome ?? 0;
+  const totalExpenses = normProfile?.monthlyExpenses ?? 0;
   const totalEmis = normProfile?.monthlyDebtPayments ?? 0;
   const monthlySavings = Math.max(0, totalIncome - totalExpenses - totalEmis);
   const savingsRatePct = totalIncome > 0 ? Math.round((monthlySavings / totalIncome) * 100) : 0;
@@ -52,48 +58,47 @@ export default function DashboardPage() {
   const diagnostic = calculateFinancialHealthScore({
     monthlyIncome: totalIncome,
     monthlyExpenses: totalExpenses,
-    monthlyEssentialExpenses: normProfile?.monthlyEssentialExpenses ?? 25000,
-    emergencyFund: normProfile?.emergencyFund ?? 100000,
+    monthlyEssentialExpenses: normProfile?.monthlyEssentialExpenses ?? 0,
+    emergencyFund: normProfile?.emergencyFund ?? 0,
     monthlyDebtPayments: totalEmis,
     goals: normProfile?.goals || [],
     portfolioAllocation: [],
     safetyData: { hasHealthInsurance: true, hasLifeInsurance: true }
   });
 
-  const healthScore = diagnostic.overallScore;
-  const emergencyMonths = totalExpenses > 0 ? (normProfile?.emergencyFund / totalExpenses).toFixed(1) : '2.9';
-  const riskProfile = normProfile?.riskProfile || 'Moderate';
-  const isCompleted = Boolean(normProfile?.onboardingCompleted);
+  const healthScore = isCompleted ? diagnostic.overallScore : 0;
+  const emergencyMonths = totalExpenses > 0 ? (normProfile?.emergencyFund / totalExpenses).toFixed(1) : '0.0';
+  const riskProfile = isCompleted ? (normProfile?.riskProfile || 'Moderate') : 'Pending Onboarding';
 
   // Dynamic Health Metric Pillars
   const dynamicHealthMetrics = [
     {
       metric: 'Savings Rate',
-      score: `${savingsRatePct}%`,
+      score: isCompleted ? `${savingsRatePct}%` : '0%',
       target: '25%',
-      status: savingsRatePct >= 25 ? 'Excellent' : savingsRatePct >= 15 ? 'Good' : 'Needs Attention',
-      description: `Saving ₹${monthlySavings.toLocaleString('en-IN')} of ₹${totalIncome.toLocaleString('en-IN')} income.`,
+      status: isCompleted ? (savingsRatePct >= 25 ? 'Excellent' : savingsRatePct >= 15 ? 'Good' : 'Needs Attention') : 'Pending Setup',
+      description: isCompleted ? `Saving ₹${monthlySavings.toLocaleString('en-IN')} of ₹${totalIncome.toLocaleString('en-IN')} income.` : 'Complete onboarding to evaluate savings rate.',
     },
     {
       metric: 'Emergency Fund',
-      score: `${emergencyMonths} Months`,
+      score: isCompleted ? `${emergencyMonths} Months` : '0.0 Months',
       target: '6.0 Months',
-      status: Number(emergencyMonths) >= 6 ? 'Excellent' : Number(emergencyMonths) >= 3 ? 'Good' : 'Needs Attention',
-      description: `₹${(normProfile?.emergencyFund || 100000).toLocaleString('en-IN')} accumulated buffer.`,
+      status: isCompleted ? (Number(emergencyMonths) >= 6 ? 'Excellent' : Number(emergencyMonths) >= 3 ? 'Good' : 'Needs Attention') : 'Pending Setup',
+      description: isCompleted ? `₹${(normProfile?.emergencyFund || 0).toLocaleString('en-IN')} accumulated buffer.` : 'Complete onboarding to evaluate emergency fund.',
     },
     {
       metric: 'Debt-to-Income',
-      score: `${emiRatioPct}%`,
+      score: isCompleted ? `${emiRatioPct}%` : '0%',
       target: '< 30%',
-      status: emiRatioPct <= 15 ? 'Excellent' : emiRatioPct <= 30 ? 'Good' : 'Needs Attention',
-      description: emiRatioPct > 0 ? `₹${totalEmis.toLocaleString('en-IN')} monthly debt outflow` : 'Zero active loan obligations',
+      status: isCompleted ? (emiRatioPct <= 15 ? 'Excellent' : emiRatioPct <= 30 ? 'Good' : 'Needs Attention') : 'Pending Setup',
+      description: isCompleted ? (emiRatioPct > 0 ? `₹${totalEmis.toLocaleString('en-IN')} monthly debt outflow` : 'Zero active loan obligations') : 'Complete onboarding to evaluate debt ratio.',
     },
     {
       metric: 'Diversification',
-      score: `${Math.min(100, Math.max(25, (formData.assetClasses || []).filter(a => a !== 'None yet').length * 25))} / 100`,
+      score: isCompleted ? `${Math.min(100, Math.max(25, (normProfile?.raw?.investment_categories || normProfile?.raw?.investmentCategories || []).length * 25))} / 100` : '0 / 100',
       target: '80 / 100',
-      status: (formData.assetClasses || []).length >= 3 ? 'Good' : 'Moderate',
-      description: `Across ${(formData.assetClasses || []).filter(a => a !== 'None yet').join(', ') || '1 asset class'}`,
+      status: isCompleted ? ((normProfile?.raw?.investment_categories || []).length >= 3 ? 'Good' : 'Moderate') : 'Pending Setup',
+      description: isCompleted ? `Across ${(normProfile?.raw?.investment_categories || normProfile?.raw?.investmentCategories || []).join(', ') || 'Liquid reserve'}` : 'Complete onboarding to configure asset allocation.',
     },
   ];
 
@@ -164,7 +169,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Emergency Reserve"
-          value={formatINR(normProfile?.emergencyFund ?? 100000)}
+          value={formatINR(normProfile?.emergencyFund ?? 0)}
           icon={ShieldCheck}
           change={`${emergencyMonths} months buffer`}
           changeType={Number(emergencyMonths) >= 3 ? 'positive' : 'negative'}

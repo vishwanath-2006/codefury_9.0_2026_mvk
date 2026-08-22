@@ -41,6 +41,8 @@ export default function AiPage() {
   // Load user financial context for Action Plan on mount
   useEffect(() => {
     let mounted = true;
+    setUserAnalysis(null);
+    setMessages([]);
     async function loadAnalysis() {
       if (user?.id) {
         try {

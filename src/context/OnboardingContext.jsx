@@ -1,19 +1,98 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getSavedOnboardingProfile, saveOnboardingProfile, initialOnboardingData } from '../services/onboardingService';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useAuth } from './AuthContext';
+import { getSavedOnboardingProfile, getFinancialProfile, saveFinancialProfile, createEmptyOnboardingData } from '../services/onboardingService';
 
 const OnboardingContext = createContext(null);
 
 export function OnboardingProvider({ children }) {
-  const [profileState, setProfileState] = useState(() => getSavedOnboardingProfile());
+  const { user, profile, loading: authLoading } = useAuth();
+  const [profileState, setProfileState] = useState(() => getSavedOnboardingProfile(user?.id));
+  const currentUserIdRef = useRef(user?.id);
 
+  // Sync state when user changes or auth finishes loading
   useEffect(() => {
-    // Reload state if updated elsewhere
-    const loaded = getSavedOnboardingProfile();
-    setProfileState(loaded);
-  }, []);
+    currentUserIdRef.current = user?.id;
 
-  const updateProfile = async (formData) => {
-    const result = await saveOnboardingProfile(formData);
+    if (authLoading) {
+      return;
+    }
+
+    if (!user?.id) {
+      // User logged out or unauthenticated -> Reset state completely
+      setProfileState({
+        formData: createEmptyOnboardingData(),
+        healthScore: null,
+        riskProfile: null,
+        completedAt: null,
+      });
+      return;
+    }
+
+    let isMounted = true;
+    const activeUserId = user.id;
+
+    async function loadActiveUserProfile() {
+      // Clear previous user's profile state immediately before fetching new user
+      setProfileState({
+        formData: createEmptyOnboardingData(user, profile),
+        healthScore: null,
+        riskProfile: null,
+        completedAt: null,
+      });
+
+      const loaded = await getFinancialProfile(activeUserId);
+
+      // Prevent race conditions if user changed while request was in-flight
+      if (!isMounted || currentUserIdRef.current !== activeUserId) return;
+
+      if (loaded && (loaded.onboarding_completed || loaded.onboardingCompleted || loaded.monthly_income != null || loaded.monthlyIncome != null)) {
+        setProfileState({
+          formData: loaded,
+          healthScore: null,
+          riskProfile: loaded.risk_tolerance || loaded.riskTolerance || 'Moderate',
+          completedAt: loaded.onboarding_completed || loaded.onboardingCompleted ? new Date().toISOString() : null,
+        });
+      } else {
+        // User has no saved profile -> Fresh state with completedAt = null
+        setProfileState({
+          formData: createEmptyOnboardingData(user, profile),
+          healthScore: null,
+          riskProfile: null,
+          completedAt: null,
+        });
+      }
+    }
+
+    loadActiveUserProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, authLoading]);
+
+  const refreshOnboardingState = async () => {
+    if (!user?.id) return;
+    const loaded = await getFinancialProfile(user.id);
+    if (loaded && (loaded.onboarding_completed || loaded.onboardingCompleted || loaded.monthly_income != null || loaded.monthlyIncome != null)) {
+      setProfileState({
+        formData: loaded,
+        healthScore: null,
+        riskProfile: loaded.risk_tolerance || loaded.riskTolerance || 'Moderate',
+        completedAt: loaded.onboarding_completed || loaded.onboardingCompleted ? new Date().toISOString() : null,
+      });
+    } else {
+      setProfileState({
+        formData: createEmptyOnboardingData(user, profile),
+        healthScore: null,
+        riskProfile: null,
+        completedAt: null,
+      });
+    }
+  };
+
+  const updateProfile = async (formData, userId = null) => {
+    const targetUserId = userId || user?.id;
+    const result = await saveFinancialProfile(targetUserId, formData);
     setProfileState(result);
     return result;
   };
@@ -21,11 +100,12 @@ export function OnboardingProvider({ children }) {
   return (
     <OnboardingContext.Provider
       value={{
-        formData: profileState.formData || initialOnboardingData,
-        healthScore: profileState.healthScore ?? 74,
-        riskProfile: profileState.riskProfile || 'Moderate',
+        formData: profileState.formData || createEmptyOnboardingData(user, profile),
+        healthScore: profileState.healthScore,
+        riskProfile: profileState.riskProfile,
         completedAt: profileState.completedAt,
         updateProfile,
+        refreshOnboardingState,
       }}
     >
       {children}

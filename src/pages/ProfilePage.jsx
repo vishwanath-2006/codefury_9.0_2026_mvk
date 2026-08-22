@@ -22,7 +22,7 @@ import {
   ArrowRight,
   Edit
 } from 'lucide-react';
-import { getFinancialProfile } from '../services/onboardingService';
+import { getFinancialProfile, getNormalizedFinancialProfile } from '../services/onboardingService';
 
 export default function ProfilePage() {
   const { user, profile, updateProfile } = useAuth();
@@ -41,13 +41,18 @@ export default function ProfilePage() {
   }, [profile]);
 
   useEffect(() => {
+    let mounted = true;
+    setFinProfile(null);
     async function loadFinData() {
       if (user?.id) {
-        const data = await getFinancialProfile(user.id);
-        if (data) setFinProfile(data);
+        const data = await getNormalizedFinancialProfile(user.id);
+        if (mounted && data) setFinProfile(data);
       }
     }
     loadFinData();
+    return () => {
+      mounted = false;
+    };
   }, [user?.id]);
 
   const handleUpdate = async (e) => {
@@ -89,35 +94,38 @@ export default function ProfilePage() {
     return exp;
   };
 
+  const raw = finProfile?.raw;
+  const isCompleted = Boolean(finProfile?.onboardingCompleted || raw?.onboarding_completed);
+
   // Persisted view data if profile completed, with zero-safe nullish coalescing
   const displayData = {
-    age: finProfile?.age ?? 28,
-    employmentStatus: finProfile?.employment_status || 'Employed',
-    occupation: finProfile?.occupation || 'Software Engineer',
-    dependents: finProfile?.dependents ?? 0,
-    incomeStability: finProfile?.income_stability || 'Stable',
-    monthlyIncome: finProfile?.monthly_income ?? 50000,
-    otherIncome: finProfile?.other_income ?? 0,
-    essentialExpenses: finProfile?.monthly_essential_expenses ?? 25000,
-    discretionaryExpenses: finProfile?.monthly_discretionary_expenses ?? 10000,
-    totalExpenses: finProfile?.monthly_expenses ?? 35000,
-    currentSavings: finProfile?.current_savings ?? 150000,
-    emergencyFund: finProfile?.emergency_fund ?? 100000,
-    monthlySavings: finProfile?.monthly_savings ?? 15000,
-    hasDebt: Boolean(finProfile?.has_debt),
-    totalDebt: finProfile?.total_debt ?? 0,
-    monthlyDebtPayments: finProfile?.monthly_debt_payments ?? 0,
-    debtType: finProfile?.debt_type || 'N/A',
+    age: raw?.age ?? (isCompleted ? 'N/A' : '—'),
+    employmentStatus: raw?.employment_status || (isCompleted ? 'Employed' : '—'),
+    occupation: raw?.occupation || (isCompleted ? 'N/A' : '—'),
+    dependents: raw?.dependents ?? 0,
+    incomeStability: raw?.income_stability || (isCompleted ? 'Stable' : '—'),
+    monthlyIncome: finProfile?.monthlyIncome ?? raw?.monthly_income ?? 0,
+    otherIncome: raw?.other_income ?? 0,
+    essentialExpenses: finProfile?.monthlyEssentialExpenses ?? raw?.monthly_essential_expenses ?? 0,
+    discretionaryExpenses: finProfile?.monthlyDiscretionaryExpenses ?? raw?.monthly_discretionary_expenses ?? 0,
+    totalExpenses: finProfile?.monthlyExpenses ?? raw?.monthly_expenses ?? 0,
+    currentSavings: finProfile?.currentSavings ?? raw?.current_savings ?? 0,
+    emergencyFund: finProfile?.emergencyFund ?? raw?.emergency_fund ?? 0,
+    monthlySavings: raw?.monthly_savings ?? Math.max(0, (finProfile?.monthlyIncome || 0) - (finProfile?.monthlyExpenses || 0)),
+    hasDebt: Boolean(raw?.has_debt),
+    totalDebt: raw?.total_debt ?? 0,
+    monthlyDebtPayments: finProfile?.monthlyDebtPayments ?? raw?.monthly_debt_payments ?? 0,
+    debtType: raw?.debt_type || (raw?.has_debt ? 'Personal' : 'None'),
     goals: finProfile?.goals || [],
-    hasInvestments: finProfile?.has_investments ?? true,
-    investmentCategories: finProfile?.investment_categories || ['Mutual Funds', 'Stocks'],
-    investmentExperience: formatExperienceLabel(finProfile?.investment_experience),
-    hasHealthInsurance: finProfile?.has_health_insurance ?? true,
-    hasLifeInsurance: finProfile?.has_life_insurance ?? true,
-    timeHorizon: finProfile?.time_horizon || '5–10 years',
-    riskResponseFall20: finProfile?.risk_response_fall_20 || 'Hold',
-    investmentPriority: finProfile?.investment_priority || 'Balanced growth',
-    riskTolerance: finProfile?.risk_tolerance || 'Moderate'
+    hasInvestments: Boolean(raw?.has_investments),
+    investmentCategories: raw?.investment_categories || [],
+    investmentExperience: formatExperienceLabel(raw?.investment_experience),
+    hasHealthInsurance: Boolean(raw?.has_health_insurance),
+    hasLifeInsurance: Boolean(raw?.has_life_insurance),
+    timeHorizon: raw?.time_horizon || (isCompleted ? '5–10 years' : '—'),
+    riskResponseFall20: raw?.risk_response_fall_20 || (isCompleted ? 'Hold' : '—'),
+    investmentPriority: raw?.investment_priority || (isCompleted ? 'Balanced growth' : '—'),
+    riskTolerance: finProfile?.riskProfile || raw?.risk_tolerance || (isCompleted ? 'Moderate' : 'Pending')
   };
 
   const totalIncome = displayData.monthlyIncome + displayData.otherIncome;
@@ -151,8 +159,8 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <Badge variant="neutral" className="text-xs font-mono">
-            {finProfile?.onboarding_completed ? 'Onboarding Complete' : 'Profile Initialized'}
+          <Badge variant={finProfile?.onboardingCompleted || finProfile?.onboarding_completed ? 'success' : 'neutral'} className="text-xs font-mono">
+            {finProfile?.onboardingCompleted || finProfile?.onboarding_completed ? 'Onboarding Complete' : 'Profile Initialized'}
           </Badge>
         </div>
 
