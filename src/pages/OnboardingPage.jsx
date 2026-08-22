@@ -206,7 +206,7 @@ export default function OnboardingPage() {
   const handleVerifyOtp = () => {
     setOtpError('');
     if (!userOtpInput || userOtpInput.trim() !== generatedOtp) {
-      setOtpError(`Invalid OTP code entered. Please enter ${generatedOtp} shown in the SMS alert banner above.`);
+      setOtpError('Invalid OTP code entered. Please check your SMS notification and enter the correct 4-digit code.');
       return;
     }
 
@@ -463,47 +463,68 @@ export default function OnboardingPage() {
                         </Button>
                       </div>
 
-                      {/* SMS SIMULATED OTP TOAST BANNER */}
+                      {/* SMS SIMULATED OTP TOAST NOTIFICATION (Top-Right Screen Toast) */}
                       {otpSent && (
-                        <div className="space-y-3 animate-in fade-in">
-                          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Smartphone className="w-4 h-4 text-emerald-500 shrink-0" />
-                              <span>📱 <strong>SMS Alert:</strong> Your FinLabs verification OTP is <span className="font-mono text-sm underline">{generatedOtp}</span></span>
+                        <>
+                          {/* Floating Realistic Top-Right Mobile SMS Notification */}
+                          <div className="fixed top-6 right-6 z-50 max-w-sm w-full bg-slate-900/95 text-white p-4 rounded-2xl border border-emerald-500/40 shadow-2xl backdrop-blur-md animate-in slide-in-from-top duration-300">
+                            <div className="flex items-start justify-between pb-1.5 border-b border-slate-800">
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-md bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold">
+                                  💬
+                                </div>
+                                <span className="text-[11px] font-extrabold tracking-tight text-slate-200">SMS Notification • FinLabs Auth</span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-mono">Just Now</span>
                             </div>
-                            <span className="text-[10px] text-slate-400 font-mono">Simulated SMS</span>
+                            <div className="pt-2 text-xs leading-relaxed space-y-1">
+                              <p className="text-slate-300 font-medium">
+                                Your FinLabs verification OTP for <strong>+91 {formData.phone}</strong> is:
+                              </p>
+                              <div className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-center font-mono font-extrabold text-lg text-emerald-400 tracking-widest my-1">
+                                {generatedOtp}
+                              </div>
+                              <p className="text-[10px] text-slate-400">Valid for 5 minutes. Do not share this OTP with anyone.</p>
+                            </div>
                           </div>
 
-                          <div className="flex gap-2 items-center">
-                            <input
-                              type="text"
-                              maxLength={4}
-                              placeholder="Enter OTP"
-                              value={userOtpInput}
-                              onChange={(e) => setUserOtpInput(e.target.value)}
-                              className="w-36 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center font-mono text-sm tracking-widest font-bold focus:border-emerald-500 focus:outline-none"
-                            />
-                            <Button
-                              type="button"
-                              variant="primary"
-                              size="sm"
-                              icon={ShieldCheck}
-                              onClick={handleVerifyOtp}
-                              className="bg-emerald-600 hover:bg-emerald-700 font-bold text-xs"
-                            >
-                              Verify OTP
-                            </Button>
-                            {resendTimer > 0 && (
-                              <span className="text-[11px] text-slate-400 font-mono">
-                                Resend in {resendTimer}s
-                              </span>
+                          {/* Clean Form OTP Verification Box */}
+                          <div className="space-y-3 pt-1 animate-in fade-in">
+                            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                              An OTP has been sent to <strong>+91 {formData.phone}</strong>. Check your phone notifications.
+                            </p>
+
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="text"
+                                maxLength={4}
+                                placeholder="Enter 4-digit OTP"
+                                value={userOtpInput}
+                                onChange={(e) => setUserOtpInput(e.target.value)}
+                                className="w-40 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center font-mono text-sm tracking-widest font-bold focus:border-emerald-500 focus:outline-none"
+                              />
+                              <Button
+                                type="button"
+                                variant="primary"
+                                size="sm"
+                                icon={ShieldCheck}
+                                onClick={handleVerifyOtp}
+                                className="bg-emerald-600 hover:bg-emerald-700 font-bold text-xs"
+                              >
+                                Verify OTP
+                              </Button>
+                              {resendTimer > 0 && (
+                                <span className="text-[11px] text-slate-400 font-mono">
+                                  Resend in {resendTimer}s
+                                </span>
+                              )}
+                            </div>
+
+                            {otpError && (
+                              <p className="text-xs text-rose-500 font-semibold">{otpError}</p>
                             )}
                           </div>
-
-                          {otpError && (
-                            <p className="text-xs text-rose-500 font-semibold">{otpError}</p>
-                          )}
-                        </div>
+                        </>
                       )}
                     </div>
                   )}
