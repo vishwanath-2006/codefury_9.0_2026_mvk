@@ -360,7 +360,9 @@ export default function AiPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleSendCustomPrompt();
+              if (inputQuery.trim() && !loading) {
+                handleSendCustomPrompt();
+              }
             }}
             className="flex gap-2 pt-1"
           >
@@ -370,6 +372,14 @@ export default function AiPage() {
               placeholder="Ask anything (e.g., 'What is a mutual fund?', 'How to invest ₹1,00,000')..."
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (inputQuery.trim() && !loading) {
+                    handleSendCustomPrompt();
+                  }
+                }
+              }}
               disabled={loading}
               className="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 font-medium"
             />
@@ -455,7 +465,7 @@ function renderFormattedAiMessage(rawText) {
     }
 
     // 2. Numbered list item
-    const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+    const numMatch = trimmed.match(/^(\\d+)\\.\\s+(.*)$/);
     if (numMatch) {
       const num = numMatch[1];
       const text = numMatch[2];
@@ -474,7 +484,7 @@ function renderFormattedAiMessage(rawText) {
     if (trimmed.startsWith('**') && trimmed.endsWith('**') && !trimmed.includes(':')) {
       elements.push(
         <div key={lineIdx} className="font-extrabold text-emerald-400 text-sm mt-3 mb-1 tracking-tight">
-          {trimmed.replace(/\*\*/g, '')}
+          {trimmed.replace(/\\*\\*/g, '')}
         </div>
       );
       return;
@@ -502,7 +512,7 @@ function renderFormattedAiMessage(rawText) {
 }
 
 function parseInlineMarkdown(text) {
-  const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+  const parts = text.split(/(\\*\\*.*?\\*\\*|`.*?`)/g);
 
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
