@@ -14,13 +14,13 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
 
-  // Prepare normalized time-series data (base = 100 at start of period)
+  // Prepare normalized time-series data (base = 100 at start of selected timeframe)
   const normalizedSeries = useMemo(() => {
     if (!items || items.length === 0) return [];
 
     let daysToSlice = 250;
     if (timeFilter === '1M') daysToSlice = 22;
-    if (timeFilter === '6M') daysToSlice = 130;
+    if (timeFilter === '6M') daysToSlice = 120;
     if (timeFilter === '1Y') daysToSlice = 250;
 
     return items.map((item, itemIdx) => {
@@ -28,7 +28,15 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
       const rawHistory = item.history || [];
       const sliced = rawHistory.slice(-daysToSlice);
 
-      if (sliced.length === 0) return { symbol: item.symbol, color, points: [] };
+      if (sliced.length === 0) {
+        return {
+          id: item.id || item.symbol,
+          symbol: item.symbol,
+          displayName: item.displayName || item.name || item.symbol,
+          color,
+          points: []
+        };
+      }
 
       const basePrice = Number(sliced[0].price) || 1;
 
@@ -45,8 +53,10 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
       });
 
       return {
+        id: item.id || item.symbol,
         symbol: item.symbol,
-        name: item.name,
+        displayName: item.displayName || item.name || item.symbol,
+        name: item.displayName || item.name || item.symbol,
         color,
         points
       };
@@ -258,9 +268,10 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-3">
           {normalizedSeries.map((s) => (
-            <div key={s.symbol} className="flex items-center gap-1.5 font-bold">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: s.color.hex }} />
-              <span className="text-slate-800 dark:text-slate-200">{s.symbol}</span>
+            <div key={s.id || s.symbol} className="flex items-center gap-1.5 font-bold">
+              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
+              <span className="text-slate-800 dark:text-slate-200 truncate max-w-[180px]">{s.displayName}</span>
+              <span className="text-[10px] text-slate-400 font-mono">({s.symbol})</span>
             </div>
           ))}
         </div>
@@ -278,14 +289,14 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
           className="cursor-crosshair block w-full"
         />
 
-        {/* Multi-series Tooltip without ₹ currency symbol */}
+        {/* Multi-series Tooltip without ₹ currency symbol for index values */}
         {hoverIndex !== null && hoveredDate && (
           <div
             className="absolute z-20 pointer-events-none p-3 bg-slate-900/95 text-white rounded-xl shadow-xl text-xs font-semibold leading-tight flex flex-col gap-1.5 border border-slate-700/80 backdrop-blur-md"
             style={{
               left: `${Math.min(
-                (containerRef.current?.clientWidth || 300) - 180,
-                Math.max(15, hoverPos.x - 70)
+                (containerRef.current?.clientWidth || 300) - 200,
+                Math.max(15, hoverPos.x - 80)
               )}px`,
               top: '15px'
             }}
@@ -299,10 +310,10 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
               if (!pt) return null;
               const isPositive = pt.returnPct >= 0;
               return (
-                <div key={s.symbol} className="flex items-center justify-between gap-4 text-[11px]">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color.hex }} />
-                    <span className="font-bold">{s.symbol}</span>
+                <div key={s.id || s.symbol} className="flex items-center justify-between gap-4 text-[11px]">
+                  <div className="flex items-center gap-1.5 truncate max-w-[120px]">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
+                    <span className="font-bold truncate">{s.symbol}</span>
                   </div>
                   <div className="font-mono flex items-center gap-2">
                     <span className="text-slate-200 font-bold">{pt.normalizedVal}</span>

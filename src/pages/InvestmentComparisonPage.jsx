@@ -24,7 +24,7 @@ import MultiAssetLineChart from '../components/comparison/MultiAssetLineChart';
 import ComparisonBarChart from '../components/comparison/ComparisonBarChart';
 
 export default function InvestmentComparisonPage() {
-  // Asset filter for search
+  // Asset filter for search dropdown
   const [filterType, setFilterType] = useState('all'); // 'all' | 'stocks' | 'mf' | 'ipos'
 
   // Selected investments (Default: 1 stock + 1 mutual fund for cross-asset clarity)
@@ -40,7 +40,7 @@ export default function InvestmentComparisonPage() {
   const [loading, setLoading] = useState(false);
   const [maxWarning, setMaxWarning] = useState(false);
 
-  // Load comparison data whenever selectedItems change
+  // Load canonical comparison data whenever selectedItems change
   const loadData = async () => {
     if (selectedItems.length < 2) {
       setComparisonData([]);
@@ -62,11 +62,11 @@ export default function InvestmentComparisonPage() {
     loadData();
   }, [selectedItems]);
 
-  // Autocomplete search
+  // Autocomplete search (filtered by category filter without clearing selected items)
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
     const all = searchAllInvestments(searchQuery, filterType);
-    return all.filter((res) => !selectedItems.some((s) => s.key === res.key));
+    return all.filter((res) => !selectedItems.some((s) => s.key === res.key || s.key === res.symbol));
   }, [searchQuery, filterType, selectedItems]);
 
   const handleAddItem = (item) => {
@@ -75,21 +75,23 @@ export default function InvestmentComparisonPage() {
       setTimeout(() => setMaxWarning(false), 3000);
       return;
     }
-    setSelectedItems((prev) => [...prev, { type: item.type, key: item.key, name: item.name, rawItem: item.rawItem }]);
+    setSelectedItems((prev) => [
+      ...prev,
+      { type: item.type, key: item.key || item.symbol || item.id, name: item.displayName || item.name }
+    ]);
     setSearchQuery('');
   };
 
   const handleRemoveItem = (keyToRemove) => {
-    setSelectedItems((prev) => prev.filter((i) => i.key !== keyToRemove));
+    setSelectedItems((prev) => prev.filter((i) => i.key !== keyToRemove && i.symbol !== keyToRemove));
   };
 
-  // Generate dynamic 2–3 concise takeaway points strictly from selected items
+  // Dynamic 2–3 key takeaways derived strictly from selected items
   const keyDifferences = useMemo(() => {
     return generateKeyDifferences(comparisonData);
   }, [comparisonData]);
 
-  // Visual dot color gradient mapping based on existing risk data:
-  // 🟢 Green = Low risk | 🟡 Yellow = Moderate risk | 🟠 Orange = High risk | 🔴 Red = Very High risk
+  // Visual dot color gradient mapping based on canonical risk data
   const getRiskDotClass = (risk) => {
     const r = (risk || '').toLowerCase();
     if (r.includes('low') && !r.includes('moderate')) return 'bg-emerald-500 shadow-xs shadow-emerald-500/50';
@@ -182,7 +184,7 @@ export default function InvestmentComparisonPage() {
                       {res.badge}
                     </Badge>
                     <div>
-                      <span className="font-bold text-slate-900 dark:text-slate-100">{res.name}</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">{res.displayName || res.name}</span>
                       <span className="text-[11px] text-slate-400 ml-2 font-mono">({res.symbol})</span>
                     </div>
                   </div>
@@ -258,7 +260,7 @@ export default function InvestmentComparisonPage() {
         </div>
       )}
 
-      {/* MAIN COMPACT COMPARISON */}
+      {/* MAIN CANONICAL COMPARISON */}
       {!loading && comparisonData.length >= 2 && (
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* 3. Quick Comparison Table (8 core factors with sticky Factor column) */}
@@ -282,18 +284,18 @@ export default function InvestmentComparisonPage() {
                   <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200/80 dark:border-slate-800/80 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
                     <th className="p-3.5 min-w-[150px] sticky left-0 bg-slate-50 dark:bg-slate-950 z-10">Factor</th>
                     {comparisonData.map((item) => (
-                      <th key={item.id} className="p-3.5 min-w-[160px]">
+                      <th key={item.id} className="p-3.5 min-w-[170px]">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-extrabold text-slate-900 dark:text-slate-100 truncate">{item.name}</span>
+                          <span className="font-extrabold text-slate-900 dark:text-slate-100 truncate">{item.displayName}</span>
                         </div>
-                        <span className="text-[10px] font-normal text-slate-400 block mt-0.5">{item.typeBadge}</span>
+                        <span className="text-[10px] font-normal text-slate-400 block mt-0.5">{item.typeBadge} · {item.symbol}</span>
                       </th>
                     ))}
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                  {/* 1. Risk Profile Row (with colored indicator dot) */}
+                  {/* 1. Risk Profile Row */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">Risk Profile</td>
                     {comparisonData.map((item) => (
@@ -309,7 +311,7 @@ export default function InvestmentComparisonPage() {
                     ))}
                   </tr>
 
-                  {/* 2. 1-Year Return / Expected Gain Row (with subtle risk dot) */}
+                  {/* 2. 1-Year Return / Gain Row */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">1-Year Return / Gain</td>
                     {comparisonData.map((item) => (
@@ -449,7 +451,7 @@ export default function InvestmentComparisonPage() {
                   onClick={() => setAnalyticsCategory('valuation')}
                   className={`px-3 py-1 rounded-lg transition-all duration-150 cursor-pointer ${
                     analyticsCategory === 'valuation'
-                      ? 'bg-emerald-500 text-white shadow-xs'
+                      ? 'bg-emerald-500 text-white shadow-xs font-bold'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -492,12 +494,13 @@ export default function InvestmentComparisonPage() {
                   title="Valuation Multiple / Cost"
                   subtitle="P/E for Stocks, TER for Funds, GMP for IPOs"
                   data={comparisonData}
-                  metricKey="valuationDisplay"
+                  displayKey="valuationDisplay"
+                  numericKey="valuationNumeric"
                   theme="indigo"
                 />
                 <ComparisonBarChart
                   title="1-Year Growth / Premium (%)"
-                  subtitle="Comparative baseline yield"
+                  subtitle="1-Year historical gain / yield"
                   data={comparisonData}
                   metricKey="return1Y"
                   unit="%"
@@ -505,9 +508,10 @@ export default function InvestmentComparisonPage() {
                 />
                 <ComparisonBarChart
                   title="Minimum Investment Entry"
-                  subtitle="Capital entry requirement"
+                  subtitle="Minimum lot / SIP requirement"
                   data={comparisonData}
-                  metricKey="minInvestment"
+                  displayKey="minInvestment"
+                  numericKey="minInvestmentNum"
                   theme="teal"
                 />
               </div>
@@ -543,9 +547,9 @@ export default function InvestmentComparisonPage() {
               <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
                 {comparisonData.map((item) => (
                   <div key={item.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 truncate">
+                    <div className="flex items-center gap-2 truncate max-w-[65%]">
                       <span className={`w-2 h-2 rounded-full inline-block shrink-0 ${getRiskDotClass(item.risk)}`} />
-                      <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{item.name}</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{item.displayName}</span>
                     </div>
                     <span className="font-semibold text-slate-500 shrink-0 ml-2">{item.risk} Risk</span>
                   </div>
@@ -571,9 +575,9 @@ export default function InvestmentComparisonPage() {
                     return (
                       <div key={item.id} className="space-y-1 text-xs">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 truncate">
+                          <div className="flex items-center gap-2 truncate max-w-[65%]">
                             <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${getRiskDotClass(item.risk)}`} />
-                            <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{item.name}</span>
+                            <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{item.displayName}</span>
                           </div>
                           <span className="font-mono font-bold text-emerald-500 shrink-0 ml-2">{item.returnDisplay}</span>
                         </div>

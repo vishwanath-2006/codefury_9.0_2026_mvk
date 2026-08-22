@@ -5,6 +5,8 @@ export default function ComparisonBarChart({
   subtitle,
   data = [],
   metricKey,
+  displayKey,
+  numericKey,
   unit = '%',
   prefix = '',
   isReturn = false,
@@ -12,9 +14,19 @@ export default function ComparisonBarChart({
 }) {
   if (!data || data.length === 0) return null;
 
-  // Find max for scaling
-  const values = data.map((d) => Math.abs(Number(d[metricKey]) || 0));
-  const maxVal = Math.max(...values, 1);
+  // Extract numeric values for scaling (trying numericKey -> metricKey -> parse string)
+  const numValues = data.map((d) => {
+    if (numericKey && d[numericKey] !== undefined && d[numericKey] !== null) {
+      return Math.abs(Number(d[numericKey]) || 0);
+    }
+    const directNum = Number(d[metricKey]);
+    if (!isNaN(directNum)) return Math.abs(directNum);
+    // Parse numeric substring if string contains numbers (e.g. "31.2x P/E" -> 31.2, "0.58% TER" -> 0.58)
+    const match = String(d[metricKey] || '').match(/[\d.]+/);
+    return match ? Math.abs(parseFloat(match[0]) || 0) : 1;
+  });
+
+  const maxVal = Math.max(...numValues, 1);
 
   const getGradient = (isPositive) => {
     if (isReturn) {
@@ -45,20 +57,43 @@ export default function ComparisonBarChart({
 
       <div className="space-y-3.5">
         {data.map((item, idx) => {
-          const rawVal = Number(item[metricKey]);
-          const isNum = !isNaN(rawVal);
-          const valDisplay = isNum
-            ? `${rawVal > 0 && isReturn ? '+' : ''}${prefix}${rawVal.toLocaleString('en-IN')}${unit}`
-            : item[metricKey] || 'N/A';
-          const pctWidth = isNum ? Math.min(100, Math.max(8, (Math.abs(rawVal) / maxVal) * 100)) : 0;
-          const isPositive = rawVal >= 0;
+          let numVal = 0;
+          if (numericKey && item[numericKey] !== undefined && item[numericKey] !== null) {
+            numVal = Number(item[numericKey]) || 0;
+          } else {
+            const raw = Number(item[metricKey]);
+            if (!isNaN(raw)) {
+              numVal = raw;
+            } else {
+              const match = String(item[metricKey] || '').match(/[\d.]+/);
+              numVal = match ? parseFloat(match[0]) || 0 : 0;
+            }
+          }
+
+          // Format displayed value
+          let valDisplay = 'N/A';
+          if (displayKey && item[displayKey]) {
+            valDisplay = item[displayKey];
+          } else if (item[metricKey] !== undefined && item[metricKey] !== null) {
+            const raw = Number(item[metricKey]);
+            if (!isNaN(raw)) {
+              valDisplay = `${raw > 0 && isReturn ? '+' : ''}${prefix}${raw.toLocaleString('en-IN')}${unit}`;
+            } else {
+              valDisplay = String(item[metricKey]);
+            }
+          }
+
+          const pctWidth = maxVal > 0 ? Math.min(100, Math.max(14, (Math.abs(numVal) / maxVal) * 100)) : 20;
+          const isPositive = numVal >= 0;
 
           return (
-            <div key={item.symbol || item.id || idx} className="space-y-1.5 text-xs">
+            <div key={item.key || item.symbol || item.id || idx} className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{item.symbol || item.name}</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[60%]">
+                  {item.displayName || item.name || item.symbol}
+                </span>
                 <span
-                  className={`font-mono font-bold ${
+                  className={`font-mono font-bold shrink-0 ml-2 ${
                     isReturn
                       ? isPositive
                         ? 'text-emerald-500 dark:text-emerald-400'
@@ -70,7 +105,7 @@ export default function ComparisonBarChart({
                 </span>
               </div>
 
-              {/* Bar Fill */}
+              {/* Proportional Bar Fill */}
               <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${getGradient(isPositive)}`}
