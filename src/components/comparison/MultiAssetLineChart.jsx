@@ -45,7 +45,18 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         return true;
       });
 
-      // Fallback if filtering yields fewer than 2 points
+      // If asset is unlisted or has no trading points
+      if (filtered.length < 2 && rawHistory.length < 2) {
+        return {
+          id: item.id || item.symbol,
+          symbol: item.symbol,
+          displayName: item.displayName || item.name || item.symbol,
+          color,
+          isUnlisted: true,
+          points: []
+        };
+      }
+
       if (filtered.length < 2) {
         const sliceCount = timeFilter === '1M' ? 22 : timeFilter === '6M' ? 120 : 250;
         filtered = rawHistory.slice(-sliceCount);
@@ -57,6 +68,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
           symbol: item.symbol,
           displayName: item.displayName || item.name || item.symbol,
           color,
+          isUnlisted: true,
           points: []
         };
       }
@@ -82,6 +94,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         displayName: item.displayName || item.name || item.symbol,
         name: item.displayName || item.name || item.symbol,
         color,
+        isUnlisted: false,
         points
       };
     });
@@ -118,7 +131,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container || normalizedSeries.length === 0 || dataLength === 0) return;
+    if (!canvas || !container || normalizedSeries.length === 0) return;
 
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
@@ -135,6 +148,22 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
     const gridColor = isDark ? 'rgba(51, 65, 85, 0.35)' : 'rgba(226, 232, 240, 0.8)';
     const textColor = isDark ? '#94a3b8' : '#64748b';
 
+    ctx.clearRect(0, 0, width, height);
+
+    if (dataLength === 0) {
+      // Clean fallback if all selected assets are unlisted IPOs
+      ctx.fillStyle = textColor;
+      ctx.font = '12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(
+        'Unlisted assets track primary market GMP. Secondary market historical price curves become active post-listing.',
+        width / 2,
+        height / 2
+      );
+      return;
+    }
+
     const paddingLeft = 45;
     const paddingRight = 20;
     const paddingTop = 20;
@@ -143,8 +172,6 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
     const plotWidth = width - paddingLeft - paddingRight;
     const plotHeight = height - paddingTop - paddingBottom;
     const yRange = maxVal - minVal || 1;
-
-    ctx.clearRect(0, 0, width, height);
 
     // 1. Draw horizontal grid lines and baseline (100)
     const gridLines = 5;
@@ -202,7 +229,8 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
     });
 
     // 3. Draw X-axis date labels
-    const refPoints = normalizedSeries[0]?.points || [];
+    const validSeries = normalizedSeries.find((s) => s.points.length > 1);
+    const refPoints = validSeries?.points || [];
     if (refPoints.length > 1) {
       ctx.fillStyle = textColor;
       ctx.textAlign = 'center';
@@ -284,7 +312,8 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
     setHoverIndex(null);
   };
 
-  const hoveredDate = normalizedSeries[0]?.points[hoverIndex]?.date || '';
+  const validSeries = normalizedSeries.find((s) => s.points.length > 0);
+  const hoveredDate = validSeries?.points[hoverIndex]?.date || '';
 
   return (
     <div className="space-y-3">
@@ -295,7 +324,9 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
             <div key={s.id || s.symbol} className="flex items-center gap-1.5 font-bold">
               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
               <span className="text-slate-800 dark:text-slate-200 truncate max-w-[180px]">{s.displayName}</span>
-              <span className="text-[10px] text-slate-400 font-mono">({s.symbol})</span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                ({s.symbol}){s.isUnlisted ? ' · Primary GMP' : ''}
+              </span>
             </div>
           ))}
         </div>
@@ -330,6 +361,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
               <span className="text-slate-200">{hoveredDate}</span>
             </div>
             {normalizedSeries.map((s) => {
+              if (s.points.length === 0) return null;
               const pt = s.points[hoverIndex];
               if (!pt) return null;
               const isPositive = pt.returnPct >= 0;

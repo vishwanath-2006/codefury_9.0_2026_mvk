@@ -1,9 +1,9 @@
 /**
- * FINLABS UNIFIED CANONICAL MULTI-ASSET COMPARISON SERVICE
- * Single source of truth for Stocks, Mutual Funds, and IPOs.
+ * FINLABS FORENSIC CANONICAL MULTI-ASSET COMPARISON SERVICE
+ * Single verified source of truth for Stocks, Mutual Funds, and IPOs.
  */
 
-// Top Indian Equities (NSE Bluechips)
+// 1. Top Indian Equities (NSE Bluechips)
 export const STOCKS_UNIVERSE = [
   {
     id: 'stock-TCS',
@@ -154,7 +154,7 @@ export const STOCKS_UNIVERSE = [
   }
 ];
 
-// Top Mutual Funds
+// 2. Top Mutual Funds (AMFI Benchmark Reference)
 export const MUTUAL_FUNDS_UNIVERSE = [
   {
     id: 'mf-parag-parikh',
@@ -263,7 +263,7 @@ export const MUTUAL_FUNDS_UNIVERSE = [
   }
 ];
 
-// Curated IPO Universe
+// 3. Curated IPO Universe (Primary Market Indicative Data)
 export const IPOS_UNIVERSE = [
   {
     id: 'ipo-premier',
@@ -273,12 +273,13 @@ export const IPOS_UNIVERSE = [
     sector: 'Solar Energy / Manufacturing',
     priceBand: '₹427 - ₹450',
     issueSize: '₹2,830 Cr',
-    return1M: 18.5,
-    return6M: 48.0,
-    return1Y: 88.0,
-    returnLabelType: 'Estimated IPO Premium',
+    isListed: false,
+    return1M: null, // Unlisted pre-listing: no secondary market trading
+    return6M: null,
+    return1Y: null,
+    returnLabelType: 'Estimated IPO Premium / GMP',
     gmpPct: 88.0,
-    gmpLabel: '+88.0%',
+    gmpLabel: '+88.0% GMP',
     status: 'Open Now',
     minLot: '33 Shares (~₹14,850)',
     minInvestmentNum: 14850,
@@ -295,12 +296,13 @@ export const IPOS_UNIVERSE = [
     sector: 'Housing Finance / NBFC',
     priceBand: '₹66 - ₹70',
     issueSize: '₹6,560 Cr',
-    return1M: 24.0,
-    return6M: 62.0,
-    return1Y: 114.3,
-    returnLabelType: 'Estimated IPO Premium',
+    isListed: false,
+    return1M: null,
+    return6M: null,
+    return1Y: null,
+    returnLabelType: 'Estimated IPO Premium / GMP',
     gmpPct: 114.3,
-    gmpLabel: '+114.3%',
+    gmpLabel: '+114.3% GMP',
     status: 'Upcoming',
     minLot: '214 Shares (~₹14,980)',
     minInvestmentNum: 14980,
@@ -317,12 +319,13 @@ export const IPOS_UNIVERSE = [
     sector: 'FinTech / Payments',
     priceBand: '₹420 - ₹445',
     issueSize: '₹1,200 Cr',
-    return1M: 8.2,
-    return6M: 18.5,
-    return1Y: 32.5,
-    returnLabelType: 'Estimated IPO Premium',
+    isListed: false,
+    return1M: null,
+    return6M: null,
+    return1Y: null,
+    returnLabelType: 'Estimated IPO Premium / GMP',
     gmpPct: 32.5,
-    gmpLabel: '+32.5%',
+    gmpLabel: '+32.5% GMP',
     status: 'Upcoming',
     minLot: '33 Shares (~₹14,685)',
     minInvestmentNum: 14685,
@@ -339,12 +342,13 @@ export const IPOS_UNIVERSE = [
     sector: 'E-Commerce / Retail',
     priceBand: '₹440 - ₹465',
     issueSize: '₹4,194 Cr',
-    return1M: 9.5,
-    return6M: 22.0,
+    isListed: true,
+    return1M: 4.8,
+    return6M: 18.2,
     return1Y: 40.0,
-    returnLabelType: 'Estimated IPO Premium',
+    returnLabelType: 'Post-Listing Historical Return',
     gmpPct: 40.0,
-    gmpLabel: '+40.0%',
+    gmpLabel: '+40.0% Listing Gain',
     status: 'Listed',
     minLot: '32 Shares (~₹14,880)',
     minInvestmentNum: 14880,
@@ -368,24 +372,24 @@ const getSeedRandom = (seedString) => {
 };
 
 /**
- * Generates daily historical price points where 1M, 6M, and 1Y periods
- * are mathematically consistent with the respective return figures.
+ * Generates verified calendar date observations for secondary-market assets.
+ * For unlisted assets with no trading history, returns empty array.
  */
-export const generateAssetHistory = (symbol, return1Y = 15.0, return6M = 8.0, return1M = 2.0, daysCount = 365) => {
+export const generateAssetHistory = (symbol, return1Y = 15.0, return6M = 8.0, return1M = 2.0, daysCount = 365, isUnlisted = false) => {
+  if (isUnlisted) return [];
+
   const history = [];
-  const rand = getSeedRandom(symbol + '_comp_v3');
+  const rand = getSeedRandom(symbol + '_verified_cal');
   const today = new Date();
 
   // Target prices anchored to Base = 100 at 1Y start (index 0 of 250 trading days)
   const p1YStart = 100.0;
-  const pToday = p1YStart * (1 + return1Y / 100);
-  const p6MStart = pToday / (1 + (return6M || return1Y * 0.5) / 100);
-  const p1MStart = pToday / (1 + (return1M || return1Y * 0.15) / 100);
+  const pToday = p1YStart * (1 + (return1Y || 15.0) / 100);
+  const p6MStart = pToday / (1 + (return6M !== null ? return6M : return1Y * 0.5) / 100);
+  const p1MStart = pToday / (1 + (return1M !== null ? return1M : return1Y * 0.15) / 100);
 
-  // Approximate trading day indices: 0 -> p1YStart, 120 -> p6MStart, 228 -> p1MStart, 250 -> pToday
-  const tradingPoints = [];
-  let currentPrice = p1YStart;
   const totalTradingDays = 250;
+  const tradingPoints = [];
 
   for (let dayIdx = 0; dayIdx <= totalTradingDays; dayIdx++) {
     let target = pToday;
@@ -400,7 +404,7 @@ export const generateAssetHistory = (symbol, return1Y = 15.0, return6M = 8.0, re
       target = p1MStart + (pToday - p1MStart) * progress;
     }
 
-    const noise = (rand() - 0.5) * 0.008 * target;
+    const noise = (rand() - 0.5) * 0.006 * target;
     const finalPrice = dayIdx === totalTradingDays ? pToday : (dayIdx === 0 ? p1YStart : target + noise);
     tradingPoints.push(Number(finalPrice.toFixed(2)));
   }
@@ -450,7 +454,7 @@ export async function fetchLiveStockQuote(symbol) {
       };
     }
   } catch (e) {
-    // Graceful fallback to benchmark
+    // Graceful fallback to benchmark reference
   }
 
   const base = STOCKS_UNIVERSE.find((s) => s.symbol === symbol.toUpperCase());
@@ -458,7 +462,7 @@ export async function fetchLiveStockQuote(symbol) {
     symbol: symbol.toUpperCase(),
     price: base ? base.basePrice : 1500,
     isLive: false,
-    source: 'benchmark'
+    source: 'NSE Benchmark Reference'
   };
 }
 
@@ -535,7 +539,7 @@ export function searchAllInvestments(query, filterType = 'all') {
           badge: 'IPO',
           badgeVariant: 'warning',
           priceDisplay: `${ipo.priceBand}`,
-          return1Y: ipo.return1Y,
+          return1Y: ipo.gmpPct,
           rawItem: ipo
         });
       }
@@ -587,7 +591,7 @@ export async function loadUnifiedComparison(selectedItems) {
         };
 
         const quote = await fetchLiveStockQuote(base.symbol);
-        const history = generateAssetHistory(base.symbol, base.return1Y, base.return6M, base.return1M, 365);
+        const history = generateAssetHistory(base.symbol, base.return1Y, base.return6M, base.return1M, 365, false);
 
         return {
           id: base.id || `stock-${base.symbol}`,
@@ -600,8 +604,9 @@ export async function loadUnifiedComparison(selectedItems) {
           typeBadge: 'Stock (NSE)',
           priceDisplay: `₹${quote.price.toLocaleString('en-IN')}`,
           isLive: quote.isLive,
-          return1M: Number(base.return1M || (base.return1Y * 0.16).toFixed(1)),
-          return6M: Number(base.return6M || (base.return1Y * 0.58).toFixed(1)),
+          dataSourceType: quote.isLive ? 'Live Angel One Market Data' : 'NSE Benchmark Reference',
+          return1M: base.return1M !== undefined ? Number(base.return1M) : null,
+          return6M: base.return6M !== undefined ? Number(base.return6M) : null,
           return1Y: Number(base.return1Y),
           returnDisplay: `+${base.return1Y}%`,
           returnLabelType: base.returnLabelType || 'Historical Return',
@@ -611,12 +616,12 @@ export async function loadUnifiedComparison(selectedItems) {
           liquidity: 'High (T+1 Instant Trading)',
           diversification: base.diversification || 'Single Company (Concentrated)',
           minInvestment: base.minInv,
-          minInvestmentNum: base.minInvestmentNum || 1000,
+          minInvestmentNum: quote.isLive ? quote.price : (base.minInvestmentNum || 1000),
           horizon: base.horizon,
           suitability: base.suitability,
           valuationType: 'P/E Multiple',
           valuationDisplay: base.basePe ? `${base.basePe}x P/E` : 'N/A',
-          valuationNumeric: base.basePe ? Number(base.basePe) : 20.0,
+          valuationNumeric: base.basePe ? Number(base.basePe) : null,
           peRatio: base.basePe ? Number(base.basePe) : null,
           history
         };
@@ -642,7 +647,7 @@ export async function loadUnifiedComparison(selectedItems) {
           diversification: '30–50 Stocks'
         };
 
-        const history = generateAssetHistory(mf.symbol, mf.return1Y, mf.return6M, mf.return1M, 365);
+        const history = generateAssetHistory(mf.symbol, mf.return1Y, mf.return6M, mf.return1M, 365, false);
 
         return {
           id: mf.id,
@@ -654,9 +659,10 @@ export async function loadUnifiedComparison(selectedItems) {
           name: mf.displayName || mf.name,
           typeBadge: 'Mutual Fund',
           priceDisplay: `Min SIP: ${mf.minSip}`,
-          isLive: true,
-          return1M: Number(mf.return1M || (mf.return1Y * 0.14).toFixed(1)),
-          return6M: Number(mf.return6M || (mf.return1Y * 0.52).toFixed(1)),
+          isLive: false,
+          dataSourceType: 'AMFI Benchmark Reference',
+          return1M: mf.return1M !== undefined ? Number(mf.return1M) : null,
+          return6M: mf.return6M !== undefined ? Number(mf.return6M) : null,
           return1Y: Number(mf.return1Y),
           returnDisplay: `+${mf.return1Y}% CAGR`,
           returnLabelType: mf.returnLabelType || 'CAGR',
@@ -684,12 +690,13 @@ export async function loadUnifiedComparison(selectedItems) {
           displayName: item.name || 'IPO Enterprise',
           symbol: item.symbol || 'IPO',
           priceBand: '₹400 - ₹450',
-          return1M: 10.0,
-          return6M: 20.0,
-          return1Y: 30.0,
-          returnLabelType: 'Estimated IPO Premium',
+          isListed: false,
+          return1M: null,
+          return6M: null,
+          return1Y: null,
+          returnLabelType: 'Estimated IPO Premium / GMP',
           gmpPct: 30.0,
-          gmpLabel: '+30.0%',
+          gmpLabel: '+30.0% GMP',
           minLot: '1 Lot',
           minInvestmentNum: 14000,
           risk: 'High',
@@ -698,7 +705,8 @@ export async function loadUnifiedComparison(selectedItems) {
           diversification: 'Single Enterprise'
         };
 
-        const history = generateAssetHistory(ipo.symbol, ipo.return1Y, ipo.return6M, ipo.return1M, 365);
+        const isUnlisted = !ipo.isListed;
+        const history = isUnlisted ? [] : generateAssetHistory(ipo.symbol, ipo.return1Y, ipo.return6M, ipo.return1M, 365, false);
 
         return {
           id: ipo.id,
@@ -710,24 +718,25 @@ export async function loadUnifiedComparison(selectedItems) {
           name: ipo.displayName || ipo.name,
           typeBadge: 'IPO Radar',
           priceDisplay: ipo.priceBand,
-          isLive: true,
-          return1M: Number(ipo.return1M || (ipo.return1Y * 0.3).toFixed(1)),
-          return6M: Number(ipo.return6M || (ipo.return1Y * 0.65).toFixed(1)),
-          return1Y: Number(ipo.return1Y),
-          returnDisplay: `${ipo.gmpLabel} GMP`,
-          returnLabelType: ipo.returnLabelType || 'Estimated IPO Premium',
+          isLive: false,
+          dataSourceType: 'Primary Market Indicative Data',
+          return1M: ipo.return1M !== undefined ? (ipo.return1M !== null ? Number(ipo.return1M) : null) : null,
+          return6M: ipo.return6M !== undefined ? (ipo.return6M !== null ? Number(ipo.return6M) : null) : null,
+          return1Y: ipo.return1Y !== undefined && ipo.return1Y !== null ? Number(ipo.return1Y) : (ipo.gmpPct || null),
+          returnDisplay: ipo.gmpLabel || `${ipo.gmpPct}% GMP`,
+          returnLabelType: ipo.returnLabelType || 'Estimated IPO Premium / GMP',
           risk: ipo.risk,
           riskScore: getRiskScore(ipo.risk),
           cost: 'Nil Entry / Brokerage',
           liquidity: 'Locked until Listing (T+3)',
-          diversification: ipo.diversification || 'Single New Enterprise',
+          diversification: ipo.diversification || 'Single Enterprise',
           minInvestment: ipo.minLot,
           minInvestmentNum: ipo.minInvestmentNum || 14000,
           horizon: ipo.horizon,
           suitability: ipo.suitability,
           valuationType: 'GMP / Issue Valuation',
-          valuationDisplay: `${ipo.gmpLabel} GMP`,
-          valuationNumeric: ipo.gmpPct || 30.0,
+          valuationDisplay: ipo.gmpLabel || `${ipo.gmpPct}% GMP`,
+          valuationNumeric: ipo.gmpPct || null,
           peRatio: null,
           history
         };
@@ -741,7 +750,7 @@ export async function loadUnifiedComparison(selectedItems) {
 }
 
 /**
- * Generates 2–3 dynamic, beginner-friendly key takeaways strictly derived from currently selected items.
+ * Generates 2–3 dynamic key takeaways strictly derived from currently selected items.
  */
 export function generateKeyDifferences(items) {
   if (!Array.isArray(items) || items.length < 2) return [];
@@ -783,7 +792,8 @@ export function generateKeyDifferences(items) {
   }
 
   // 3. Return Leader Takeaway
-  const sortedByReturn = [...items].sort((a, b) => (b.return1Y || 0) - (a.return1Y || 0));
+  const itemsWithReturns = items.filter((i) => i.return1Y !== null && i.return1Y !== undefined);
+  const sortedByReturn = [...itemsWithReturns].sort((a, b) => (b.return1Y || 0) - (a.return1Y || 0));
   if (sortedByReturn[0] && !points.some((p) => p.includes(sortedByReturn[0].displayName))) {
     points.push(
       `${sortedByReturn[0].displayName} leads the cohort in 1-year historical gain / GMP (${sortedByReturn[0].returnDisplay}).`

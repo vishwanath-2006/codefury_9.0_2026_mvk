@@ -109,14 +109,16 @@ export default function ComparisonBarChart({
           }
 
           // Compute normalized visual width (type-aware for valuation)
-          let pctWidth = 20;
-          if (isValuation && isMixedAssetTypes) {
-            // For mixed asset valuation (e.g. P/E vs TER), scale within its own asset class
-            const catMax = maxByCategory[cat] || 1;
-            pctWidth = Math.min(100, Math.max(25, (Math.abs(numVal) / catMax) * 100));
-          } else {
-            const denom = overallMax > 0 ? overallMax : 1;
-            pctWidth = Math.min(100, Math.max(14, (Math.abs(numVal) / denom) * 100));
+          let pctWidth = 0;
+          if (valDisplay !== 'N/A' && numVal !== null && numVal !== undefined) {
+            if (isValuation && isMixedAssetTypes) {
+              // For mixed asset valuation (e.g. P/E vs TER), scale within its own asset class
+              const catMax = maxByCategory[cat] || 1;
+              pctWidth = Math.min(100, Math.max(25, (Math.abs(numVal) / catMax) * 100));
+            } else {
+              const denom = overallMax > 0 ? overallMax : 1;
+              pctWidth = Math.min(100, Math.max(14, (Math.abs(numVal) / denom) * 100));
+            }
           }
 
           const isPositive = numVal >= 0;
