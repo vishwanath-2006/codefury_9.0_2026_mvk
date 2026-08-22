@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -13,10 +13,7 @@ import {
   Info,
   AlertCircle,
   TrendingUp,
-  LineChart,
-  SlidersHorizontal,
-  BarChart3,
-  ArrowRight
+  LineChart
 } from 'lucide-react';
 import {
   searchAllInvestments,
@@ -42,8 +39,6 @@ export default function InvestmentComparisonPage() {
   const [comparisonData, setComparisonData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [maxWarning, setMaxWarning] = useState(false);
-  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
-  const quickMenuRef = useRef(null);
 
   // Load comparison data whenever selectedItems change
   const loadData = async () => {
@@ -66,37 +61,6 @@ export default function InvestmentComparisonPage() {
   useEffect(() => {
     loadData();
   }, [selectedItems]);
-
-  // Click outside to close quick menu & Escape key listener
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (quickMenuRef.current && !quickMenuRef.current.contains(e.target)) {
-        setQuickMenuOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        setQuickMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []);
-
-  const scrollToSection = (id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    setQuickMenuOpen(false);
-  };
 
   // Autocomplete search
   const searchResults = useMemo(() => {
@@ -136,7 +100,7 @@ export default function InvestmentComparisonPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto pb-16 relative">
+    <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto pb-16">
       {/* 1. Header */}
       <PageHeader
         title="Investment Comparison"
@@ -462,28 +426,30 @@ export default function InvestmentComparisonPage() {
             <MultiAssetLineChart items={comparisonData} timeFilter={timeFilter} />
           </Card>
 
-          {/* 5. Visual Analytics Breakdown (with restored Returns / Valuation toggle) */}
-          <div id="visual-analytics" className="space-y-3 pt-1 scroll-mt-20">
+          {/* 5. Visual Analytics Breakdown (In-place Returns / Valuation toggle) */}
+          <div className="space-y-3 pt-1">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 Visual Analytics Breakdown
               </h3>
               <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs font-semibold">
                 <button
+                  type="button"
                   onClick={() => setAnalyticsCategory('returns')}
-                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg transition-all duration-150 cursor-pointer ${
                     analyticsCategory === 'returns'
-                      ? 'bg-emerald-500 text-white shadow-xs'
+                      ? 'bg-emerald-500 text-white shadow-xs font-bold'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   Returns
                 </button>
                 <button
+                  type="button"
                   onClick={() => setAnalyticsCategory('valuation')}
-                  className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg transition-all duration-150 cursor-pointer ${
                     analyticsCategory === 'valuation'
-                      ? 'bg-emerald-500 text-white shadow-xs'
+                      ? 'bg-emerald-500 text-white shadow-xs font-bold'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -492,9 +458,9 @@ export default function InvestmentComparisonPage() {
               </div>
             </div>
 
-            {/* Switchable Analytics View */}
-            {analyticsCategory === 'returns' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {/* In-place content switcher */}
+            {analyticsCategory === 'returns' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 animate-in fade-in duration-150">
                 <ComparisonBarChart
                   title="1-Month Return (%)"
                   subtitle="Short-term price momentum"
@@ -520,13 +486,11 @@ export default function InvestmentComparisonPage() {
                   isReturn={true}
                 />
               </div>
-            )}
-
-            {analyticsCategory === 'valuation' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 animate-in fade-in duration-150">
                 <ComparisonBarChart
                   title="Valuation Multiple / Cost"
-                  subtitle="P/E Multiple for Stocks, Expense Ratio for Funds, or GMP for IPOs"
+                  subtitle="P/E for Stocks, TER for Funds, GMP for IPOs"
                   data={comparisonData}
                   metricKey="valuationDisplay"
                   theme="indigo"
@@ -539,12 +503,19 @@ export default function InvestmentComparisonPage() {
                   unit="%"
                   isReturn={true}
                 />
+                <ComparisonBarChart
+                  title="Minimum Investment Entry"
+                  subtitle="Capital entry requirement"
+                  data={comparisonData}
+                  metricKey="minInvestment"
+                  theme="teal"
+                />
               </div>
             )}
           </div>
 
           {/* 6. Risk Spectrum & 1-Year Return / Yield (Side-by-side) */}
-          <div id="risk-return" className="grid grid-cols-1 md:grid-cols-2 gap-4 scroll-mt-20">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Risk Spectrum Visual */}
             <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between shadow-xs">
               <div>
@@ -648,87 +619,6 @@ export default function InvestmentComparisonPage() {
           </div>
         </div>
       )}
-
-      {/* 9. Floating Quick Navigation Menu (High Z-Index, Viewport Safe) */}
-      <div
-        ref={quickMenuRef}
-        className="fixed bottom-6 right-24 sm:right-28 md:right-32 z-50 pointer-events-auto"
-      >
-        {/* Floating Menu Popover */}
-        {quickMenuOpen && (
-          <div
-            role="menu"
-            aria-orientation="vertical"
-            onClick={(e) => e.stopPropagation()}
-            className="absolute bottom-full right-0 mb-3 w-64 sm:w-72 bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-700/80 shadow-2xl shadow-emerald-500/20 p-2.5 space-y-1.5 animate-in fade-in zoom-in-95 duration-150 text-slate-100"
-          >
-            {/* Header */}
-            <div className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-slate-400 flex items-center justify-between border-b border-slate-800">
-              <span>QUICK MENU</span>
-              <span className="text-emerald-400 text-[10px] font-sans font-semibold">FinLabs</span>
-            </div>
-
-            {/* Option 1: 📊 Visual Analytics */}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => scrollToSection('visual-analytics')}
-              className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800/90 text-left transition-all duration-150 group cursor-pointer border border-transparent hover:border-slate-700/60"
-            >
-              <div className="flex items-start gap-2.5 min-w-0">
-                <span className="text-base leading-none shrink-0 mt-0.5">📊</span>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                    Visual Analytics
-                  </div>
-                  <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                    Returns / Valuation
-                  </div>
-                </div>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
-            </button>
-
-            {/* Option 2: ⚖️ Risk & Return */}
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => scrollToSection('risk-return')}
-              className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-800/90 text-left transition-all duration-150 group cursor-pointer border border-transparent hover:border-slate-700/60"
-            >
-              <div className="flex items-start gap-2.5 min-w-0">
-                <span className="text-base leading-none shrink-0 mt-0.5">⚖️</span>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                    Risk & Return
-                  </div>
-                  <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                    Risk Spectrum & 1Y Return
-                  </div>
-                </div>
-              </div>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
-            </button>
-          </div>
-        )}
-
-        {/* Floating Trigger Button */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setQuickMenuOpen((prev) => !prev);
-          }}
-          aria-expanded={quickMenuOpen}
-          aria-haspopup="true"
-          title="Investment Comparison Quick Navigation"
-          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900 border border-slate-700/80 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/50 shadow-xl shadow-emerald-500/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
-            quickMenuOpen ? 'ring-2 ring-emerald-500 text-emerald-400 bg-slate-800 shadow-emerald-500/20' : ''
-          }`}
-        >
-          <SlidersHorizontal className="w-4 h-4 sm:w-5 sm:h-5" />
-        </button>
-      </div>
     </div>
   );
 }
