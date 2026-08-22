@@ -13,7 +13,6 @@ import {
   Calculator,
   GitCompare,
   Sparkles,
-  Bot,
   Settings,
   User,
   ShieldCheck,
@@ -59,10 +58,6 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'SIP Calculator', path: '/tools/sip-calculator', icon: Calculator },
     { name: 'Investment Comparison', path: '/tools/investment-comparison', icon: GitCompare },
     { name: 'Suitability', path: '/tools/suitability', icon: Sparkles },
-  ];
-
-  const aiNav = [
-    { name: 'FinLabs AI', path: '/ai', icon: Bot, badge: 'Copilot' },
   ];
 
   const bottomNav = [
@@ -162,14 +157,6 @@ export default function Sidebar({ isOpen, onClose }) {
               Tools & Calculators
             </p>
             {renderNavGroup(toolsNav)}
-          </div>
-
-          {/* 4. AI Copilot */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
-              AI Intelligence
-            </p>
-            {renderNavGroup(aiNav)}
           </div>
         </div>
 
