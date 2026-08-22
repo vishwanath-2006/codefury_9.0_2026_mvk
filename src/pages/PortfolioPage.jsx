@@ -60,7 +60,8 @@ export default function PortfolioPage() {
 
   const connectAngelOne = () => {
     const smartApiKey = 'OPvmoROA';
-    window.location.href = `https://smartapi.angelone.in/publisher-login?api_key=${smartApiKey}`;
+    const redirectUrl = encodeURIComponent(window.location.origin + '/portfolio');
+    window.location.href = `https://smartapi.angelone.in/publisher-login?api_key=${smartApiKey}&redirect_url=${redirectUrl}`;
   };
 
   const formatINR = (val) =>
