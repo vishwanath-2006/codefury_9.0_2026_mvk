@@ -41,7 +41,7 @@ export function computeEmergencyStatus(emergencyFund: number | null, totalExpens
 export function computeCashFlowMetrics(monthlyIncome: number | null, otherIncome = 0, totalExpenses: number | null, monthlyDebtPayments = 0) {
   const inc = Number(monthlyIncome);
   const oth = Number(otherIncome) || 0;
-  const exp = Number(totalExpenses);
+  const exp = Number(totalExpenses) || 0;
   const debt = Number(monthlyDebtPayments) || 0;
 
   if (isNaN(inc) || inc <= 0) {
@@ -54,14 +54,14 @@ export function computeCashFlowMetrics(monthlyIncome: number | null, otherIncome
   }
 
   const totalMonthlyIncome = inc + oth;
-  const monthlySurplus = !isNaN(exp) ? totalMonthlyIncome - exp : null;
+  const monthlySurplus = Math.max(0, totalMonthlyIncome - exp - debt);
 
   let savingsRatePct = null;
-  if (monthlySurplus != null) {
+  if (totalMonthlyIncome > 0) {
     savingsRatePct = Math.max(0, Math.round((monthlySurplus / totalMonthlyIncome) * 100));
   }
 
-  const dtiRatioPct = Math.round((debt / totalMonthlyIncome) * 100);
+  const dtiRatioPct = totalMonthlyIncome > 0 ? Math.round((debt / totalMonthlyIncome) * 100) : 0;
 
   return {
     totalMonthlyIncome,
