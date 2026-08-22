@@ -18,7 +18,9 @@ import {
   ArrowRight,
   Sliders,
   HelpCircle,
-  BarChart3
+  BarChart3,
+  Lightbulb,
+  HeartHandshake
 } from 'lucide-react';
 
 export default function RiskProfilerPage() {
@@ -60,58 +62,81 @@ export default function RiskProfilerPage() {
   // 4. Composite Risk Quotient (PRQ: 0-100)
   const prq = Math.round(0.30 * sGoal + 0.35 * sHorizon + 0.35 * sTolerance);
 
-  // 5. Risk Archetype Classification
+  // 5. Risk Archetype Classification & Human Translation
   const archetype =
     prq <= 35
-      ? { label: 'Conservative (Capital Shield)', color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/30' }
+      ? {
+          label: 'Conservative Investor (Capital Shield)',
+          shortLabel: 'Conservative',
+          color: 'text-amber-500',
+          bg: 'bg-amber-500/10 border-amber-500/30',
+          badgeVar: 'warning',
+          translation:
+            'Your priority is keeping your money 100% safe. You prefer steady, guaranteed returns over high-growth stock market swings.',
+        }
       : prq <= 70
-      ? { label: 'Moderate (Balanced Compounder)', color: 'text-indigo-500', bg: 'bg-indigo-500/10 border-indigo-500/30' }
-      : { label: 'Aggressive (Alpha Accelerator)', color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/30' };
+      ? {
+          label: 'Balanced Investor (Moderate Growth)',
+          shortLabel: 'Balanced Investor',
+          color: 'text-emerald-500',
+          bg: 'bg-emerald-500/10 border-emerald-500/30',
+          badgeVar: 'brand',
+          translation:
+            'You want your money to grow faster than a bank FD, but you don\'t want extreme rollercoaster risks. A balanced mix of stable funds and stocks is your sweet spot.',
+        }
+      : {
+          label: 'Aggressive Investor (Alpha Accelerator)',
+          shortLabel: 'Aggressive Growth',
+          color: 'text-indigo-400',
+          bg: 'bg-indigo-500/10 border-indigo-500/30',
+          badgeVar: 'purple',
+          translation:
+            'You are focused on maximum long-term wealth growth. You don\'t mind short-term market dips because you have time on your side.',
+        };
 
   // Recommended Benchmark Allocation based on Archetype
   const benchmarkAlloc =
     prq <= 35
       ? [
-          { name: 'Large Cap Equities', pct: 15, color: '#10b981' },
-          { name: 'Mid/Small Cap', pct: 0, color: '#6366f1' },
-          { name: 'Fixed Income / FDs', pct: 75, color: '#f59e0b' },
+          { name: 'Large Company Stocks & Index Funds', pct: 15, color: '#10b981' },
+          { name: 'Growing Mid/Small Company Funds', pct: 0, color: '#06b6d4' },
+          { name: 'Safe Fixed Deposits & Bonds', pct: 75, color: '#3b82f6' },
           { name: 'Gold Reserves', pct: 10, color: '#eab308' },
         ]
       : prq <= 70
       ? [
-          { name: 'Large Cap Equities', pct: 45, color: '#10b981' },
-          { name: 'Mid/Small Cap', pct: 15, color: '#6366f1' },
-          { name: 'Fixed Income / FDs', pct: 30, color: '#f59e0b' },
+          { name: 'Large Company Stocks & Index Funds', pct: 45, color: '#10b981' },
+          { name: 'Growing Mid/Small Company Funds', pct: 15, color: '#06b6d4' },
+          { name: 'Safe Fixed Deposits & Bonds', pct: 30, color: '#3b82f6' },
           { name: 'Gold Reserves', pct: 10, color: '#eab308' },
         ]
       : [
-          { name: 'Large Cap Equities', pct: 50, color: '#10b981' },
-          { name: 'Mid/Small Cap', pct: 35, color: '#6366f1' },
-          { name: 'Fixed Income / FDs', pct: 10, color: '#f59e0b' },
+          { name: 'Large Company Stocks & Index Funds', pct: 50, color: '#10b981' },
+          { name: 'Growing Mid/Small Company Funds', pct: 35, color: '#06b6d4' },
+          { name: 'Safe Fixed Deposits & Bonds', pct: 10, color: '#3b82f6' },
           { name: 'Gold Reserves', pct: 5, color: '#eab308' },
         ];
 
   // User Current Allocation
-  const portfolio = userProfile.portfolio || { mutualFunds: 175000, stocks: 105000, fixedDeposits: 35000, gold: 35000, cashBuffer: 150000 };
-  const totalNetWorth = userProfile.totalPortfolioNetWorth || 350000;
-  const currentEquityValue = portfolio.mutualFunds + portfolio.stocks;
+  const portfolio = userProfile.portfolio || { mutualFunds: 0, stocks: 0, fixedDeposits: 150000, gold: 0, cashBuffer: 150000 };
+  const totalNetWorth = userProfile.totalPortfolioNetWorth || 300000;
+  const currentEquityValue = (portfolio.mutualFunds || 0) + (portfolio.stocks || 0);
   const actualEquityPct = Math.round((currentEquityValue / (totalNetWorth || 1)) * 100);
 
   const targetEquityPct = benchmarkAlloc[0].pct + benchmarkAlloc[1].pct;
-  const equityDiff = actualEquityPct - targetEquityPct;
-  const isDeviated = Math.abs(equityDiff) > 20;
+  const isZeroEquity = actualEquityPct === 0;
 
   const profilerContent = (
     <div className="space-y-8">
-      {/* SECTION A: PROFILE SUMMARY & DYNAMIC GAUGE CARD */}
+      {/* SECTION A: SCORE CARD & SUB-SCORE BREAKDOWN */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* RADIAL SCORE GAUGE */}
+        {/* SCORE DISPLAY CARD WITH DONUT SCORE */}
         <Card className="p-6 flex flex-col items-center justify-center text-center bg-slate-900 text-white border-slate-800 shadow-xl">
           <CardHeader className="p-0 pb-2 mb-2 w-full text-center border-b border-slate-800">
-            <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider block mb-1">
-              Personalized Risk Quotient
+            <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider block mb-1">
+              Your Personal Risk Score
             </span>
-            <CardTitle className="text-base font-extrabold text-white">PRQ Score</CardTitle>
+            <CardTitle className="text-base font-extrabold text-white">Investor Profile Score</CardTitle>
           </CardHeader>
 
           {/* SVG Radial Arc Gauge */}
@@ -135,213 +160,286 @@ export default function RiskProfilerPage() {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-4xl font-extrabold font-mono text-white">{prq}</span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Out of 100</span>
+              <span className="text-4xl font-extrabold font-mono text-white">{prq} / 100</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Risk Score</span>
             </div>
           </div>
 
-          <div className={`px-3.5 py-1.5 rounded-full border text-xs font-extrabold ${archetype.bg} ${archetype.color}`}>
+          <div className={`px-4 py-1.5 rounded-full border text-xs font-extrabold mb-3 ${archetype.bg} ${archetype.color}`}>
             {archetype.label}
           </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed font-medium px-2 bg-slate-950/80 p-3 rounded-2xl border border-slate-800">
+            "{archetype.translation}"
+          </p>
         </Card>
 
-        {/* SUB-SCORE MATRIX (3 PROGRESS BARS) */}
+        {/* HUMAN-FRIENDLY SUB-SCORE MATRIX */}
         <Card className="lg:col-span-2 p-6 flex flex-col justify-between">
           <CardHeader className="p-0 pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="text-base font-extrabold flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-emerald-500" />
-              Risk Vector Sub-Score Breakdown
+              What Drives Your Risk Score?
             </CardTitle>
-            <CardDescription>Evaluates Goal Urgency, Investment Horizon Capacity, and Volatility Comfort</CardDescription>
+            <CardDescription>Understanding the 3 core factors that shape your ideal investment balance</CardDescription>
           </CardHeader>
 
-          <CardContent className="p-0 space-y-5">
-            {/* Vector 1: Goal Urgency */}
+          <CardContent className="p-0 space-y-6">
+            {/* Factor 1: Goal Urgency */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-700 dark:text-slate-300">1. Goal Urgency & Capital Priority ($S_{'{goal}'}$)</span>
-                <span className="font-mono font-extrabold text-emerald-500">{sGoal} / 100 pts</span>
+                <div>
+                  <span className="font-extrabold text-slate-900 dark:text-slate-100 block text-sm">1. Goal Urgency & Importance</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">How soon and how badly you need this money</span>
+                </div>
+                <span className="font-mono font-extrabold text-emerald-500 text-sm">{sGoal} / 100</span>
               </div>
               <ProgressIndicator value={sGoal} max={100} color="emerald" />
-              <p className="text-[10px] text-slate-400">
-                {goalUrgencyType === 'emergency' ? 'Emergency / Preservation (<2 Yrs)' : goalUrgencyType === 'milestone' ? 'Milestone Target (2-5 Yrs)' : 'Long-term Wealth (5+ Yrs)'}
-              </p>
             </div>
 
-            {/* Vector 2: Time Horizon */}
+            {/* Factor 2: Time Horizon */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-700 dark:text-slate-300">2. Time Horizon Capacity ($S_{'{horizon}'}$)</span>
-                <span className="font-mono font-extrabold text-indigo-500">{sHorizon} / 100 pts</span>
+                <div>
+                  <span className="font-extrabold text-slate-900 dark:text-slate-100 block text-sm">2. Investment Timeline</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">How many years you can let your money grow without touching it</span>
+                </div>
+                <span className="font-mono font-extrabold text-sky-500 text-sm">{sHorizon} / 100</span>
               </div>
               <ProgressIndicator value={sHorizon} max={100} color="sky" />
-              <p className="text-[10px] text-slate-400">
-                {horizonYears} Years Investment Horizon
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                ⏱️ Current Selection: <strong>{horizonYears} Years Growth Timeline</strong>
               </p>
             </div>
 
-            {/* Vector 3: Behavioral Volatility */}
+            {/* Factor 3: Market Comfort Level */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-700 dark:text-slate-300">3. Behavioral Volatility Comfort ($S_{'{tolerance}'}$)</span>
-                <span className="font-mono font-extrabold text-amber-500">{sTolerance} / 100 pts</span>
+                <div>
+                  <span className="font-extrabold text-slate-900 dark:text-slate-100 block text-sm">3. Market Comfort Level</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">How calm you stay when market prices go up and down</span>
+                </div>
+                <span className="font-mono font-extrabold text-amber-500 text-sm">{sTolerance} / 100</span>
               </div>
               <ProgressIndicator value={sTolerance} max={100} color="amber" />
-              <p className="text-[10px] text-slate-400">
-                {sTolerance <= 25 ? 'Panic/Liquidate in 20% Dip' : sTolerance <= 65 ? 'Hold & Wait out Volatility' : 'Aggressive Dip-Buyer'}
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                🎢 Reaction to 20% Dip: <strong>{sTolerance <= 25 ? 'Panic & Sell' : sTolerance <= 65 ? 'Stay Calm & Hold' : 'Buy the Discount'}</strong>
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* SECTION B: TARGET VS CURRENT ALLOCATION & REBALANCING ALERT */}
-      <div className="space-y-4">
-        <Card className="p-6">
-          <CardHeader className="p-0 pb-4 mb-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-            <div>
-              <CardTitle className="text-base font-extrabold flex items-center gap-2">
-                <PieChart className="w-5 h-5 text-indigo-500" />
-                Target vs. Current Holding Allocation
-              </CardTitle>
-              <CardDescription>Compares actual portfolio asset distribution against PRQ benchmark allocation</CardDescription>
-            </div>
-            <Badge variant="brand" className="font-mono text-xs">
-              {archetype.label.split(' ')[0]} Benchmark
-            </Badge>
-          </CardHeader>
+      {/* SECTION B: VISUAL ALLOCATION DONUT / BAR CHARTS */}
+      <Card className="p-6">
+        <CardHeader className="p-0 pb-4 mb-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <CardTitle className="text-base font-extrabold flex items-center gap-2">
+              <PieChart className="w-5 h-5 text-indigo-500" />
+              Where Your Money Is vs. Where It Should Be
+            </CardTitle>
+            <CardDescription>Visual comparison of your actual holdings against your recommended balance</CardDescription>
+          </div>
+          <Badge variant="brand" className="font-mono text-xs">
+            {archetype.shortLabel}
+          </Badge>
+        </CardHeader>
 
-          <CardContent className="p-0 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* CURRENT ALLOCATION */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-extrabold text-xs text-slate-700 dark:text-slate-300 uppercase tracking-wider">Current Portfolio Allocation</h4>
-                  <span className="font-mono text-xs font-bold text-emerald-500">{actualEquityPct}% Equity</span>
+        <CardContent className="p-0 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* LEFT CHART: WHERE YOUR MONEY IS RIGHT NOW */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800/60 flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">Where Your Money Is Right Now</h4>
+                  <Badge variant={isZeroEquity ? "neutral" : "success"} className="text-[10px]">
+                    {isZeroEquity ? 'Too Safe / Low Growth' : 'Active Growth'}
+                  </Badge>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-mono"><span>Mutual Funds & Stocks:</span> <strong className="text-emerald-500">{formatINR(currentEquityValue)} ({actualEquityPct}%)</strong></div>
-                  <div className="flex justify-between text-xs font-mono"><span>FDs & Liquid Cash:</span> <strong className="text-amber-500">{formatINR(portfolio.fixedDeposits + portfolio.cashBuffer)} ({100 - actualEquityPct}%)</strong></div>
+
+                {/* Allocation Stack Bar */}
+                <div className="w-full h-4 rounded-full overflow-hidden flex bg-slate-200 dark:bg-slate-700 mb-4">
+                  {actualEquityPct > 0 && (
+                    <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${actualEquityPct}%` }} />
+                  )}
+                  <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${100 - actualEquityPct}%` }} />
+                </div>
+
+                <div className="space-y-2.5 text-xs font-semibold">
+                  <div className="flex justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                    <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                      Fixed Deposits & Cash Buffer:
+                    </span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{100 - actualEquityPct}%</span>
+                  </div>
+
+                  <div className="flex justify-between p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                    <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      Stocks & Mutual Funds:
+                    </span>
+                    <span className="font-mono font-bold text-emerald-500">{actualEquityPct}%</span>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* RECOMMENDED BENCHMARK */}
-              <div className="p-4 rounded-2xl bg-slate-900 text-white border border-slate-800 space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-extrabold text-xs text-emerald-400 uppercase tracking-wider">Recommended PRQ Target</h4>
-                  <span className="font-mono text-xs font-bold text-emerald-400">{targetEquityPct}% Equity Ceiling</span>
+            {/* RIGHT CHART: RECOMMENDED BALANCE FOR YOU */}
+            <div className="p-5 rounded-2xl bg-slate-900 text-white border border-slate-800 flex flex-col justify-between space-y-4 shadow-xl">
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <h4 className="font-extrabold text-sm text-emerald-400">Recommended Balance For You</h4>
+                  <Badge variant="brand" className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px]">
+                    Optimal Growth & Safety Blend
+                  </Badge>
                 </div>
-                <div className="space-y-1.5 text-xs font-mono">
+
+                {/* Recommended Stack Bar */}
+                <div className="w-full h-4 rounded-full overflow-hidden flex bg-slate-800 mb-4">
                   {benchmarkAlloc.map((b, i) => (
-                    <div key={i} className="flex justify-between">
-                      <span className="text-slate-300">{b.name}:</span>
-                      <strong className="text-white">{b.pct}%</strong>
+                    <div
+                      key={i}
+                      className="h-full transition-all duration-500"
+                      style={{ width: `${b.pct}%`, backgroundColor: b.color }}
+                      title={`${b.name}: ${b.pct}%`}
+                    />
+                  ))}
+                </div>
+
+                <div className="space-y-2 text-xs font-semibold">
+                  {benchmarkAlloc.map((b, i) => (
+                    <div key={i} className="flex justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="flex items-center gap-2 text-slate-200">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: b.color }} />
+                        {b.name}:
+                      </span>
+                      <span className="font-mono font-bold text-white">{b.pct}%</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* REBALANCING DIAGNOSTIC ALERT */}
-            {isDeviated ? (
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider mb-0.5">Actionable Rebalancing Diagnostic Alert</h4>
-                  <p className="text-xs leading-relaxed font-medium">
-                    Your portfolio is currently <strong>{actualEquityPct}% equity</strong>, but your {horizonYears}-year timeline suggests a <strong>{targetEquityPct}% equity ceiling</strong> to protect capital. Consider rebalancing into fixed income.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-                <div>
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider mb-0.5">Optimal Asset Alignment</h4>
-                  <p className="text-xs leading-relaxed font-medium">
-                    Your equity allocation of {actualEquityPct}% matches your recommended PRQ target within safe variance limits!
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          {/* HUMAN-READABLE ALERT CARD */}
+          <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-slate-900 dark:text-slate-100 flex items-start gap-3.5 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-500 border border-amber-500/30 shrink-0 mt-0.5">
+              <Lightbulb className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-extrabold text-sm text-amber-600 dark:text-amber-400">
+                💡 Easy Fix for Faster Growth
+              </h4>
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                {isZeroEquity ? (
+                  <>
+                    Right now, <strong>100% of your money</strong> is sitting in low-interest cash and FDs. Since you have a <strong>{horizonYears}-year timeline</strong>, inflation will eat away your purchasing power. Shifting a small portion into index mutual funds will help you reach your goals much faster without taking crazy risks.
+                  </>
+                ) : (
+                  <>
+                    Your current mix has <strong>{actualEquityPct}% in growth assets</strong>. For a <strong>{horizonYears}-year horizon</strong>, keeping around <strong>{targetEquityPct}% in stocks & mutual funds</strong> provides the perfect balance between beating inflation and keeping your capital safe.
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* SECTION C: INTERACTIVE SCENARIO SIMULATOR */}
+      {/* SECTION C: INTERACTIVE SIMULATOR (ZERO JARGON) */}
       <Card className="p-6 bg-slate-900 text-white border-slate-800 shadow-xl space-y-6">
         <CardHeader className="p-0 pb-4 border-b border-slate-800 flex justify-between items-center">
           <div>
-            <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider block mb-1">
-              Live Interactive Simulator
+            <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider block mb-1">
+              Try It Out Live
             </span>
             <CardTitle className="text-lg font-extrabold text-white flex items-center gap-2">
               <Sliders className="w-5 h-5 text-emerald-400" />
-              Risk Scenario Profiling Simulator
+              Test How Your Risk Score Changes
             </CardTitle>
           </div>
           <Badge variant="brand" className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono">
-            Live PRQ Recalculation
+            Live Recalculation
           </Badge>
         </CardHeader>
 
         <CardContent className="p-0 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Slider 1: Horizon */}
-            <div className="space-y-2.5 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <div className="flex justify-between items-center text-xs">
-                <label className="font-bold text-slate-300">Investment Horizon</label>
-                <span className="font-mono font-extrabold text-emerald-400">{horizonYears} Years</span>
+            {/* Control 1: How long will you invest? */}
+            <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="font-extrabold text-xs text-slate-200">How long will you invest?</label>
+                  <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono font-bold text-xs">
+                    {horizonYears} Years
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="20"
+                  value={horizonYears}
+                  onChange={(e) => setHorizonYears(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500 mt-2"
+                />
               </div>
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={horizonYears}
-                onChange={(e) => setHorizonYears(Number(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                <span>1 Yr</span>
-                <span>20 Yrs</span>
-              </div>
-            </div>
-
-            {/* Slider 2: Dip Reaction */}
-            <div className="space-y-2.5 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <div className="flex justify-between items-center text-xs">
-                <label className="font-bold text-slate-300">Market Dip Reaction</label>
-                <span className="font-mono font-extrabold text-indigo-400">
-                  {dipReaction <= 25 ? 'Panic' : dipReaction <= 65 ? 'Hold' : 'Buy Dip'}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="15"
-                max="90"
-                step="25"
-                value={dipReaction}
-                onChange={(e) => setDipReaction(Number(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-              />
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                <span>Panic</span>
-                <span>Opportunistic</span>
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono pt-2">
+                <span>1 Year (Short)</span>
+                <span>20 Years (Long)</span>
               </div>
             </div>
 
-            {/* Selector 3: Goal Urgency */}
-            <div className="space-y-2.5 bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <label className="block text-xs font-bold text-slate-300">Primary Goal Urgency</label>
-              <select
-                value={goalUrgencyType}
-                onChange={(e) => setGoalUrgencyType(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-extrabold text-white focus:border-emerald-500 focus:outline-none"
-              >
-                <option value="emergency">Emergency / Capital Preservation</option>
-                <option value="milestone">Milestone Target (Home / Education)</option>
-                <option value="wealth">Long-term Wealth & Retirement</option>
-              </select>
+            {/* Control 2: If market drops 20% */}
+            <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
+              <label className="font-extrabold text-xs text-slate-200 block">If the market drops 20%, you will:</label>
+              <div className="flex flex-col gap-1.5">
+                {[
+                  { label: 'Panic & Sell', val: 15 },
+                  { label: 'Stay Calm & Hold', val: 55 },
+                  { label: 'Buy the Discount', val: 90 },
+                ].map((opt) => (
+                  <button
+                    key={opt.val}
+                    type="button"
+                    onClick={() => setDipReaction(opt.val)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition text-left flex items-center justify-between ${
+                      dipReaction === opt.val
+                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                        : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800'
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    {dipReaction === opt.val && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Control 3: Target goal is for */}
+            <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
+              <label className="font-extrabold text-xs text-slate-200 block">Your target goal is for:</label>
+              <div className="flex flex-col gap-1.5">
+                {[
+                  { label: 'Emergency Safety', val: 'emergency' },
+                  { label: 'House / Education', val: 'milestone' },
+                  { label: 'Long-Term Wealth', val: 'wealth' },
+                ].map((opt) => (
+                  <button
+                    key={opt.val}
+                    type="button"
+                    onClick={() => setGoalUrgencyType(opt.val)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition text-left flex items-center justify-between ${
+                      goalUrgencyType === opt.val
+                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                        : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800'
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    {goalUrgencyType === opt.val && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -355,21 +453,21 @@ export default function RiskProfilerPage() {
       <div className="space-y-8 animate-in fade-in duration-150">
         <PageHeader
           title="Risk Profiler & Asset Allocation Engine"
-          subtitle="Evaluates goal urgency, horizon capacity, and volatility tolerance to generate your Composite Risk Quotient (PRQ)."
+          subtitle="Evaluates your goal urgency, timeline, and market comfort to find your ideal investment sweet spot."
           tag="Risk Intelligence"
         />
 
         <FeatureOverviewCard
           moduleName="Risk Profiler Engine"
-          subtitle="Computes your Composite Risk Quotient (PRQ: 0-100) and matches your portfolio against recommended asset allocation benchmarks."
+          subtitle="Computes your Investor Risk Score (0-100) and matches your portfolio against recommended asset allocation benchmarks."
           capabilities={[
-            "Composite Risk Quotient (PRQ): Combines Goal Urgency (30%), Time Horizon (35%), and Volatility Tolerance (35%).",
-            "Target vs Current Allocation: Side-by-side benchmark comparison with rebalancing diagnostic alerts.",
-            "Interactive Scenario Simulator: Test how changing your investment timeframe alters your risk archetype live."
+            "Personalized Investor Risk Score (0-100): Evaluates your goal timeline, urgency, and market comfort.",
+            "Side-by-Side Visual Asset Allocation: Shows where your money is right now vs. where it should be.",
+            "Interactive Live Simulator: Test how changing your timeline or dip reaction updates your score in real time."
           ]}
           whyItMatters={[
-            "Investing without assessing your true risk capacity leads to impulse selling during market corrections.",
-            "Rebalancing your equity vs fixed-income ratio protects capital as your milestone target date approaches."
+            "Investing without assessing your true risk comfort leads to panic selling during market corrections.",
+            "Rebalancing your equity vs fixed-income ratio protects your capital as your target date approaches."
           ]}
         >
           {profilerContent}
@@ -383,7 +481,7 @@ export default function RiskProfilerPage() {
     <div className="space-y-8 animate-in fade-in duration-150">
       <PageHeader
         title="Risk Profiler & Asset Allocation Engine"
-        subtitle="Evaluates goal urgency, horizon capacity, and volatility tolerance to generate your Composite Risk Quotient (PRQ)."
+        subtitle="Evaluates your goal urgency, timeline, and market comfort to find your ideal investment sweet spot."
         tag="Risk Intelligence"
       />
 
