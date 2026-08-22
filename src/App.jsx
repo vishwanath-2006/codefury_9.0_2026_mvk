@@ -24,6 +24,7 @@ import IposPage from './pages/IposPage';
 import SipCalculatorPage from './pages/SipCalculatorPage';
 import InvestmentComparisonPage from './pages/InvestmentComparisonPage';
 import SuitabilityPage from './pages/SuitabilityPage';
+import RiskProfilerPage from './pages/RiskProfilerPage';
 import AiPage from './pages/AiPage';
 import SettingsPage from './pages/SettingsPage';
 import ProfilePage from './pages/ProfilePage';
@@ -70,6 +71,7 @@ export default function App() {
                 <Route path="/tools/sip-calculator" element={<SipCalculatorPage />} />
                 <Route path="/tools/investment-comparison" element={<InvestmentComparisonPage />} />
                 <Route path="/tools/suitability" element={<SuitabilityPage />} />
+                <Route path="/tools/risk-profiler" element={<RiskProfilerPage />} />
 
                 {/* AI Assistant Sub-route */}
                 <Route path="/ai" element={<AiPage />} />

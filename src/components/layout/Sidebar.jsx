@@ -55,6 +55,7 @@ export default function Sidebar({ isOpen, onClose }) {
   ];
 
   const toolsNav = [
+    { name: 'Risk Profiler', path: '/tools/risk-profiler', icon: ShieldCheck },
     { name: 'SIP Calculator', path: '/tools/sip-calculator', icon: Calculator },
     { name: 'Investment Comparison', path: '/tools/investment-comparison', icon: GitCompare },
     { name: 'Suitability', path: '/tools/suitability', icon: Sparkles },
