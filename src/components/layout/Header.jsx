@@ -248,25 +248,18 @@ export default function Header({ onOpenSidebar }) {
           </button>
         )}
 
-        {/* Onboarding Status Action */}
-        {!isOnboarded ? (
-          <button
-            onClick={() => navigate('/onboarding')}
-            className="relative group p-[2px] rounded-xl overflow-hidden shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-transform active:scale-95 shrink-0"
-            title="Complete your 2-minute FinLabs financial onboarding"
-          >
-            <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#10b981_0%,#06b6d4_25%,#6366f1_50%,#ec4899_75%,#10b981_100%)] opacity-90 group-hover:opacity-100 transition-opacity" />
-            <span className="relative z-10 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-slate-950 dark:bg-slate-900 text-white font-extrabold text-xs tracking-wider uppercase group-hover:bg-slate-900/90 transition-colors">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span>COMPLETE ONBOARDING</span>
-            </span>
-          </button>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-bold font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Profile Active</span>
+        {/* Prominent Glowing Animated Onboarding Setup Button (Always Prominent & Clickable) */}
+        <button
+          onClick={() => navigate('/onboarding')}
+          className="relative group p-[2px] rounded-xl overflow-hidden shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-transform active:scale-95 shrink-0"
+          title="Open FinLabs 5-step financial onboarding questionnaire"
+        >
+          <span className="absolute inset-[-1000%] animate-[spin_3s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#10b981_0%,#06b6d4_25%,#6366f1_50%,#ec4899_75%,#10b981_100%)] opacity-90 group-hover:opacity-100 transition-opacity" />
+          <span className="relative z-10 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] bg-slate-950 dark:bg-slate-900 text-white font-extrabold text-xs tracking-wider uppercase group-hover:bg-slate-900/90 transition-colors">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span>{isOnboarded ? 'ONBOARDING SETUP' : 'COMPLETE ONBOARDING'}</span>
           </span>
-        )}
+        </button>
 
         <Badge variant="brand" className="hidden sm:inline-flex gap-1 text-[10px]">
           <Sparkles className="w-3 h-3 text-emerald-500" />
