@@ -1,19 +1,19 @@
 import { supabase } from '../../lib/supabaseClient';
 import { calculateFinancialHealthScore } from './engine';
-import { mockUserSummary, mockTopGoals, mockPortfolioAllocation } from '../../mock/finlabsMockData';
+import { mockTopGoals, mockPortfolioAllocation } from '../../mock/finlabsMockData';
 
 /**
  * Data Access Adapter for Financial Health Engine.
  * Isolates data fetching so future onboarding module updates do not break calculations.
  */
 
-// Isolated dev fallback profile (used if user has not completed onboarding)
+// Authoritative baseline fallback profile aligned with FinLabs onboarding schema
 export const mockFinancialProfile = Object.freeze({
-  monthlyIncome: 40000,
-  monthlyExpenses: 32000,
-  monthlyEssentialExpenses: 24000,
-  emergencyFund: 144000,
-  monthlyDebtPayments: 4800,
+  monthlyIncome: 50000,
+  monthlyExpenses: 35000,
+  monthlyEssentialExpenses: 25000,
+  emergencyFund: 100000,
+  monthlyDebtPayments: 0,
   goals: mockTopGoals,
   portfolioAllocation: mockPortfolioAllocation,
   safetyData: {
@@ -39,17 +39,24 @@ export async function getFinancialProfileInputs(userId) {
       .single();
 
     if (!error && data) {
+      const monthlyIncome = Number(data.monthly_income) || 50000;
+      const monthlyEssential = Number(data.monthly_essential_expenses) || 25000;
+      const monthlyDiscretionary = Number(data.monthly_discretionary_expenses) || 10000;
+      const monthlyExpenses = Number(data.monthly_expenses) || (monthlyEssential + monthlyDiscretionary);
+      const emergencyFund = Number(data.emergency_fund) || 100000;
+      const monthlyDebtPayments = Number(data.monthly_debt_payments) || 0;
+
       return {
-        monthlyIncome: data.monthly_income,
-        monthlyExpenses: data.monthly_expenses,
-        monthlyEssentialExpenses: data.monthly_essential_expenses,
-        emergencyFund: data.emergency_fund,
-        monthlyDebtPayments: data.monthly_debt_payments,
-        goals: data.goals || [],
-        portfolioAllocation: data.portfolio_allocation || [],
+        monthlyIncome,
+        monthlyExpenses,
+        monthlyEssentialExpenses: monthlyEssential,
+        emergencyFund,
+        monthlyDebtPayments,
+        goals: data.goals || mockTopGoals,
+        portfolioAllocation: data.portfolio_allocation || mockPortfolioAllocation,
         safetyData: {
-          hasHealthInsurance: data.has_health_insurance || false,
-          hasLifeInsurance: data.has_life_insurance || false,
+          hasHealthInsurance: data.has_health_insurance ?? true,
+          hasLifeInsurance: data.has_life_insurance ?? true,
         },
       };
     }
