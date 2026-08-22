@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -13,7 +13,9 @@ import {
   Info,
   AlertCircle,
   TrendingUp,
-  LineChart
+  LineChart,
+  SlidersHorizontal,
+  ChevronDown
 } from 'lucide-react';
 import {
   searchAllInvestments,
@@ -39,6 +41,8 @@ export default function InvestmentComparisonPage() {
   const [comparisonData, setComparisonData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [maxWarning, setMaxWarning] = useState(false);
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const quickMenuRef = useRef(null);
 
   // Load comparison data whenever selectedItems change
   const loadData = async () => {
@@ -61,6 +65,39 @@ export default function InvestmentComparisonPage() {
   useEffect(() => {
     loadData();
   }, [selectedItems]);
+
+  // Click outside to close quick menu & Escape key listener
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (quickMenuRef.current && !quickMenuRef.current.contains(e.target)) {
+        setQuickMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setQuickMenuOpen(false);
+      }
+    };
+
+    if (quickMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [quickMenuOpen]);
+
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    setQuickMenuOpen(false);
+  };
 
   // Autocomplete search
   const searchResults = useMemo(() => {
@@ -100,7 +137,7 @@ export default function InvestmentComparisonPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto pb-16">
+    <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto pb-16 relative">
       {/* 1. Header */}
       <PageHeader
         title="Investment Comparison"
@@ -427,7 +464,7 @@ export default function InvestmentComparisonPage() {
           </Card>
 
           {/* 5. Visual Analytics Breakdown (with restored Returns / Valuation toggle) */}
-          <div className="space-y-3 pt-1">
+          <div id="visual-analytics" className="space-y-3 pt-1 scroll-mt-20">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 Visual Analytics Breakdown
@@ -508,7 +545,7 @@ export default function InvestmentComparisonPage() {
           </div>
 
           {/* 6. Risk Spectrum & 1-Year Return / Yield (Side-by-side) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div id="risk-return" className="grid grid-cols-1 md:grid-cols-2 gap-4 scroll-mt-20">
             {/* Risk Spectrum Visual */}
             <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between shadow-xs">
               <div>
@@ -612,6 +649,49 @@ export default function InvestmentComparisonPage() {
           </div>
         </div>
       )}
+
+      {/* 9. Floating Quick Menu in the bottom-right area */}
+      <div ref={quickMenuRef} className="fixed bottom-6 right-24 sm:right-28 md:right-32 z-40">
+        {/* Floating Menu Popover */}
+        {quickMenuOpen && (
+          <div
+            role="menu"
+            aria-orientation="vertical"
+            className="absolute bottom-full right-0 mb-3 w-52 p-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-2xl shadow-emerald-500/10 space-y-1 animate-in fade-in zoom-in-95 duration-150"
+          >
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+              Comparison Navigation
+            </div>
+            <button
+              role="menuitem"
+              onClick={() => scrollToSection('visual-analytics')}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
+            >
+              <span>Returns / Valuation</span>
+              <span className="text-[10px] text-slate-400 font-mono">↓</span>
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => scrollToSection('risk-return')}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
+            >
+              <span>Risk & Return</span>
+              <span className="text-[10px] text-slate-400 font-mono">↓</span>
+            </button>
+          </div>
+        )}
+
+        {/* Floating Quick Menu Trigger Button */}
+        <button
+          onClick={() => setQuickMenuOpen((prev) => !prev)}
+          aria-expanded={quickMenuOpen}
+          aria-haspopup="true"
+          title="Comparison Quick Navigation Menu"
+          className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-emerald-500 dark:hover:text-emerald-400 hover:border-emerald-500/50 shadow-lg shadow-emerald-500/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+        >
+          <SlidersHorizontal className="w-4 h-4 sm:w-5 sm:h-5" />
+        </button>
+      </div>
     </div>
   );
 }
