@@ -15,13 +15,13 @@ export default function AppLayout() {
   const [showEntryModal, setShowEntryModal] = useState(false);
 
   useEffect(() => {
-    // Automatically trigger pop-up notification modal on landing when user is not onboarded
-    if (!isOnboarded) {
+    // Automatically trigger pop-up notification modal every time an un-onboarded user lands or navigates
+    if (!isOnboarded && location.pathname !== '/onboarding') {
       setShowEntryModal(true);
     } else {
       setShowEntryModal(false);
     }
-  }, [isOnboarded]);
+  }, [isOnboarded, location.pathname]);
 
   const handleCloseModal = () => {
     setShowEntryModal(false);
