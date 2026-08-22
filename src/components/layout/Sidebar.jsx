@@ -38,19 +38,17 @@ export default function Sidebar({ isOpen, onClose }) {
   const displayName = profile?.full_name || user?.user_metadata?.full_name || 'FinLabs User';
   const displayEmail = user?.email || 'user@finlabs.io';
 
-  const overviewNav = [
-    { name: 'Overview', path: '/dashboard', icon: LayoutDashboard },
-  ];
-
-  // Investments & Market Trends placed FIRST as requested
-  const investmentNav = [
+  // Market & Investments placed FIRST at the very top as requested
+  const marketAndInvestmentNav = [
+    { name: 'Market Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Mutual Funds', path: '/investments/mutual-funds', icon: TrendingUp },
     { name: 'Stocks', path: '/investments/stocks', icon: LineChart },
     { name: 'IPOs', path: '/investments/ipos', icon: Rocket },
   ];
 
-  // Personal Finance placed SECOND below Investments
+  // Personal Finance placed SECOND (Personal Overview, Financial Health, Expenses, Goals, Portfolio)
   const personalFinanceNav = [
+    { name: 'Personal Overview', path: '/overview', icon: LayoutDashboard },
     { name: 'Financial Health', path: '/financial-health', icon: Activity },
     { name: 'Expenses', path: '/expenses', icon: Wallet },
     { name: 'Goals', path: '/goals', icon: Target },
@@ -141,24 +139,16 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {/* Scrollable Navigation Groups */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-          {/* 1. Main Overview */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
-              Main Dashboard
-            </p>
-            {renderNavGroup(overviewNav)}
-          </div>
-
-          {/* 2. Investments & Market Trends (FIRST) */}
+          {/* 1. Market & Investments (FIRST) */}
           <div>
             <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 px-3 flex items-center justify-between">
               <span>Investments & Markets</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Public</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Landing</span>
             </p>
-            {renderNavGroup(investmentNav)}
+            {renderNavGroup(marketAndInvestmentNav)}
           </div>
 
-          {/* 3. Personal Finance & Blueprint (SECOND) */}
+          {/* 2. Personal Finance (SECOND - Personal Overview, Health, Expenses, Goals, Portfolio) */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
               Personal Finance
@@ -166,7 +156,7 @@ export default function Sidebar({ isOpen, onClose }) {
             {renderNavGroup(personalFinanceNav)}
           </div>
 
-          {/* 4. Tools & Calculators */}
+          {/* 3. Tools & Calculators */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
               Tools & Calculators
@@ -174,7 +164,7 @@ export default function Sidebar({ isOpen, onClose }) {
             {renderNavGroup(toolsNav)}
           </div>
 
-          {/* 5. AI Copilot */}
+          {/* 4. AI Copilot */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
               AI Intelligence

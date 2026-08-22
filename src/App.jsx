@@ -10,6 +10,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import MarketDashboardPage from './pages/MarketDashboardPage';
 import DashboardPage from './pages/DashboardPage';
 import FinancialHealthPage from './pages/FinancialHealthPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -49,7 +50,11 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route path="/dashboard" element={<DashboardPage />} />
+                {/* Main Dashboard (Market Analysis Landing View) */}
+                <Route path="/dashboard" element={<MarketDashboardPage />} />
+
+                {/* Personal Finance Sub-routes */}
+                <Route path="/overview" element={<DashboardPage />} />
                 <Route path="/financial-health" element={<FinancialHealthPage />} />
                 <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route path="/expenses" element={<ExpensesPage />} />
