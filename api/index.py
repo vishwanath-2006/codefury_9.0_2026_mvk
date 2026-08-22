@@ -272,15 +272,37 @@ async def get_historical_candles(payload: HistoricalCandleRequest):
         if not session_data.get('status'):
             raise HTTPException(status_code=401, detail=f"Login failed: {session_data.get('message', 'Unknown Error')}")
 
-        search_res = smart_api.searchScrip("NSE", symbol)
-        if not search_res or not isinstance(search_res, list) or len(search_res) == 0:
-            search_res = smart_api.searchScrip("NSE", symbol[:4])
+        symbol_token = None
+        trading_symbol = f"{symbol}-EQ"
 
-        if not search_res or not isinstance(search_res, list) or len(search_res) == 0:
-            raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found on NSE")
+        # 1. Exact token lookup for top NSE bluechips
+        NSE_TOKENS = {
+            "TCS": "11536",
+            "INFY": "1594",
+            "RELIANCE": "2885",
+            "HDFCBANK": "1333",
+            "TATAMOTORS": "3456",
+            "ITC": "1660",
+            "SBIN": "3045",
+            "ICICIBANK": "4963",
+            "BHARTIARTL": "10604",
+            "KOTAKBANK": "1922",
+            "LT": "11483"
+        }
 
-        scrip = search_res[0]
-        symbol_token = scrip.get('symboltoken')
+        if symbol in NSE_TOKENS:
+            symbol_token = NSE_TOKENS[symbol]
+        else:
+            search_res = smart_api.searchScrip("NSE", symbol)
+            if not search_res or not isinstance(search_res, list) or len(search_res) == 0:
+                search_res = smart_api.searchScrip("NSE", symbol[:4])
+
+            if not search_res or not isinstance(search_res, list) or len(search_res) == 0:
+                raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found on NSE")
+
+            scrip = search_res[0]
+            symbol_token = scrip.get('symboltoken')
+            trading_symbol = scrip.get('tradingsymbol', trading_symbol)
 
         from datetime import datetime, timedelta
         now = datetime.now()
