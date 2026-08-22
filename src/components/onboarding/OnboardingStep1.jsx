@@ -157,105 +157,14 @@ export default function OnboardingStep1({ data, onChange }) {
           />
         </div>
 
-        {/* EMAIL ADDRESS WITH SUPABASE REAL EMAIL OTP VERIFICATION */}
-        <div className="p-4 bg-slate-50 dark:bg-slate-900/80 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="font-bold text-slate-900 dark:text-slate-100 text-xs flex items-center gap-2">
-              <Mail className="w-4 h-4 text-emerald-500" />
-              Email Address (Supabase Real Email Verification) <span className="text-rose-500">*</span>
-            </label>
-
-            {data.emailVerified && (
-              <Badge variant="success" className="font-mono text-xs flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Email Verified
-              </Badge>
-            )}
-          </div>
-
-          {data.emailVerified ? (
-            <div className="flex items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 font-bold text-xs">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
-                <span>Email Address Verified: <strong>{data.email}</strong></span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onChange('emailVerified', false)}
-                className="text-[11px] text-slate-500 hover:text-rose-500 underline font-semibold"
-              >
-                Change Email
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="email"
-                    placeholder="e.g. user@gmail.com"
-                    value={data.email || ''}
-                    onChange={(e) => onChange('email', e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-mono text-xs font-bold focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  disabled={otpLoading}
-                  icon={otpLoading ? Loader2 : Mail}
-                  onClick={handleSendEmailOtp}
-                  className="bg-emerald-500 hover:bg-emerald-600 font-bold text-xs shrink-0 disabled:opacity-50"
-                >
-                  {otpLoading ? 'Sending Email...' : otpSent ? 'Resend Email OTP' : 'Send Email OTP'}
-                </Button>
-              </div>
-
-              {/* REAL SUPABASE EMAIL OTP INPUT CONTAINER */}
-              {otpSent && (
-                <div className="space-y-3 pt-1 animate-in fade-in">
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                    <Mail className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>A 6-digit Email OTP was sent to <strong>{data.email}</strong>. Check your inbox & spam folder.</span>
-                  </p>
-
-                  <div className="flex gap-2 items-center flex-wrap">
-                    <input
-                      type="text"
-                      maxLength={6}
-                      placeholder="Enter 6-digit OTP"
-                      value={userOtpInput}
-                      onChange={(e) => setUserOtpInput(e.target.value)}
-                      className="w-44 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center font-mono text-sm tracking-widest font-bold focus:border-emerald-500 focus:outline-none"
-                    />
-                    <Button
-                      type="button"
-                      variant="primary"
-                      size="sm"
-                      disabled={otpLoading || !userOtpInput.trim()}
-                      icon={otpLoading ? Loader2 : ShieldCheck}
-                      onClick={handleVerifyEmailOtp}
-                      className="bg-emerald-600 hover:bg-emerald-700 font-bold text-xs disabled:opacity-50"
-                    >
-                      {otpLoading ? 'Verifying...' : 'Verify OTP'}
-                    </Button>
-
-                    {resendTimer > 0 && (
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        Resend in {resendTimer}s
-                      </span>
-                    )}
-                  </div>
-
-                  {otpError && (
-                    <p className="text-xs text-rose-500 font-semibold">{otpError}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <Input
+          label="Email Address (For Reports)"
+          type="email"
+          placeholder="e.g. user@gmail.com"
+          icon={Mail}
+          value={data.email || ''}
+          onChange={(e) => onChange('email', e.target.value)}
+        />
 
         <Select
           label="Current Employment / Occupation"
