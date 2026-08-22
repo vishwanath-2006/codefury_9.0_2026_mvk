@@ -2,6 +2,8 @@ import os
 import pyotp
 import httpx
 import json
+import asyncio
+import time
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,13 +31,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Server-side Session Cache with Concurrency Lock
+AUTH_LOCK = asyncio.Lock()
+SESSION_CACHE = {
+    "jwt_token": None,
+    "expires_at": 0
+}
+
 @app.get("/api/health")
 async def health_check():
     return {
         "status": "ok",
         "service": "FinLabs Angel One Gateway",
         "has_smartapi_sdk": SmartConnect is not None,
-        "has_env_creds": bool(os.getenv('ANGELONE_API_KEY') and os.getenv('ANGELONE_CLIENT_ID'))
+        "has_env_creds": bool(os.getenv('ANGELONE_API_KEY') and os.getenv('ANGELONE_CLIENT_ID')),
+        "has_cached_session": bool(SESSION_CACHE["jwt_token"] and time.time() < SESSION_CACHE["expires_at"])
     }
 
 class SyncCredentials(BaseModel):
@@ -149,7 +159,6 @@ def get_credentials(creds: Any = None):
 async def authenticate_smartapi_rest(api_key: str, client_id: str, pin: str, totp_secret: str):
     """
     Direct REST API authentication for Angel One SmartAPI over HTTP.
-    Pure python, robust on serverless environments without C-extension dependencies.
     """
     totp_token = pyotp.TOTP(totp_secret).now()
     url = "https://apiconnect.angelbroking.com/rest/auth/angelbroking/user/v1/loginByPassword"
@@ -169,7 +178,7 @@ async def authenticate_smartapi_rest(api_key: str, client_id: str, pin: str, tot
         "totp": totp_token
     }
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=12.0) as client:
         res = await client.post(url, json=payload, headers=headers)
         if res.status_code != 200:
             return None, f"HTTP {res.status_code}: {res.text}"
@@ -178,6 +187,27 @@ async def authenticate_smartapi_rest(api_key: str, client_id: str, pin: str, tot
             return None, data.get("message", "Login rejected by SmartAPI")
         jwt_token = data.get("data", {}).get("jwtToken")
         return jwt_token, None
+
+async def get_or_create_jwt_token(api_key: str, client_id: str, pin: str, totp_secret: str):
+    """
+    Retrieves cached session token or performs single concurrent login.
+    Prevents concurrent login rate-limits when multi-asset queries are fired in parallel.
+    """
+    now_ts = time.time()
+    if SESSION_CACHE["jwt_token"] and now_ts < SESSION_CACHE["expires_at"]:
+        return SESSION_CACHE["jwt_token"], None
+
+    async with AUTH_LOCK:
+        now_ts = time.time()
+        if SESSION_CACHE["jwt_token"] and now_ts < SESSION_CACHE["expires_at"]:
+            return SESSION_CACHE["jwt_token"], None
+
+        token, err = await authenticate_smartapi_rest(api_key, client_id, pin, totp_secret)
+        if token:
+            SESSION_CACHE["jwt_token"] = token
+            SESSION_CACHE["expires_at"] = now_ts + 600  # 10 minute session TTL
+            return token, None
+        return None, err
 
 @app.post("/api/broker/angelone/historical-candles")
 async def get_historical_candles(payload: HistoricalCandleRequest):
@@ -194,18 +224,20 @@ async def get_historical_candles(payload: HistoricalCandleRequest):
         }
 
     # 1. Resolve token
-    symbol_token = NSE_TOKENS.get(symbol)
-    trading_symbol = f"{symbol}-EQ"
+    symbol_token = NSE_TOKENS.get(symbol, "11536")
 
     # 2. Format dates
     now = datetime.now()
     to_str = payload.toDate or now.strftime("%Y-%m-%d 15:30")
     from_str = payload.fromDate or (now - timedelta(days=365)).strftime("%Y-%m-%d 09:15")
 
-    # Strategy A: Try Direct HTTP REST API (Fastest and zero-dependency)
-    try:
-        jwt_token, auth_err = await authenticate_smartapi_rest(api_key, client_id, pin, totp_secret)
-        if jwt_token:
+    # Strategy A: REST API with Session Cache & Retry
+    for attempt in range(2):
+        try:
+            jwt_token, auth_err = await get_or_create_jwt_token(api_key, client_id, pin, totp_secret)
+            if not jwt_token:
+                break
+
             candle_url = "https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData"
             headers = {
                 "Content-Type": "application/json",
@@ -220,7 +252,7 @@ async def get_historical_candles(payload: HistoricalCandleRequest):
             }
             candle_payload = {
                 "exchange": "NSE",
-                "symboltoken": str(symbol_token or "11536"),
+                "symboltoken": str(symbol_token),
                 "interval": payload.interval or "ONE_DAY",
                 "fromdate": from_str,
                 "todate": to_str
@@ -228,6 +260,11 @@ async def get_historical_candles(payload: HistoricalCandleRequest):
 
             async with httpx.AsyncClient(timeout=15.0) as client:
                 c_res = await client.post(candle_url, json=candle_payload, headers=headers)
+                if c_res.status_code == 401 or (c_res.status_code == 200 and "Invalid Token" in c_res.text):
+                    # Invalidate session cache and retry once
+                    SESSION_CACHE["jwt_token"] = None
+                    continue
+
                 if c_res.status_code == 200:
                     c_data = c_res.json()
                     status_val = c_data.get("status")
@@ -256,9 +293,8 @@ async def get_historical_candles(payload: HistoricalCandleRequest):
                             "source": "live_angelone",
                             "candles": candles
                         }
-    except Exception as e:
-        # Fall through to SmartApi SDK if REST fails
-        pass
+        except Exception:
+            pass
 
     # Strategy B: Fallback to SmartConnect SDK if available
     if SmartConnect is not None:
@@ -268,46 +304,40 @@ async def get_historical_candles(payload: HistoricalCandleRequest):
             session_data = smart_api.generateSession(client_id, pin, totp_token)
 
             if session_data.get('status'):
-                if not symbol_token:
-                    search_res = smart_api.searchScrip("NSE", symbol)
-                    if search_res and isinstance(search_res, list) and len(search_res) > 0:
-                        symbol_token = search_res[0].get('symboltoken')
-
-                if symbol_token:
-                    historic_param = {
-                        "exchange": "NSE",
-                        "symboltoken": str(symbol_token),
-                        "interval": payload.interval or "ONE_DAY",
-                        "fromdate": from_str,
-                        "todate": to_str
+                historic_param = {
+                    "exchange": "NSE",
+                    "symboltoken": str(symbol_token),
+                    "interval": payload.interval or "ONE_DAY",
+                    "fromdate": from_str,
+                    "todate": to_str
+                }
+                candle_res = smart_api.getCandleData(historic_param)
+                status_val = candle_res.get('status')
+                is_ok = (status_val is True) or (isinstance(status_val, str) and status_val.lower() in ['true', 'success'])
+                if is_ok and isinstance(candle_res.get('data'), list):
+                    raw_data = candle_res.get('data', [])
+                    candles = []
+                    for c in raw_data:
+                        if isinstance(c, (list, tuple)) and len(c) >= 5:
+                            raw_ts = str(c[0])
+                            date_str = raw_ts.split('T')[0] if 'T' in raw_ts else raw_ts.split(' ')[0]
+                            close_price = float(c[4])
+                            candles.append({
+                                "date": date_str,
+                                "timestamp": raw_ts,
+                                "open": float(c[1]),
+                                "high": float(c[2]),
+                                "low": float(c[3]),
+                                "close": close_price,
+                                "price": close_price,
+                                "volume": int(c[5]) if len(c) > 5 else 0
+                            })
+                    return {
+                        "status": "success",
+                        "symbol": symbol,
+                        "source": "live_angelone",
+                        "candles": candles
                     }
-                    candle_res = smart_api.getCandleData(historic_param)
-                    status_val = candle_res.get('status')
-                    is_ok = (status_val is True) or (isinstance(status_val, str) and status_val.lower() in ['true', 'success'])
-                    if is_ok and isinstance(candle_res.get('data'), list):
-                        raw_data = candle_res.get('data', [])
-                        candles = []
-                        for c in raw_data:
-                            if isinstance(c, (list, tuple)) and len(c) >= 5:
-                                raw_ts = str(c[0])
-                                date_str = raw_ts.split('T')[0] if 'T' in raw_ts else raw_ts.split(' ')[0]
-                                close_price = float(c[4])
-                                candles.append({
-                                    "date": date_str,
-                                    "timestamp": raw_ts,
-                                    "open": float(c[1]),
-                                    "high": float(c[2]),
-                                    "low": float(c[3]),
-                                    "close": close_price,
-                                    "price": close_price,
-                                    "volume": int(c[5]) if len(c) > 5 else 0
-                                })
-                        return {
-                            "status": "success",
-                            "symbol": symbol,
-                            "source": "live_angelone",
-                            "candles": candles
-                        }
         except Exception:
             pass
 
@@ -349,7 +379,6 @@ async def get_stock_quote(payload: QuoteRequest):
     symbol = payload.symbol.upper()
     api_key, client_id, pin, totp_secret = get_credentials(payload)
 
-    # Deterministic reference price for benchmark fallback
     mock_dict = {h["symbol"]: h["ltp"] for h in MOCK_HOLDINGS}
     base_price = mock_dict.get(symbol, 1500.0)
 
@@ -363,7 +392,7 @@ async def get_stock_quote(payload: QuoteRequest):
         }
 
     try:
-        jwt_token, _ = await authenticate_smartapi_rest(api_key, client_id, pin, totp_secret)
+        jwt_token, _ = await get_or_create_jwt_token(api_key, client_id, pin, totp_secret)
         if jwt_token:
             symbol_token = NSE_TOKENS.get(symbol, "11536")
             quote_url = "https://apiconnect.angelbroking.com/rest/secure/angelbroking/market/v1/quote/"
@@ -434,7 +463,7 @@ async def sync_holdings(payload: Optional[SyncCredentials] = None):
         }
 
     try:
-        jwt_token, _ = await authenticate_smartapi_rest(api_key, client_id, pin, totp_secret)
+        jwt_token, _ = await get_or_create_jwt_token(api_key, client_id, pin, totp_secret)
         if jwt_token:
             holding_url = "https://apiconnect.angelbroking.com/rest/secure/angelbroking/portfolio/v1/getHolding"
             headers = {
