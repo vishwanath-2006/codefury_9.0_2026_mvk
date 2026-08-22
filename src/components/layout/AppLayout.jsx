@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { useOnboarding } from '../../context/OnboardingContext';
@@ -9,15 +9,14 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { isOnboarded } = useOnboarding();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Entry Modal Prompt State (Onboard vs Overview)
   const [showEntryModal, setShowEntryModal] = useState(false);
 
   useEffect(() => {
-    const isCompleted = localStorage.getItem('finlabs_onboarding_completed') === 'true';
-    const isDismissedInSession = sessionStorage.getItem('finlabs_entry_modal_dismissed') === 'true';
-
-    if (!isCompleted && !isDismissedInSession) {
+    // Automatically trigger pop-up notification modal on landing when user is not onboarded
+    if (!isOnboarded) {
       setShowEntryModal(true);
     } else {
       setShowEntryModal(false);
@@ -25,12 +24,10 @@ export default function AppLayout() {
   }, [isOnboarded]);
 
   const handleCloseModal = () => {
-    sessionStorage.setItem('finlabs_entry_modal_dismissed', 'true');
     setShowEntryModal(false);
   };
 
   const handleStartOnboarding = () => {
-    sessionStorage.setItem('finlabs_entry_modal_dismissed', 'true');
     setShowEntryModal(false);
     navigate('/onboarding');
   };
