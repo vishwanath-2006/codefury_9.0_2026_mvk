@@ -261,10 +261,6 @@ export default function FloatingAiWidget() {
     persistState(defaultPos, false, 'right', defaultPos);
   };
 
-  if (isAiPage) {
-    return null;
-  }
-
   return (
     <>
       <style>{`
@@ -340,7 +336,7 @@ export default function FloatingAiWidget() {
             top: position.y !== null ? `${position.y}px` : undefined,
             bottom: position.x === null ? '24px' : undefined,
             right: position.x === null ? '24px' : undefined,
-            zIndex: 50,
+            zIndex: 9999,
             touchAction: 'none'
           }}
           className={`flex flex-col items-end gap-2 select-none ${

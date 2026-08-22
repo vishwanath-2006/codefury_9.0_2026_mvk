@@ -149,17 +149,28 @@ export async function generateAiResponse(query, userId, fallbackProfile = null, 
 
   // 1. Invoke Backend FinLabs AI Server Endpoint (/api/ai/chat)
   try {
+    const formattedHistory = (conversationHistory || []).slice(-8).map((msg) => ({
+      role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
+      sender: msg.sender || (msg.role === 'user' ? 'user' : 'ai'),
+      content: msg.content || msg.text || '',
+      text: msg.text || msg.content || ''
+    }));
+
     const aiChatPayload = {
+      message: query,
       query,
-      conversationHistory: (conversationHistory || []).slice(-6).map((msg) => ({
-        sender: msg.sender || (msg.role === 'user' ? 'user' : 'ai'),
-        text: msg.text || msg.content || ''
-      })),
+      ctx: {
+        ...ctx,
+        queryIntent: intent,
+        simulationResult
+      },
       context: {
         ...ctx,
         queryIntent: intent,
         simulationResult
-      }
+      },
+      messages: formattedHistory,
+      conversationHistory: formattedHistory
     };
 
     const response = await fetch('/api/ai/chat', {
@@ -172,12 +183,14 @@ export async function generateAiResponse(query, userId, fallbackProfile = null, 
 
     if (response.ok) {
       const data = await response.json();
-      if (data && data.success && data.answer) {
-        return data.answer;
+      if (data && data.success && (data.response || data.answer)) {
+        return data.response || data.answer;
       }
+    } else {
+      console.warn(`Backend /api/ai/chat responded with status HTTP ${response.status}`);
     }
   } catch (backendErr) {
-    console.info('Backend /api/ai/chat notice:', backendErr.message);
+    console.info('Backend /api/ai/chat network notice:', backendErr.message);
   }
 
   // 2. Client-side deterministic contextual financial engine (Zero-mock fallback using verified user numbers)

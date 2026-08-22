@@ -609,26 +609,30 @@ def get_holdings_by_token(payload: TokenSyncRequest):
 # ==========================================
 
 class AiChatRequest(BaseModel):
-    query: str
-    conversationHistory: Optional[List[dict]] = None
+    message: Optional[str] = None
+    query: Optional[str] = None
+    ctx: Optional[dict] = None
     context: Optional[dict] = None
+    messages: Optional[List[dict]] = None
+    conversationHistory: Optional[List[dict]] = None
 
 def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, history: Optional[List[dict]] = None) -> str:
     import re
     ctx = context or {}
     q = query.lower().strip()
-    name = (ctx.get("fullName") or "there").split()[0]
-    monthly_income = float(ctx.get("monthlyIncome") or 0)
-    total_expenses = float(ctx.get("totalExpenses") or 0)
-    monthly_debt = float(ctx.get("monthlyDebtPayments") or 0)
-    monthly_surplus = float(ctx.get("monthlySurplus") or max(0, monthly_income - total_expenses - monthly_debt))
-    savings_rate = ctx.get("savingsRatePct") or (round((monthly_surplus / monthly_income) * 100) if monthly_income > 0 else 0)
-    health_score = ctx.get("overallHealthScore") or 74
-    prev_invest_amt = float(ctx.get("previousInvestmentAmount") or 0)
-    prev_platforms = ctx.get("previousInvestmentPlatforms") or []
-    risk_tolerance = ctx.get("riskTolerance") or "Moderate"
-    time_horizon = ctx.get("timeHorizon") or "5–10 years"
-    emergency_months = ctx.get("emergencyMonths") or (round(float(ctx.get("emergencyFund") or 0) / total_expenses, 1) if total_expenses > 0 else 0)
+    name = (ctx.get("fullName") or ctx.get("full_name") or "there").split()[0]
+    monthly_income = float(ctx.get("monthlyIncome") or ctx.get("monthly_income") or 0)
+    total_expenses = float(ctx.get("totalExpenses") or ctx.get("monthlyExpenses") or ctx.get("monthly_expenses") or 0)
+    monthly_debt = float(ctx.get("monthlyDebtPayments") or ctx.get("monthly_debt_payments") or ctx.get("monthly_debt") or 0)
+    monthly_surplus = float(ctx.get("monthlySurplus") or ctx.get("monthly_surplus") or max(0, monthly_income - total_expenses - monthly_debt))
+    savings_rate = ctx.get("savingsRatePct") or ctx.get("savings_rate_pct") or (round((monthly_surplus / monthly_income) * 100) if monthly_income > 0 else 0)
+    health_score = ctx.get("overallHealthScore") or ctx.get("overall_health_score") or 74
+    prev_invest_amt = float(ctx.get("previousInvestmentAmount") or ctx.get("previous_investment_amount") or 0)
+    prev_platforms = ctx.get("previousInvestmentPlatforms") or ctx.get("previous_investment_platforms") or []
+    risk_tolerance = ctx.get("riskTolerance") or ctx.get("riskProfile") or ctx.get("risk_profile") or "Moderate"
+    time_horizon = ctx.get("timeHorizon") or ctx.get("time_horizon") or "5–10 years"
+    emergency_fund = float(ctx.get("emergencyFund") or ctx.get("emergency_fund") or 0)
+    emergency_months = ctx.get("emergencyMonths") or (round(emergency_fund / total_expenses, 1) if total_expenses > 0 else 0)
 
     def fmt_inr(val):
         try:
@@ -663,7 +667,7 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
         )
 
     # 3. Concept: SIP (Systematic Investment Plan)
-    if ("explain sip" in q or "what is sip" in q or "how does sip work" in q) and not ("sip vs" in q or "lump sum" in q):
+    if ("explain sip" in q or "what is sip" in q or "how does sip work" in q or "sip simply" in q) and not ("sip vs" in q or "lump sum" in q):
         return (
             f"**A Systematic Investment Plan (SIP)** is a disciplined method of investing a fixed sum of money into a mutual fund scheme at regular recurring intervals (typically monthly).\n\n"
             f"**Key Benefits:**\n"
@@ -696,8 +700,8 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
             f"- **Context Matters**: Always compare a company's P/E ratio against its **historical 5-year average** and **sector peers** rather than looking at the number in isolation."
         )
 
-    # 6. Concept: Diversification
-    if "diversification" in q or "diversify" in q:
+    # 6. Concept: Diversification & How to Diversify
+    if "diversification" in q or "diversify" in q or "diversifying" in q:
         return (
             f"**Diversification** is the foundational risk-management strategy of spreading your capital across various asset classes, sectors, and instruments to reduce portfolio risk.\n\n"
             f"**Why Diversification Works:**\n"
@@ -759,14 +763,53 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
             f"- No single equity stock should exceed **5% to 10%** of your total investment portfolio."
         )
 
-    # 11. Question: What is TCS / Stock price today? (Live market safety guard)
+    # 11. Question: Beginner Starter Guide ("I am a beginner. Where should I start?")
+    if "beginner" in q or "where should i start" in q or "new to investing" in q or "start investing" in q:
+        return (
+            f"**Welcome to Investing! Here is your step-by-step beginner blueprint:**\n\n"
+            f"**Phase 1: Build Your Financial Foundation**\n"
+            f"1. **Clear High-Interest Debt**: Eliminate credit card dues or personal loans (>12% interest) before investing.\n"
+            f"2. **Establish an Emergency Fund**: Save 3 to 6 months of living expenses in a liquid savings account or liquid fund.\n"
+            f"3. **Insurance First**: Secure adequate term life and health insurance to protect against unexpected life shocks.\n\n"
+            f"**Phase 2: Begin Wealth Compounding**\n"
+            f"4. **Start with a Low-Cost Nifty 50 Index Fund**: Put ₹1,000–₹5,000/month via automated SIP. This invests in India's 50 largest companies with rock-bottom expense ratios.\n"
+            f"5. **Add a Parag Parikh Flexi Cap Fund**: For active multi-cap diversification.\n"
+            f"6. **Avoid Speculation**: Stay away from intraday trading, F&O (Futures & Options), or penny stocks until you have years of experience."
+        )
+
+    # 12. Question: Emergency fund size ("How much emergency fund should I maintain?")
+    if "emergency fund" in q or "emergency reserve" in q or "how much emergency" in q:
+        target_amt = total_expenses * 6 if total_expenses > 0 else 180000
+        return (
+            f"**Emergency Fund Guideline: 3 to 6 Months of Living Expenses**\n\n"
+            f"Based on your monthly expenses of **{fmt_inr(total_expenses)}**:\n"
+            f"- **Minimum Buffer (3 Months)**: **{fmt_inr(total_expenses * 3)}** (for dual-income stable households)\n"
+            f"- **Target Buffer (6 Months)**: **{fmt_inr(target_amt)}** (recommended standard)\n"
+            f"- **Extended Buffer (9–12 Months)**: If you are self-employed or have single-income dependents.\n\n"
+            f"**Where to Park Your Emergency Fund:**\n"
+            f"- **50%** in High-Yield Savings Account / Auto-sweep Fixed Deposit (instant liquidity).\n"
+            f"- **50%** in Overnight or Liquid Mutual Funds (T+1 redemption with stable returns)."
+        )
+
+    # 13. Question: Stock Evaluation Checklist ("What should I consider before buying a stock?")
+    if "buying a stock" in q or "before buying" in q or "consider before buying" in q:
+        return (
+            f"**Core Stock Evaluation Checklist Before Investing:**\n\n"
+            f"1. **Business Moat & Competitive Advantage**: Does the company have pricing power, high brand loyalty, or regulatory barriers protecting its market share?\n"
+            f"2. **Revenue & Profit Growth**: Has the company consistently grown sales and net profit at **12%+ CAGR** over the past 3–5 years?\n"
+            f"3. **Return on Equity (ROE) & ROCE**: Look for companies with **ROE > 15%** and **ROCE > 18%**, indicating high capital efficiency.\n"
+            f"4. **Low Debt-to-Equity**: Prefer companies with Debt-to-Equity **< 0.5** or zero debt, especially in rising interest rate environments.\n"
+            f"5. **Reasonable Valuation (P/E & P/B)**: Compare current valuation multiples against historical averages and industry peers."
+        )
+
+    # 14. Question: What is TCS / Stock price today? (Live market safety guard)
     if ("price today" in q or "current price of" in q or "live price" in q or "stock price of" in q) and ("tcs" in q or "infy" in q or "reliance" in q or "stock" in q or "share" in q):
         return (
             f"I do not have a live streaming broker ticker connection in this chat window. To view real-time quotes and historical price charts, please navigate to our **Investment Comparison Tool** or connect your Angel One broker feed.\n\n"
             f"FinLabs AI provides educational guidance, cash flow analytics, and asset allocation strategies without fabricating unverified live market prices."
         )
 
-    # 12. Question / Scenario: "I have ₹1,00,000 / ₹2 lakh to invest" or Conversational Follow-up "How should I allocate it?"
+    # Extract numerical amounts from current query
     amount_found = None
     q_clean = q.replace(",", "")
     amt_match = re.search(r'(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lac|l)\b', q_clean)
@@ -781,11 +824,11 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
             if num_match:
                 amount_found = float(num_match.group(1))
 
-    # Contextual Memory: If no amount in current query, check previous messages in conversation history!
+    # Conversational Memory Context Recovery: If no amount in current query, check previous turns!
     if not amount_found and history:
         for prev_msg in reversed(history):
-            if prev_msg.get("sender") == "user" or prev_msg.get("role") == "user":
-                prev_text = (prev_msg.get("text") or prev_msg.get("content") or "").lower()
+            prev_text = (prev_msg.get("text") or prev_msg.get("content") or "").lower().replace(",", "")
+            if prev_text:
                 prev_amt = re.search(r'(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lac|l)\b', prev_text)
                 if prev_amt:
                     amount_found = float(prev_amt.group(1)) * 100000
@@ -799,8 +842,8 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
                     amount_found = float(prev_num.group(1))
                     break
 
-    # 12. Question: Existing investor with specific footprint (Check before generic new lump-sum)
-    if ("already invested" in q or "already invest" in q or "previous" in q or "stocks and mutual funds" in q) and ("what next" in q or "consider" in q or "recommend" in q or "invested in" in q or "consider next" in q or "where to" in q or "next" in q):
+    # 15. Question: Existing investor with specific footprint (Check before generic new lump-sum)
+    if ("already invested" in q or "already invest" in q or "previous" in q or "stocks and mutual funds" in q) and ("what next" in q or "consider" in q or "recommend" in q or "invested in" in q or "consider next" in q or "where to" in q or "next" in q or "more" in q):
         footprint_amt = fmt_inr(prev_invest_amt) if prev_invest_amt > 0 else (fmt_inr(500000) if "5,00,000" in q or "5 lakh" in q or "5lakh" in q else "your active portfolio")
         platforms = prev_platforms if prev_platforms else (["Stocks", "Mutual Funds"] if "stocks and mutual funds" in q else ["Direct Equity", "Mutual Funds"])
         platforms_str = ", ".join(platforms)
@@ -819,8 +862,8 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
             f"- With your net monthly surplus of **{fmt_inr(monthly_surplus)}** ({savings_rate}% savings rate), automate step-up SIPs aligned with your specific financial goals."
         )
 
-    # 13. Question / Scenario: "I have ₹1,00,000 / ₹2 lakh to invest" or Conversational Follow-up "How should I allocate it?"
-    if (amount_found and ("invest" in q or "allocate" in q or "where should i" in q or "what should i do" in q or "how should i" in q or "available" in q)) or (("allocate it" in q or "invest it" in q or "what to do with it" in q) and amount_found):
+    # 16. Question / Scenario: "I have ₹1,00,000 / ₹2 lakh to invest" or Conversational Follow-up "How should I allocate it?" / "What about the remaining amount?"
+    if (amount_found and ("invest" in q or "allocate" in q or "where should i" in q or "what should i do" in q or "how should i" in q or "available" in q or "remaining" in q or "how much" in q or "put into" in q)) or (("allocate it" in q or "invest it" in q or "what to do with it" in q or "remaining amount" in q) and amount_found):
         amt_str = fmt_inr(amount_found)
         res_emergency = fmt_inr(amount_found * 0.20)
         res_large_cap = fmt_inr(amount_found * 0.45)
@@ -841,7 +884,7 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
             f"*Note: Rather than deploying 100% in a single day, consider deploying via a Systematic Transfer Plan (STP) over 3 to 6 months to reduce market timing risk.*"
         )
 
-    # 14. Question: Financial health situation / score
+    # 17. Question: Financial health situation / score
     if "health situation" in q or "financial health" in q or "my score" in q or "my health score" in q:
         return (
             f"**Your Personalized FinLabs Financial Health Snapshot:**\n\n"
@@ -858,8 +901,8 @@ def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, his
             f"2. Automate your monthly surplus of **{fmt_inr(monthly_surplus)}** into diversified equity SIPs to compound wealth."
         )
 
-    # 15. Question: What should I do with my monthly surplus?
-    if "monthly surplus" in q or "do with my surplus" in q or "what should i do with my savings" in q:
+    # 18. Question: What should I do with my monthly surplus?
+    if "monthly surplus" in q or "do with my surplus" in q or "what should i do with my savings" in q or "surplus" in q:
         return (
             f"You have a net monthly surplus of **{fmt_inr(monthly_surplus)}** ({savings_rate}% savings rate) after accounting for expenses ({fmt_inr(total_expenses)}) and debt payments ({fmt_inr(monthly_debt)}).\n\n"
             f"**Optimal Surplus Deployment Blueprint:**\n\n"
@@ -886,18 +929,18 @@ async def ai_chat_get():
     return {
         "status": "ok",
         "service": "FinLabs AI Copilot API",
-        "message": "Send a POST request with {'query': '...'} to chat with FinLabs AI."
+        "message": "Send a POST request with {'message': '...', 'ctx': {}, 'messages': []} to chat with FinLabs AI."
     }
 
 @app.post("/api/ai/chat")
 @app.post("/ai/chat")
 async def ai_chat_post(payload: AiChatRequest):
-    query = (payload.query or "").strip()
+    query = (payload.message or payload.query or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
 
-    context = payload.context or {}
-    history = payload.conversationHistory or []
+    context = payload.ctx or payload.context or {}
+    history = payload.messages or payload.conversationHistory or []
 
     # 1. Attempt External Gemini LLM if API Key is configured in environment
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -927,10 +970,12 @@ async def ai_chat_post(payload: AiChatRequest):
                     if candidates and "content" in candidates[0]:
                         parts = candidates[0]["content"].get("parts", [])
                         if parts and "text" in parts[0]:
+                            text_answer = parts[0]["text"].strip()
                             return {
                                 "success": True,
-                                "answer": parts[0]["text"].strip(),
-                                "source": "gemini_api"
+                                "response": text_answer,
+                                "answer": text_answer,
+                                "source": "gemini"
                             }
         except Exception as e:
             print(f"Gemini API invocation fallback notice: {e}")
@@ -939,6 +984,7 @@ async def ai_chat_post(payload: AiChatRequest):
     answer = generate_finlabs_ai_response(query, context, history)
     return {
         "success": True,
+        "response": answer,
         "answer": answer,
-        "source": "finlabs_ai_engine"
+        "source": "finlabs_engine"
     }

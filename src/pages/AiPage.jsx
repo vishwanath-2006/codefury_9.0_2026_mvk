@@ -157,7 +157,7 @@ export default function AiPage() {
     setLoading(true);
 
     try {
-      const aiResponse = await generateAiResponse(text, user?.id, profile);
+      const aiResponse = await generateAiResponse(text, user?.id, profile, messages);
       setMessages((prev) => [
         ...prev,
         { id: `ai_${Date.now()}`, sender: 'ai', text: aiResponse }
@@ -169,7 +169,9 @@ export default function AiPage() {
         {
           id: `ai_err_${Date.now()}`,
           sender: 'ai',
-          text: 'Unable to analyze financial context right now. Please check your network connection and try again.'
+          isError: true,
+          failedQuery: text,
+          text: 'Unable to formulate financial response right now. Please check your network connection and click Retry.'
         }
       ]);
     } finally {
@@ -253,6 +255,21 @@ export default function AiPage() {
                       >
                         <span>{msg.appAction.label}</span>
                         <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Optional Retry Button on Error */}
+                  {msg.isError && msg.failedQuery && (
+                    <div className="mt-2.5 pt-2 border-t border-rose-500/20 flex items-center justify-between">
+                      <span className="text-[11px] text-rose-400 font-medium">Request failed</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSendCustomPrompt(msg.failedQuery)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Retry</span>
                       </button>
                     </div>
                   )}
