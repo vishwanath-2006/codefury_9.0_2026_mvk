@@ -13,25 +13,49 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
   const canvasRef = useRef(null);
   const [hoverIndex, setHoverIndex] = useState(null);
   const [hoverPos, setHoverPos] = useState({ x: 0, y: 0 });
+  const [containerWidth, setContainerWidth] = useState(0);
 
-  // Prepare normalized time-series data using actual calendar date filtering
+  // Measure container width responsively
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+
+    let ro;
+    if (window.ResizeObserver && containerRef.current) {
+      ro = new ResizeObserver(() => updateWidth());
+      ro.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateWidth);
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
+  // Prepare normalized time-series data using strict calendar date filtering
   const normalizedSeries = useMemo(() => {
     if (!items || items.length === 0) return [];
 
-    const now = new Date();
-    let daysCutoff = 365;
-    if (timeFilter === '1M') daysCutoff = 32;
-    if (timeFilter === '6M') daysCutoff = 185;
-    if (timeFilter === '1Y') daysCutoff = 366;
+    const today = new Date();
+    const cutoff = new Date(today);
+    if (timeFilter === '1M') cutoff.setMonth(today.getMonth() - 1);
+    else if (timeFilter === '6M') cutoff.setMonth(today.getMonth() - 6);
+    else if (timeFilter === '1Y') cutoff.setFullYear(today.getFullYear() - 1);
 
-    const cutoffTimestamp = now.getTime() - daysCutoff * 24 * 60 * 60 * 1000;
+    const cutoffTimestamp = cutoff.getTime();
 
     return items.map((item, itemIdx) => {
       const color = SERIES_COLORS[itemIdx % SERIES_COLORS.length];
       const rawHistory = item.history || [];
 
       // Filter by real calendar date timestamp
-      let filtered = rawHistory.filter((pt) => {
+      const filtered = rawHistory.filter((pt) => {
         if (pt.rawDate instanceof Date) {
           return pt.rawDate.getTime() >= cutoffTimestamp;
         }
@@ -46,23 +70,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
       });
 
       // If asset is unlisted or has no trading points
-      if (filtered.length < 2 && rawHistory.length < 2) {
-        return {
-          id: item.id || item.symbol,
-          symbol: item.symbol,
-          displayName: item.displayName || item.name || item.symbol,
-          color,
-          isUnlisted: true,
-          points: []
-        };
-      }
-
       if (filtered.length < 2) {
-        const sliceCount = timeFilter === '1M' ? 22 : timeFilter === '6M' ? 120 : 250;
-        filtered = rawHistory.slice(-sliceCount);
-      }
-
-      if (filtered.length === 0) {
         return {
           id: item.id || item.symbol,
           symbol: item.symbol,
@@ -73,7 +81,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         };
       }
 
-      // First valid historical point is baseline (Base = 100.00)
+      // First valid historical point in period is baseline (Base = 100.00)
       const basePrice = Number(filtered[0].price) || 1;
 
       const points = filtered.map((pt) => {
@@ -280,7 +288,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         ctx.stroke();
       });
     }
-  }, [normalizedSeries, minVal, maxVal, dataLength, hoverIndex]);
+  }, [normalizedSeries, minVal, maxVal, dataLength, hoverIndex, containerWidth]);
 
   // Pointer move handler
   const handleMouseMove = (e) => {
@@ -315,15 +323,32 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
   const validSeries = normalizedSeries.find((s) => s.points.length > 0);
   const hoveredDate = validSeries?.points[hoverIndex]?.date || '';
 
+  // Intelligent tooltip horizontal position that never clips off-screen
+  const getTooltipStyle = () => {
+    const tooltipWidth = 220;
+    const cWidth = containerWidth || 320;
+    let leftPos = hoverPos.x + 16;
+
+    if (leftPos + tooltipWidth > cWidth - 10) {
+      leftPos = hoverPos.x - tooltipWidth - 16;
+    }
+
+    const clampedLeft = Math.max(10, Math.min(cWidth - tooltipWidth - 10, leftPos));
+    return {
+      left: `${clampedLeft}px`,
+      top: '15px'
+    };
+  };
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 w-full min-w-0">
       {/* Legend and Base Note */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs">
         <div className="flex flex-wrap items-center gap-3">
           {normalizedSeries.map((s) => (
             <div key={s.id || s.symbol} className="flex items-center gap-1.5 font-bold">
               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
-              <span className="text-slate-800 dark:text-slate-200 truncate max-w-[180px]">{s.displayName}</span>
+              <span className="text-slate-800 dark:text-slate-200 truncate max-w-[160px] sm:max-w-[200px]">{s.displayName}</span>
               <span className="text-[10px] text-slate-400 font-mono">
                 ({s.symbol}){s.isUnlisted ? ' · Primary GMP' : ''}
               </span>
@@ -335,8 +360,11 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         </div>
       </div>
 
-      {/* Chart Canvas */}
-      <div ref={containerRef} className="relative w-full overflow-hidden select-none bg-slate-950/40 rounded-xl p-2 border border-slate-800/60">
+      {/* Responsive Chart Canvas Wrapper */}
+      <div
+        ref={containerRef}
+        className="relative w-full min-w-0 max-w-full overflow-hidden select-none bg-slate-950/40 rounded-xl p-2 border border-slate-800/60"
+      >
         <canvas
           ref={canvasRef}
           onMouseMove={handleMouseMove}
@@ -347,14 +375,8 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         {/* Multi-series Tooltip without ₹ currency symbol for index values */}
         {hoverIndex !== null && hoveredDate && (
           <div
-            className="absolute z-20 pointer-events-none p-3 bg-slate-900/95 text-white rounded-xl shadow-xl text-xs font-semibold leading-tight flex flex-col gap-1.5 border border-slate-700/80 backdrop-blur-md"
-            style={{
-              left: `${Math.min(
-                (containerRef.current?.clientWidth || 300) - 200,
-                Math.max(15, hoverPos.x - 80)
-              )}px`,
-              top: '15px'
-            }}
+            className="absolute z-20 pointer-events-none p-3 bg-slate-900/95 text-white rounded-xl shadow-xl text-xs font-semibold leading-tight flex flex-col gap-1.5 border border-slate-700/80 backdrop-blur-md w-[200px] sm:w-[220px]"
+            style={getTooltipStyle()}
           >
             <div className="text-[10px] text-slate-400 font-mono pb-1 border-b border-slate-800 flex justify-between">
               <span>Date:</span>
@@ -366,12 +388,12 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
               if (!pt) return null;
               const isPositive = pt.returnPct >= 0;
               return (
-                <div key={s.id || s.symbol} className="flex items-center justify-between gap-4 text-[11px]">
-                  <div className="flex items-center gap-1.5 truncate max-w-[120px]">
+                <div key={s.id || s.symbol} className="flex items-center justify-between gap-2 text-[11px]">
+                  <div className="flex items-center gap-1.5 truncate max-w-[100px]">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
                     <span className="font-bold truncate">{s.symbol}</span>
                   </div>
-                  <div className="font-mono flex items-center gap-2">
+                  <div className="font-mono flex items-center gap-1.5 shrink-0 text-right">
                     <span className="text-slate-200 font-bold">{pt.normalizedVal}</span>
                     <span className={`font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {isPositive ? '+' : ''}{pt.returnPct}%

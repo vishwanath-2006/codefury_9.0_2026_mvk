@@ -102,7 +102,7 @@ export default function InvestmentComparisonPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto pb-16">
+    <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto pb-32 sm:pb-36">
       {/* 1. Header */}
       <PageHeader
         title="Investment Comparison"
