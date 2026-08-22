@@ -11,13 +11,16 @@ import {
   Scale,
   RefreshCw,
   Info,
-  AlertCircle
+  AlertCircle,
+  TrendingUp,
+  LineChart
 } from 'lucide-react';
 import {
   searchAllInvestments,
   loadUnifiedComparison,
   generateKeyDifferences
 } from '../services/comparisonService';
+import MultiAssetLineChart from '../components/comparison/MultiAssetLineChart';
 
 export default function InvestmentComparisonPage() {
   // Asset filter for search
@@ -30,6 +33,7 @@ export default function InvestmentComparisonPage() {
   ]);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [timeFilter, setTimeFilter] = useState('1Y'); // '1M' | '6M' | '1Y'
   const [comparisonData, setComparisonData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [maxWarning, setMaxWarning] = useState(false);
@@ -220,7 +224,7 @@ export default function InvestmentComparisonPage() {
           </div>
 
           {selectedItems.length < 2 && (
-            <span className="text-amber-500 font-medium">Select at least 2 investments to compare</span>
+            <span className="text-amber-500 font-medium">Select at least 2 investments</span>
           )}
         </div>
       </Card>
@@ -255,7 +259,7 @@ export default function InvestmentComparisonPage() {
       {/* MAIN COMPACT COMPARISON */}
       {!loading && comparisonData.length >= 2 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* 3. Quick Comparison Matrix Card */}
+          {/* 3. Quick Comparison Table (8 core factors) */}
           <Card className="overflow-hidden border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/80 shadow-xs">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -287,7 +291,7 @@ export default function InvestmentComparisonPage() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
-                  {/* Risk Profile Row (with colored indicator dot) */}
+                  {/* 1. Risk Profile Row (with colored indicator dot) */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500">Risk Profile</td>
                     {comparisonData.map((item) => (
@@ -303,7 +307,7 @@ export default function InvestmentComparisonPage() {
                     ))}
                   </tr>
 
-                  {/* 1-Year Return / Expected Gain Row (with subtle risk dot) */}
+                  {/* 2. 1-Year Return / Expected Gain Row (with subtle risk dot) */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500">1-Year Return / Gain</td>
                     {comparisonData.map((item) => (
@@ -319,7 +323,7 @@ export default function InvestmentComparisonPage() {
                     ))}
                   </tr>
 
-                  {/* Cost & Expenses */}
+                  {/* 3. Cost & Expenses */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500">Cost & Expenses</td>
                     {comparisonData.map((item) => (
@@ -329,7 +333,7 @@ export default function InvestmentComparisonPage() {
                     ))}
                   </tr>
 
-                  {/* Liquidity */}
+                  {/* 4. Liquidity */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500">Liquidity</td>
                     {comparisonData.map((item) => (
@@ -339,7 +343,7 @@ export default function InvestmentComparisonPage() {
                     ))}
                   </tr>
 
-                  {/* Diversification */}
+                  {/* 5. Diversification */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500">Diversification</td>
                     {comparisonData.map((item) => (
@@ -349,7 +353,7 @@ export default function InvestmentComparisonPage() {
                     ))}
                   </tr>
 
-                  {/* Minimum Investment */}
+                  {/* 6. Minimum Investment */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500">Minimum Entry</td>
                     {comparisonData.map((item) => (
@@ -359,7 +363,7 @@ export default function InvestmentComparisonPage() {
                     ))}
                   </tr>
 
-                  {/* Recommended Horizon */}
+                  {/* 7. Recommended Horizon */}
                   <tr>
                     <td className="p-3.5 font-semibold text-slate-500">Recommended Horizon</td>
                     {comparisonData.map((item) => (
@@ -369,7 +373,7 @@ export default function InvestmentComparisonPage() {
                     ))}
                   </tr>
 
-                  {/* Best Suited For */}
+                  {/* 8. Best Suited For */}
                   <tr className="bg-slate-50/50 dark:bg-slate-950/40">
                     <td className="p-3.5 font-semibold text-slate-500">Best Suited For</td>
                     {comparisonData.map((item) => (
@@ -383,10 +387,47 @@ export default function InvestmentComparisonPage() {
             </div>
           </Card>
 
-          {/* 4. Risk & Return Visuals */}
+          {/* 4. Relative Normalized Performance Graph (Baseline = 100) */}
+          <Card className="p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/80 shadow-xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <LineChart className="w-4 h-4 text-emerald-500" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Relative Normalized Performance
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Normalized to Base = 100 at start of period for fair multi-asset performance comparison.
+                </p>
+              </div>
+
+              {/* Timeframe Filter Switcher */}
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                {['1M', '6M', '1Y'].map((tf) => (
+                  <button
+                    key={tf}
+                    onClick={() => setTimeFilter(tf)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      timeFilter === tf
+                        ? 'bg-emerald-500 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-200'
+                    }`}
+                  >
+                    {tf}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Single Compact Canvas Line Chart */}
+            <MultiAssetLineChart items={comparisonData} timeFilter={timeFilter} />
+          </Card>
+
+          {/* 5. Risk Spectrum & 1-Year Return / Yield (Side-by-side) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Risk Spectrum Visual */}
-            <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between">
+            <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between shadow-xs">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -423,7 +464,7 @@ export default function InvestmentComparisonPage() {
             </Card>
 
             {/* Return Comparison Bar Visual */}
-            <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between">
+            <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between shadow-xs">
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -464,9 +505,9 @@ export default function InvestmentComparisonPage() {
             </Card>
           </div>
 
-          {/* 5. Key Differences Summary (2–3 bullet points) */}
+          {/* 6. Key Differences Summary (2–3 bullet points) */}
           {keyDifferences.length > 0 && (
-            <Card className="p-4 sm:p-5 bg-emerald-500/5 dark:bg-slate-900/60 border border-emerald-500/20 space-y-2.5">
+            <Card className="p-4 sm:p-5 bg-emerald-500/5 dark:bg-slate-900/60 border border-emerald-500/20 space-y-2.5 shadow-xs">
               <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Key Differences at a Glance</span>
@@ -481,7 +522,7 @@ export default function InvestmentComparisonPage() {
             </Card>
           )}
 
-          {/* 6. Regulatory Disclaimer */}
+          {/* 7. Regulatory Disclaimer */}
           <div className="flex items-center gap-2 text-[11px] text-slate-500 justify-center text-center pt-2">
             <Info className="w-3.5 h-3.5 shrink-0" />
             <span>Comparison is for informational purposes only and is not investment advice.</span>

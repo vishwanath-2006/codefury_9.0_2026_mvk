@@ -3,8 +3,6 @@
  * Supports Stocks, Mutual Funds, and IPOs comparison with normalized decision metrics.
  */
 
-import { mockMutualFunds } from '../mock/finlabsMockData';
-
 // Top Indian Equities (NSE Bluechips)
 export const STOCKS_UNIVERSE = [
   { symbol: 'TCS', name: 'Tata Consultancy Services', sector: 'IT Services / Tech', exchange: 'NSE', basePrice: 4120.25, base1Y: 24.8, basePe: '31.2', baseMcap: '15,08,100 Cr', risk: 'High', minInv: '1 Share (~₹4,120)', horizon: '3–5+ Years', suitability: 'Direct Equity Growth' },
@@ -32,6 +30,52 @@ export const IPOS_UNIVERSE = [
   { id: 'ipo-fintech-spark', symbol: 'FTSPARK', name: 'FinTech Spark India Ltd', sector: 'FinTech / Payments', priceBand: '₹420 - ₹445', issueSize: '₹1,200 Cr', gmpPct: 32.5, gmpLabel: '+32.5%', status: 'Upcoming', minLot: '33 Shares (~₹14,685)', risk: 'High', horizon: 'Listing Gain / 2–3 Yrs', suitability: 'FinTech Growth Play', diversification: 'Single Tech Startup' },
   { id: 'ipo-firstcry', symbol: 'FIRSTCRY', name: 'Brainbees Solutions (FirstCry)', sector: 'E-Commerce / Retail', priceBand: '₹440 - ₹465', issueSize: '₹4,194 Cr', gmpPct: 40.0, gmpLabel: '+40.0%', status: 'Listed', minLot: '32 Shares (~₹14,880)', risk: 'High', horizon: '3–5 Years', suitability: 'Consumer Tech Ecommerce', diversification: 'Single Retail Network' }
 ];
+
+// Seedable pseudo-random helper for deterministic historical curves
+const getSeedRandom = (seedString) => {
+  let hash = 0;
+  for (let i = 0; i < seedString.length; i++) {
+    hash = seedString.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return () => {
+    const x = Math.sin(hash++) * 10000;
+    return x - Math.floor(x);
+  };
+};
+
+/**
+ * Generates daily normalized historical price points for multi-asset charts.
+ */
+export const generateAssetHistory = (symbol, return1Y = 15.0, daysCount = 365) => {
+  const history = [];
+  const rand = getSeedRandom(symbol + '_comp_v2');
+  const today = new Date();
+  let currentVal = 100 * (1 + return1Y / 100);
+
+  for (let i = 0; i < daysCount; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+
+    // Skip weekends
+    const dayOfWeek = d.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+    const dayStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+
+    // Walk backward
+    const dailyDrift = (return1Y / 250) * 0.01;
+    const volatility = (rand() - 0.5) * 0.012;
+    currentVal = currentVal / (1 + dailyDrift + volatility);
+
+    history.push({
+      date: dayStr,
+      rawDate: d,
+      price: Number(currentVal.toFixed(2))
+    });
+  }
+
+  return history.reverse();
+};
 
 /**
  * Fetches live stock quote from Angel One broker endpoint.
@@ -181,6 +225,7 @@ export async function loadUnifiedComparison(selectedItems) {
         };
 
         const quote = await fetchLiveStockQuote(base.symbol);
+        const history = generateAssetHistory(base.symbol, base.base1Y, 365);
 
         return {
           id: `stock-${base.symbol}`,
@@ -201,7 +246,7 @@ export async function loadUnifiedComparison(selectedItems) {
           minInvestment: base.minInv,
           horizon: base.horizon,
           suitability: base.suitability,
-          specificMetric: base.basePe ? `P/E: ${base.basePe}x` : null
+          history
         };
       }
 
@@ -217,6 +262,8 @@ export async function loadUnifiedComparison(selectedItems) {
           suitability: 'Diversified Investing',
           diversification: '30–50 Stocks'
         };
+
+        const history = generateAssetHistory(mf.symbol, mf.return1Y, 365);
 
         return {
           id: mf.id,
@@ -237,7 +284,7 @@ export async function loadUnifiedComparison(selectedItems) {
           minInvestment: mf.minSip,
           horizon: mf.horizon,
           suitability: mf.suitability,
-          specificMetric: `AUM: ${mf.aum || 'N/A'}`
+          history
         };
       }
 
@@ -253,6 +300,8 @@ export async function loadUnifiedComparison(selectedItems) {
           horizon: 'Listing Gain',
           suitability: 'Primary Market Alpha'
         };
+
+        const history = generateAssetHistory(ipo.symbol, ipo.gmpPct, 365);
 
         return {
           id: ipo.id,
@@ -273,7 +322,7 @@ export async function loadUnifiedComparison(selectedItems) {
           minInvestment: ipo.minLot,
           horizon: ipo.horizon,
           suitability: ipo.suitability,
-          specificMetric: `Issue: ${ipo.issueSize || 'N/A'}`
+          history
         };
       }
 
@@ -285,7 +334,7 @@ export async function loadUnifiedComparison(selectedItems) {
 }
 
 /**
- * Generates 2–4 concise, beginner-friendly key takeaways.
+ * Generates 2–3 concise, beginner-friendly key takeaways.
  */
 export function generateKeyDifferences(items) {
   if (!Array.isArray(items) || items.length < 2) return [];

@@ -1,6 +1,18 @@
 import { supabase } from '../lib/supabaseClient';
 
 /**
+ * Dynamic Authentication Redirect URL resolver.
+ * Ensures local dev sessions return to the exact localhost origin (e.g. http://localhost:3000, http://localhost:5173),
+ * while production sessions dynamically use the active deployment origin.
+ */
+export function getAuthRedirectUrl() {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/auth/callback`;
+  }
+  return import.meta.env.VITE_SITE_URL || 'http://localhost:3000/auth/callback';
+}
+
+/**
  * Register a new user with Email, Password, and Full Name.
  */
 export async function signUpUser(email, password, fullName) {
@@ -12,6 +24,7 @@ export async function signUpUser(email, password, fullName) {
     email,
     password,
     options: {
+      emailRedirectTo: getAuthRedirectUrl(),
       data: {
         full_name: fullName
       }
@@ -65,13 +78,13 @@ export async function signInUser(email, password) {
 }
 
 /**
- * Sign in/up with Google OAuth provider.
+ * Sign in/up with Google OAuth provider with dynamic origin redirect.
  */
 export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`
+      redirectTo: getAuthRedirectUrl()
     }
   });
 
