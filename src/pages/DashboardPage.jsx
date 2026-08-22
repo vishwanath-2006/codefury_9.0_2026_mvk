@@ -2,14 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, resolveUserName } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
-import { getNormalizedFinancialProfile } from '../services/onboardingService';
+import { getNormalizedFinancialProfile, getUserFinancialProfile } from '../services/onboardingService';
 import { calculateFinancialHealthScore } from '../services/financialHealth/engine';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import ProgressIndicator from '../components/ui/ProgressIndicator';
 import FeatureOverviewCard from '../components/common/FeatureOverviewCard';
-import { Wallet, TrendingUp, PiggyBank, Activity, Sparkles, ArrowRight, Settings2, ShieldCheck } from 'lucide-react';
+import {
+  Wallet,
+  TrendingUp,
+  PiggyBank,
+  Activity,
+  Target,
+  PieChart,
+  Sparkles,
+  ArrowRight,
+  Settings2,
+  ShieldCheck,
+  Zap,
+  Info
+} from 'lucide-react';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -17,6 +32,8 @@ export default function DashboardPage() {
   const { formData, isOnboarded } = useOnboarding();
 
   const [normProfile, setNormProfile] = useState(null);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [selectedSuitabilityCard, setSelectedSuitabilityCard] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -39,6 +56,16 @@ export default function DashboardPage() {
 
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val || 0);
+
+  const formatLakhs = (val) => {
+    if (val >= 10000000) {
+      return `₹${(val / 10000000).toFixed(2)} Cr`;
+    }
+    if (val >= 100000) {
+      return `₹${(val / 100000).toFixed(2)} L`;
+    }
+    return formatINR(val);
+  };
 
   // Dynamic User Name & Avatar
   const userName = resolveUserName(user, profile) || formData.fullName || 'FinLabs Investor';
@@ -68,6 +95,9 @@ export default function DashboardPage() {
   const healthScore = isCompleted ? diagnostic.overallScore : 0;
   const emergencyMonths = totalExpenses > 0 ? (normProfile?.emergencyFund / totalExpenses).toFixed(1) : '0.0';
   const riskProfile = isCompleted ? (normProfile?.riskProfile || 'Moderate') : 'Pending Onboarding';
+
+  const userProfile = getUserFinancialProfile(normProfile?.raw || formData);
+  const netWorthValue = (normProfile?.currentSavings ?? 0) + (normProfile?.emergencyFund ?? 0);
 
   const dynamicHealthMetrics = [
     {
