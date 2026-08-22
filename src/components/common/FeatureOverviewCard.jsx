@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Sparkles, CheckCircle2, ArrowRight, HelpCircle } from 'lucide-react';
-import { Card, CardHeader } from '../ui/Card';
 import Button from '../ui/Button';
 
 export default function FeatureOverviewCard({
@@ -17,8 +16,8 @@ export default function FeatureOverviewCard({
 
   return (
     <div className="space-y-6">
-      {/* Capability Walkthrough Header Card (High Contrast, Crisp Text) */}
-      <Card className="bg-slate-950 border border-slate-800 text-white relative overflow-hidden shadow-xl p-4 sm:p-6">
+      {/* Capability Walkthrough Header Card (Solid Slate-900 Dark Container for Guaranteed 100% High Contrast Text in Light & Dark Mode) */}
+      <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row justify-between gap-6">
           <div className="space-y-4 max-w-2xl">
             <div className="flex items-center gap-2">
@@ -32,29 +31,29 @@ export default function FeatureOverviewCard({
               What The {moduleName} Engine Does
             </h3>
 
-            <p className="text-sm sm:text-base text-slate-100 font-semibold leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-100 font-bold leading-relaxed">
               {subtitle}
             </p>
 
-            {/* High Contrast Capability Bullet Points */}
-            <div className="space-y-2.5 pt-2">
+            {/* High Contrast White Capability Bullet Points */}
+            <div className="space-y-3 pt-2">
               {capabilities.map((cap, idx) => (
-                <div key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-100 font-bold">
+                <div key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-white font-extrabold">
                   <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span className="leading-snug">{cap}</span>
+                  <span className="leading-snug text-white drop-shadow-xs">{cap}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Contextual CTA Box */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-700/80 flex flex-col justify-between space-y-4 shrink-0 max-w-xs w-full shadow-lg">
+          <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between space-y-4 shrink-0 max-w-xs w-full shadow-lg">
             <div>
               <div className="flex items-center gap-2 text-amber-400 text-xs font-extrabold uppercase tracking-wider mb-1.5">
                 <Lock className="w-4 h-4" />
                 <span>Live Calculations Locked</span>
               </div>
-              <p className="text-xs text-slate-200 font-medium leading-relaxed">
+              <p className="text-xs text-slate-200 font-semibold leading-relaxed">
                 Input your income & baseline financial metrics to generate live recommendations.
               </p>
             </div>
@@ -71,7 +70,7 @@ export default function FeatureOverviewCard({
             </Button>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Blurred Mock Visual Overlay Card */}
       <div className="relative rounded-3xl overflow-hidden">
@@ -81,7 +80,7 @@ export default function FeatureOverviewCard({
         </div>
 
         {/* Lock Overlay Shield */}
-        <div className="absolute inset-0 z-20 bg-slate-950/65 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center">
+        <div className="absolute inset-0 z-20 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center">
           <div className="p-4 rounded-full bg-slate-900 border-2 border-emerald-500/50 text-emerald-400 shadow-2xl shadow-emerald-500/20 mb-3 animate-bounce">
             <Lock className="w-8 h-8" />
           </div>
@@ -94,7 +93,7 @@ export default function FeatureOverviewCard({
             Personalized {moduleName} Visualizations
           </h4>
 
-          <p className="text-xs sm:text-sm text-slate-200 font-medium max-w-md mb-4 leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-200 font-semibold max-w-md mb-4 leading-relaxed">
             Complete your baseline onboarding to render active charts, ratio stress tests, and automated asset allocation.
           </p>
 
@@ -112,24 +111,20 @@ export default function FeatureOverviewCard({
       </div>
 
       {/* Why This Matters Educational Card */}
-      <Card className="bg-slate-900 border border-slate-800 text-white">
-        <CardHeader>
-          <div className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-emerald-400 uppercase tracking-wider">
-            <HelpCircle className="w-4 h-4 text-emerald-400" />
-            <span>Why This Financial Concept Matters</span>
-          </div>
-        </CardHeader>
-        <div className="p-6 pt-0">
-          <ul className="space-y-3">
-            {whyItMatters.map((point, idx) => (
-              <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-100 font-semibold leading-relaxed">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
+      <div className="bg-slate-900 border border-slate-800 text-white rounded-3xl p-6 shadow-xl">
+        <div className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-emerald-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-3">
+          <HelpCircle className="w-4 h-4 text-emerald-400" />
+          <span>Why This Financial Concept Matters</span>
         </div>
-      </Card>
+        <ul className="space-y-3">
+          {whyItMatters.map((point, idx) => (
+            <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-white font-extrabold leading-relaxed">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

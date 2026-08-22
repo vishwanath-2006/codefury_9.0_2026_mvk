@@ -4,7 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   Activity,
-  UserCheck,
   Wallet,
   Target,
   PieChart,
@@ -39,18 +38,23 @@ export default function Sidebar({ isOpen, onClose }) {
   const displayName = profile?.full_name || user?.user_metadata?.full_name || 'FinLabs User';
   const displayEmail = user?.email || 'user@finlabs.io';
 
-  const mainNav = [
+  const overviewNav = [
     { name: 'Overview', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Financial Health', path: '/financial-health', icon: Activity },
-    { name: 'Expenses', path: '/expenses', icon: Wallet },
-    { name: 'Goals', path: '/goals', icon: Target },
-    { name: 'Portfolio', path: '/portfolio', icon: PieChart },
   ];
 
+  // Investments & Market Trends placed FIRST as requested
   const investmentNav = [
     { name: 'Mutual Funds', path: '/investments/mutual-funds', icon: TrendingUp },
     { name: 'Stocks', path: '/investments/stocks', icon: LineChart },
     { name: 'IPOs', path: '/investments/ipos', icon: Rocket },
+  ];
+
+  // Personal Finance placed SECOND below Investments
+  const personalFinanceNav = [
+    { name: 'Financial Health', path: '/financial-health', icon: Activity },
+    { name: 'Expenses', path: '/expenses', icon: Wallet },
+    { name: 'Goals', path: '/goals', icon: Target },
+    { name: 'Portfolio', path: '/portfolio', icon: PieChart },
   ];
 
   const toolsNav = [
@@ -86,7 +90,7 @@ export default function Sidebar({ isOpen, onClose }) {
             }
           >
             <div className="flex items-center gap-3">
-              <Icon className="w-4 h-4 shrink-0" />
+              <Icon className="w-4 h-4 shrink-0 text-emerald-500" />
               <span>{item.name}</span>
             </div>
             {item.badge && (
@@ -137,30 +141,43 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {/* Scrollable Navigation Groups */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+          {/* 1. Main Overview */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
-              Main
+              Main Dashboard
             </p>
-            {renderNavGroup(mainNav)}
+            {renderNavGroup(overviewNav)}
           </div>
 
+          {/* 2. Investments & Market Trends (FIRST) */}
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
-              Investments
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 px-3 flex items-center justify-between">
+              <span>Investments & Markets</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Public</span>
             </p>
             {renderNavGroup(investmentNav)}
           </div>
 
+          {/* 3. Personal Finance & Blueprint (SECOND) */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
-              Tools
+              Personal Finance
+            </p>
+            {renderNavGroup(personalFinanceNav)}
+          </div>
+
+          {/* 4. Tools & Calculators */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
+              Tools & Calculators
             </p>
             {renderNavGroup(toolsNav)}
           </div>
 
+          {/* 5. AI Copilot */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
-              AI
+              AI Intelligence
             </p>
             {renderNavGroup(aiNav)}
           </div>
