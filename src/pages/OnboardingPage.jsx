@@ -23,7 +23,7 @@ import {
   Lock,
   Check,
   Loader2,
-  Smartphone,
+  Mail,
   Send,
   ShieldCheck,
   KeyRound
@@ -189,87 +189,71 @@ export default function OnboardingPage() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const handleSendOtp = async () => {
+  const handleSendEmailOtp = async () => {
     setErrorMsg('');
     setOtpError('');
-    const rawDigits = (formData.phone || '').replace(/\D/g, '');
+    const targetEmail = (formData.email || user?.email || '').trim();
 
-    let formattedPhone = '';
-    if (rawDigits.length === 10) {
-      formattedPhone = `+91${rawDigits}`;
-    } else if (rawDigits.length === 12 && rawDigits.startsWith('91')) {
-      formattedPhone = `+${rawDigits}`;
-    } else {
-      setErrorMsg('Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).');
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setErrorMsg('Please enter a valid email address before requesting an OTP code.');
       return;
     }
 
     setOtpLoading(true);
 
     try {
-      // 1. Send Real SMS via Supabase Auth SMS API
-      const { error: smsErr } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone
+      // 1. Call real Supabase Auth Email OTP API (100% Free real email delivery)
+      const { error: emailErr } = await supabase.auth.signInWithOtp({
+        email: targetEmail
       });
 
-      // Generate fallback OTP code in case Supabase SMS gateway is running in dev mode
-      const code = Math.floor(1000 + Math.random() * 9000).toString();
-      setGeneratedOtp(code);
-
-      if (smsErr) {
-        console.info('Supabase SMS Auth Notice:', smsErr.message);
+      if (emailErr) {
+        console.warn('Supabase Email Auth notice:', emailErr.message);
+        throw new Error(emailErr.message);
       }
 
-      setFormData((prev) => ({ ...prev, phone: formattedPhone }));
+      setFormData((prev) => ({ ...prev, email: targetEmail }));
       setOtpSent(true);
       setUserOtpInput('');
       setResendTimer(60);
     } catch (err) {
-      console.error('Error sending SMS to mobile number:', err);
-      setErrorMsg('Failed to send SMS to your mobile phone. Please check the number.');
+      console.error('Error sending Email OTP:', err);
+      setErrorMsg(err.message || 'Failed to send verification code to your email. Please try again.');
     } finally {
       setOtpLoading(false);
     }
   };
 
-  const handleVerifyOtp = async () => {
+  const handleVerifyEmailOtp = async () => {
     setOtpError('');
-    if (!userOtpInput || userOtpInput.trim().length < 4) {
-      setOtpError('Please enter the 4-digit OTP code received on your mobile phone.');
+    const token = userOtpInput.trim();
+    if (!token || token.length < 6) {
+      setOtpError('Please enter the 6-digit OTP code received in your email inbox.');
       return;
     }
 
     setOtpLoading(true);
-    const rawDigits = (formData.phone || '').replace(/\D/g, '');
-    const formattedPhone = rawDigits.length === 10 ? `+91${rawDigits}` : `+${rawDigits}`;
+    const targetEmail = (formData.email || user?.email || '').trim();
 
     try {
-      // 1. Verify via real Supabase Auth SMS verifyOtp API
+      // Verify via Supabase Auth Email OTP API
       const { error: verifyErr } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token: userOtpInput.trim(),
-        type: 'sms'
+        email: targetEmail,
+        token,
+        type: 'email'
       });
 
       if (!verifyErr) {
-        setFormData((prev) => ({ ...prev, phoneVerified: true }));
+        setFormData((prev) => ({ ...prev, emailVerified: true }));
         setOtpSent(false);
         setUserOtpInput('');
         return;
       }
 
-      // 2. Dev mode fallback check
-      if (generatedOtp && userOtpInput.trim() === generatedOtp) {
-        setFormData((prev) => ({ ...prev, phoneVerified: true }));
-        setOtpSent(false);
-        setUserOtpInput('');
-        return;
-      }
-
-      setOtpError('Invalid OTP code. Please enter the correct 4-digit code received on your mobile phone.');
+      setOtpError(verifyErr.message || 'Invalid or expired Email OTP code. Please check your inbox or click Resend.');
     } catch (err) {
-      console.error('Error verifying SMS OTP:', err);
-      setOtpError('Failed to verify OTP code.');
+      console.error('Error verifying Email OTP:', err);
+      setOtpError('Failed to verify Email OTP code.');
     } finally {
       setOtpLoading(false);
     }
@@ -287,12 +271,12 @@ export default function OnboardingPage() {
         setErrorMsg('Please enter a valid age (18 or older).');
         return;
       }
-      if (!formData.phone || formData.phone.replace(/\D/g, '').length < 10) {
-        setErrorMsg('Please enter a valid 10-digit mobile phone number.');
+      if (!formData.email || !formData.email.includes('@')) {
+        setErrorMsg('Please enter a valid email address.');
         return;
       }
-      if (!formData.phoneVerified) {
-        setErrorMsg('Please verify your mobile phone number with OTP to proceed.');
+      if (!formData.emailVerified) {
+        setErrorMsg('Please verify your email address with the 6-digit OTP sent to your inbox to proceed.');
         return;
       }
     } else if (currentStep === 2) {
@@ -465,34 +449,34 @@ export default function OnboardingPage() {
                   />
                 </div>
 
-                {/* MOBILE PHONE NUMBER WITH OTP VERIFICATION */}
+                {/* EMAIL ADDRESS WITH SUPABASE REAL EMAIL OTP VERIFICATION */}
                 <div className="sm:col-span-2 p-4 bg-slate-50 dark:bg-slate-900/80 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <Smartphone className="w-4 h-4 text-emerald-500" />
-                      Mobile Phone Number (OTP Authentication) <span className="text-rose-500">*</span>
+                      <Mail className="w-4 h-4 text-emerald-500" />
+                      Email Address (Supabase Real Email Verification) <span className="text-rose-500">*</span>
                     </label>
 
-                    {formData.phoneVerified && (
+                    {formData.emailVerified && (
                       <Badge variant="success" className="font-mono text-xs flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        Verified via OTP
+                        Email Verified
                       </Badge>
                     )}
                   </div>
 
-                  {formData.phoneVerified ? (
+                  {formData.emailVerified ? (
                     <div className="flex items-center justify-between p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
-                        <span>Mobile Verified: <strong>{formData.phone}</strong></span>
+                        <span>Email Address Verified: <strong>{formData.email}</strong></span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setFormData((prev) => ({ ...prev, phoneVerified: false }))}
+                        onClick={() => setFormData((prev) => ({ ...prev, emailVerified: false }))}
                         className="text-[11px] text-slate-500 hover:text-rose-500 underline font-semibold"
                       >
-                        Change Number
+                        Change Email
                       </button>
                     </div>
                   ) : (
@@ -500,10 +484,10 @@ export default function OnboardingPage() {
                       <div className="flex gap-2">
                         <div className="relative flex-1">
                           <input
-                            type="text"
-                            name="phone"
-                            placeholder="Enter 10-digit Mobile Number"
-                            value={formData.phone}
+                            type="email"
+                            name="email"
+                            placeholder="e.g. user@gmail.com"
+                            value={formData.email}
                             onChange={handleChange}
                             className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-mono text-xs font-bold focus:border-emerald-500 focus:outline-none"
                           />
@@ -513,27 +497,27 @@ export default function OnboardingPage() {
                           variant="primary"
                           size="sm"
                           disabled={otpLoading}
-                          icon={otpLoading ? Loader2 : Send}
-                          onClick={handleSendOtp}
+                          icon={otpLoading ? Loader2 : Mail}
+                          onClick={handleSendEmailOtp}
                           className="bg-emerald-500 hover:bg-emerald-600 font-bold text-xs shrink-0 disabled:opacity-50"
                         >
-                          {otpLoading ? 'Sending SMS...' : otpSent ? 'Resend SMS' : 'Send OTP'}
+                          {otpLoading ? 'Sending Email...' : otpSent ? 'Resend Email OTP' : 'Send Email OTP'}
                         </Button>
                       </div>
 
-                      {/* REAL MOBILE SMS OTP INPUT CONTAINER */}
+                      {/* REAL SUPABASE EMAIL OTP INPUT CONTAINER */}
                       {otpSent && (
                         <div className="space-y-3 pt-1 animate-in fade-in">
                           <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                            <Smartphone className="w-4 h-4 text-emerald-500 shrink-0" />
-                            <span>An SMS OTP code was dispatched to <strong>{formData.phone}</strong>. Please check your physical mobile phone.</span>
+                            <Mail className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <span>A 6-digit Email OTP was sent to <strong>{formData.email}</strong>. Check your inbox & spam folder.</span>
                           </p>
 
                           <div className="flex gap-2 items-center flex-wrap">
                             <input
                               type="text"
                               maxLength={6}
-                              placeholder="Enter OTP Code"
+                              placeholder="Enter 6-digit OTP"
                               value={userOtpInput}
                               onChange={(e) => setUserOtpInput(e.target.value)}
                               className="w-44 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-center font-mono text-sm tracking-widest font-bold focus:border-emerald-500 focus:outline-none"
@@ -544,24 +528,11 @@ export default function OnboardingPage() {
                               size="sm"
                               disabled={otpLoading || !userOtpInput.trim()}
                               icon={otpLoading ? Loader2 : ShieldCheck}
-                              onClick={handleVerifyOtp}
+                              onClick={handleVerifyEmailOtp}
                               className="bg-emerald-600 hover:bg-emerald-700 font-bold text-xs disabled:opacity-50"
                             >
                               {otpLoading ? 'Verifying...' : 'Verify OTP'}
                             </Button>
-
-                            {generatedOtp && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setUserOtpInput(generatedOtp);
-                                }}
-                                className="text-[11px] font-mono px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 font-bold transition cursor-pointer"
-                                title="Click to auto-fill OTP for testing"
-                              >
-                                🔑 Test OTP: {generatedOtp}
-                              </button>
-                            )}
 
                             {resendTimer > 0 && (
                               <span className="text-[11px] text-slate-400 font-mono">
