@@ -19,11 +19,14 @@ export default function DashboardPage() {
   const [showEntryModal, setShowEntryModal] = useState(false);
 
   useEffect(() => {
-    const isDismissed = sessionStorage.getItem('finlabs_entry_modal_dismissed');
-    if (!completedAt && !isDismissed) {
+    const isCompleted = localStorage.getItem('finlabs_onboarding_completed') === 'true';
+    const isDismissedInSession = sessionStorage.getItem('finlabs_entry_modal_dismissed') === 'true';
+
+    // Show modal popup if user hasn't completed onboarding and hasn't dismissed in session
+    if (!isCompleted && !isDismissedInSession) {
       setShowEntryModal(true);
     }
-  }, [completedAt]);
+  }, []);
 
   const handleCloseModal = () => {
     sessionStorage.setItem('finlabs_entry_modal_dismissed', 'true');

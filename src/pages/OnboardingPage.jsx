@@ -218,7 +218,8 @@ export default function OnboardingPage() {
 
     try {
       await saveFinancialProfile(user?.id, formData);
-      navigate('/profile', { replace: true });
+      localStorage.setItem('finlabs_onboarding_completed', 'true');
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setErrorMsg(err.message || 'Failed to save financial profile.');
     } finally {
