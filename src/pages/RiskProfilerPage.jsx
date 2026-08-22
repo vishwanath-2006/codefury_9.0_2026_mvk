@@ -160,7 +160,7 @@ export default function RiskProfilerPage() {
           </CardHeader>
 
           {/* SVG Radial Arc Gauge */}
-          <div className="relative w-44 h-44 my-4 flex items-center justify-center">
+          <div className="relative w-48 h-48 my-4 flex items-center justify-center mx-auto">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
               <path
                 className="text-slate-800"
@@ -179,9 +179,16 @@ export default function RiskProfilerPage() {
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
               />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="text-4xl font-extrabold font-mono text-white">{prq} / 100</span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Risk Score</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
+              <div className="flex items-baseline justify-center">
+                <span className="text-5xl font-black font-mono tracking-tight text-white drop-shadow-md">
+                  {prq}
+                </span>
+                <span className="text-xs font-bold text-emerald-400 font-mono ml-1">/100</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-1 block">
+                Risk Score
+              </span>
             </div>
           </div>
 
