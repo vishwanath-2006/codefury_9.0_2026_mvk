@@ -615,6 +615,21 @@ export default function FloatingAiWidget() {
 
             {/* 3D Floating Contact Shadow */}
             <div className="finlabs-robot-shadow w-14 sm:w-18 md:w-20 h-2.5 sm:h-3 -mt-1.5 rounded-full bg-emerald-950/70 dark:bg-emerald-900/60 blur-[4px]" />
+
+            {/* Quick 1-Click "Ask FinLabs AI" Interactive Badge */}
+            {!isDragging && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openAiChat();
+                }}
+                title="1-Click to open AI Copilot"
+                className="mt-1 flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/95 dark:bg-slate-900/95 border border-emerald-500/50 shadow-lg shadow-emerald-950/40 text-emerald-400 text-[11px] font-bold tracking-tight cursor-pointer hover:bg-emerald-500 hover:text-white transition-all hover:scale-105 select-none"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                <span>Ask FinLabs AI</span>
+              </div>
+            )}
           </div>
         </aside>
       )}

@@ -26,6 +26,9 @@ export const createEmptyOnboardingData = (user = null, profile = null) => ({
   monthlyDebtPayments: '',
   debtType: 'Home',
   goals: [],
+  previousInvestmentAmount: '',
+  previousInvestmentPlatforms: [],
+  previousInvestmentOther: '',
   hasInvestments: false,
   investmentCategories: [],
   investmentExperience: '',
@@ -80,10 +83,18 @@ export function getUserFinancialProfile(raw) {
   const bankSavings = Number(d.bankSavings ?? d.currentSavings ?? 0) || 0;
   const emergencyFundAmount = Number(d.emergencyFundAmount ?? d.emergencyFund ?? 0) || 0;
 
-  const rawTotalValue = Number(d.totalInvestmentValue ?? d.portfolioValue ?? (bankSavings + emergencyFundAmount)) || 0;
+  const previousInvestmentAmount = Number(d.previousInvestmentAmount ?? d.previous_investment_amount ?? 0) || 0;
+  const previousInvestmentPlatforms = Array.isArray(d.previousInvestmentPlatforms)
+    ? d.previousInvestmentPlatforms
+    : (Array.isArray(d.previous_investment_platforms) ? d.previous_investment_platforms : []);
+  const previousInvestmentOther = d.previousInvestmentOther || d.previous_investment_other || '';
+
+  const rawTotalValue = Number(d.totalInvestmentValue ?? d.portfolioValue ?? (previousInvestmentAmount > 0 ? previousInvestmentAmount : (bankSavings + emergencyFundAmount))) || 0;
   const assetClasses = Array.isArray(d.assetClasses) && d.assetClasses.length > 0
     ? d.assetClasses
-    : (Array.isArray(d.investmentCategories) && d.investmentCategories.length > 0 ? d.investmentCategories : ['Mutual Funds / SIPs', 'Direct Equity / Stocks']);
+    : (previousInvestmentPlatforms.length > 0
+      ? previousInvestmentPlatforms
+      : (Array.isArray(d.investmentCategories) && d.investmentCategories.length > 0 ? d.investmentCategories : ['Mutual Funds / SIPs', 'Direct Equity / Stocks']));
 
   const isMF = assetClasses.some(a => a.includes('Mutual Funds'));
   const isStocks = assetClasses.some(a => a.includes('Stocks') || a.includes('Equity'));
@@ -322,6 +333,11 @@ export async function getNormalizedFinancialProfile(userId) {
     const monthlyDebtPayments = Number(raw.monthly_debt_payments ?? raw.monthlyDebtPayments ?? 0);
     const emergencyFund = Number(raw.emergency_fund ?? raw.emergencyFund ?? 0);
     const currentSavings = Number(raw.current_savings ?? raw.currentSavings ?? 0);
+    const previousInvestmentAmount = Number(raw.previous_investment_amount ?? raw.previousInvestmentAmount ?? 0);
+    const previousInvestmentPlatforms = Array.isArray(raw.previous_investment_platforms)
+      ? raw.previous_investment_platforms
+      : (Array.isArray(raw.previousInvestmentPlatforms) ? raw.previousInvestmentPlatforms : []);
+    const previousInvestmentOther = raw.previous_investment_other || raw.previousInvestmentOther || '';
     const riskProfile = raw.risk_tolerance || raw.riskTolerance || 'Moderate';
     const onboardingCompleted = Boolean(raw.onboarding_completed ?? raw.onboardingCompleted ?? false);
 
@@ -333,6 +349,9 @@ export async function getNormalizedFinancialProfile(userId) {
       monthlyDebtPayments,
       emergencyFund,
       currentSavings,
+      previousInvestmentAmount,
+      previousInvestmentPlatforms,
+      previousInvestmentOther,
       riskProfile,
       goals: raw.goals || [],
       onboardingCompleted,
@@ -349,6 +368,9 @@ export async function getNormalizedFinancialProfile(userId) {
     monthlyDebtPayments: 0,
     emergencyFund: 0,
     currentSavings: 0,
+    previousInvestmentAmount: 0,
+    previousInvestmentPlatforms: [],
+    previousInvestmentOther: '',
     riskProfile: 'Not Set',
     goals: [],
     onboardingCompleted: false,
@@ -395,7 +417,7 @@ export async function saveFinancialProfile(userId, formData) {
     dependents: Number(formData.dependents) || 0,
     income_stability: formData.incomeStability || 'Stable',
 
-    // Step 2: Cash Flow, Savings & Debt
+    // Step 2: Cash Flow, Savings, Debt & Previous Investments
     monthly_income: Number(formData.monthlyIncome) || 0,
     other_income: Number(formData.otherIncome) || 0,
     monthly_essential_expenses: monthlyEssential,
@@ -403,6 +425,9 @@ export async function saveFinancialProfile(userId, formData) {
     monthly_expenses: computedMonthlyExpenses,
     current_savings: Number(formData.currentSavings) || 0,
     emergency_fund: Number(formData.emergencyFund) || 0,
+    previous_investment_amount: Number(formData.previousInvestmentAmount) || 0,
+    previous_investment_platforms: Array.isArray(formData.previousInvestmentPlatforms) ? formData.previousInvestmentPlatforms : [],
+    previous_investment_other: formData.previousInvestmentOther || null,
     has_debt: Boolean(formData.hasDebt),
     total_debt: Number(formData.totalDebt) || 0,
     monthly_debt_payments: Number(formData.monthlyDebtPayments) || 0,

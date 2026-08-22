@@ -91,6 +91,11 @@ export default function OnboardingPage() {
             totalDebt: saved.total_debt != null ? String(saved.total_debt) : (saved.totalDebt || '0'),
             monthlyDebtPayments: saved.monthly_debt_payments != null ? String(saved.monthly_debt_payments) : (saved.monthlyDebtPayments || '0'),
             debtType: saved.debt_type || saved.debtType || 'Home',
+            previousInvestmentAmount: saved.previous_investment_amount != null ? String(saved.previous_investment_amount) : (saved.previousInvestmentAmount || '0'),
+            previousInvestmentPlatforms: Array.isArray(saved.previous_investment_platforms)
+              ? saved.previous_investment_platforms
+              : (Array.isArray(saved.previousInvestmentPlatforms) ? saved.previousInvestmentPlatforms : []),
+            previousInvestmentOther: saved.previous_investment_other || saved.previousInvestmentOther || '',
             investmentExperience: saved.investment_experience || saved.investmentExperience || 'beginner',
             hasHealthInsurance: Boolean(saved.has_health_insurance ?? saved.hasHealthInsurance ?? true),
             hasLifeInsurance: Boolean(saved.has_life_insurance ?? saved.hasLifeInsurance ?? true),
@@ -117,6 +122,18 @@ export default function OnboardingPage() {
       isMounted = false;
     };
   }, [user?.id, profile, authLoading]);
+
+  const handleTogglePlatform = (platform) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.previousInvestmentPlatforms) ? prev.previousInvestmentPlatforms : [];
+      const exists = current.includes(platform);
+      const next = exists ? current.filter((p) => p !== platform) : [...current, platform];
+      return {
+        ...prev,
+        previousInvestmentPlatforms: next
+      };
+    });
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -493,6 +510,126 @@ export default function OnboardingPage() {
                       value={formData.emergencyFund}
                       onChange={handleChange}
                     />
+                  </div>
+                </div>
+
+                {/* PREVIOUS INVESTMENTS SECTION */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <PieChart className="w-4 h-4 text-emerald-500" />
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-800 dark:text-slate-200">
+                        Previous Investment History & Asset Allocation
+                      </h4>
+                      <p className="text-[11px] text-slate-400">
+                        Tell us about your past investments so FinLabs AI can tailor portfolio recommendations.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Question 1: How much have you invested previously? */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block">
+                        How much have you invested previously? (₹)
+                      </label>
+                      {Number(formData.previousInvestmentAmount) > 0 && (
+                        <span className="text-[11px] font-mono font-bold text-emerald-500">
+                          {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(formData.previousInvestmentAmount))}
+                        </span>
+                      )}
+                    </div>
+
+                    <Input
+                      name="previousInvestmentAmount"
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 150000 (Enter 0 if new investor)"
+                      value={formData.previousInvestmentAmount}
+                      onChange={handleChange}
+                    />
+
+                    {/* Quick amount chips */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {[
+                        { label: '₹0 (New)', val: '0' },
+                        { label: '₹25,000', val: '25000' },
+                        { label: '₹1,00,000', val: '100000' },
+                        { label: '₹5,00,000', val: '500000' },
+                        { label: '₹10,00,000+', val: '1000000' }
+                      ].map((chip) => (
+                        <button
+                          key={chip.val}
+                          type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, previousInvestmentAmount: chip.val }))}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer ${
+                            formData.previousInvestmentAmount === chip.val
+                              ? 'bg-emerald-500 text-white shadow-xs font-bold'
+                              : 'bg-slate-200/60 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-500'
+                          }`}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Question 2: Where have you invested previously? (Multi-select) */}
+                  <div className="space-y-2 pt-3 border-t border-slate-200/70 dark:border-slate-800">
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block">
+                      Where have you invested previously? <span className="text-slate-400 font-normal text-[11px]">(Select all that apply)</span>
+                    </label>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 pt-1">
+                      {[
+                        'Stocks',
+                        'Mutual Funds',
+                        'IPOs',
+                        'ETFs',
+                        'Bonds',
+                        'Fixed Deposits',
+                        'Gold',
+                        'Cryptocurrency',
+                        'Real Estate',
+                        'Other'
+                      ].map((platform) => {
+                        const isSelected = Array.isArray(formData.previousInvestmentPlatforms) && formData.previousInvestmentPlatforms.includes(platform);
+                        return (
+                          <button
+                            key={platform}
+                            type="button"
+                            onClick={() => handleTogglePlatform(platform)}
+                            className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-500/15 border-emerald-500/80 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
+                                : 'bg-white dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
+                            }`}
+                          >
+                            <span>{platform}</span>
+                            {isSelected ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <span className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-700 inline-block" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* If "Other" is selected, show text input */}
+                    {Array.isArray(formData.previousInvestmentPlatforms) && formData.previousInvestmentPlatforms.includes('Other') && (
+                      <div className="pt-2 animate-in fade-in">
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          Specify Other Investment Types
+                        </label>
+                        <Input
+                          name="previousInvestmentOther"
+                          placeholder="e.g. Commodities, P2P Lending, Angel / Startup Equity"
+                          value={formData.previousInvestmentOther || ''}
+                          onChange={handleChange}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

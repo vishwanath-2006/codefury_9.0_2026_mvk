@@ -79,6 +79,9 @@ export async function buildUserFinancialContext(userId, fallbackProfile = null) 
       debtToIncomeRatio,
       goals: rawGoals,
       goalsBreakdown,
+      previousInvestmentAmount: finProfile?.previousInvestmentAmount ?? finProfile?.raw?.previous_investment_amount ?? 0,
+      previousInvestmentPlatforms: finProfile?.previousInvestmentPlatforms || finProfile?.raw?.previous_investment_platforms || [],
+      previousInvestmentOther: finProfile?.previousInvestmentOther || finProfile?.raw?.previous_investment_other || '',
       investmentExperience: finProfile?.raw?.investment_experience || 'beginner',
       riskTolerance: finProfile.riskProfile || 'Moderate',
       timeHorizon: finProfile?.raw?.time_horizon || '5–10 years',
@@ -103,6 +106,9 @@ export async function buildUserFinancialContext(userId, fallbackProfile = null) 
       emergencyFund: 0,
       emergencyMonths: 0,
       savingsRatePct: 0,
+      previousInvestmentAmount: 0,
+      previousInvestmentPlatforms: [],
+      previousInvestmentOther: '',
       hasDebt: false,
       totalDebt: 0,
       debtToIncomeRatio: 0,
@@ -223,7 +229,25 @@ export async function generateAiResponse(query, userId, fallbackProfile = null) 
     return `Hi ${nameGreeting}, you haven't added any specific financial goals yet. You can add goals under Onboarding Step 3 or Profile to track progress!`;
   }
 
-  // Priority 4: Investment recommendations
+  // Priority 4: Investment Experience & Previous Portfolio Questions
+  if (
+    qLower.includes('previous') ||
+    qLower.includes('already invested') ||
+    qLower.includes('experience') ||
+    qLower.includes('what next') ||
+    qLower.includes('consider next') ||
+    (qLower.includes('invested in') && (qLower.includes('stocks') || qLower.includes('mutual fund')))
+  ) {
+    const platforms = ctx.previousInvestmentPlatforms || [];
+    const platformsStr = platforms.length > 0 ? platforms.join(', ') : 'Direct Equities & Mutual Funds';
+    const amountStr = ctx.previousInvestmentAmount > 0 ? formatINR(ctx.previousInvestmentAmount) : 'active holdings';
+    const risk = ctx.riskTolerance || 'Moderate';
+    const horizon = ctx.timeHorizon || '5–10 years';
+
+    return `Hi ${nameGreeting}! Since you have already invested **${amountStr}** across **${platformsStr}**, here is your tailored next-step roadmap:\n\n**1. Portfolio Diversification & Rebalancing:**\n- Ensure your direct stock equity exposure is balanced with **Flexi Cap Mutual Funds** (e.g. Parag Parikh Flexi Cap) for downside protection.\n- If you hold concentrated single-stock positions, consider dollar-cost averaging into low-cost **Nifty 50 Index Funds** (e.g. UTI Nifty 50).\n\n**2. Core vs Satellite Strategy:**\n- **Core (70%)**: Broad market indices and diversified active flexi-caps.\n- **Satellite (30%)**: Quality growth stocks (e.g. TCS, HDFC Bank, Reliance) and thematic/mid-cap opportunities.\n\n**3. Surplus Deployment:**\n- With your monthly surplus of **${formatINR(ctx.monthlySurplus)}** (${ctx.savingsRatePct}% savings rate), automate recurring monthly SIPs aligned with your **${risk}** risk profile over your **${horizon}** horizon.`;
+  }
+
+  // Priority 5: Investment recommendations
   if (intent === 'INVESTMENT_RECOMMENDATIONS' || qLower.includes('recommend') || qLower.includes('which fund')) {
     const risk = ctx.riskTolerance || 'Moderate';
     const horizon = ctx.timeHorizon || '3–5 years';

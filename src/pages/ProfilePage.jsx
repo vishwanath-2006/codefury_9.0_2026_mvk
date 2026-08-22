@@ -119,6 +119,9 @@ export default function ProfilePage() {
     goals: finProfile?.goals || [],
     hasInvestments: Boolean(raw?.has_investments),
     investmentCategories: raw?.investment_categories || [],
+    previousInvestmentAmount: finProfile?.previousInvestmentAmount ?? raw?.previous_investment_amount ?? 0,
+    previousInvestmentPlatforms: finProfile?.previousInvestmentPlatforms || raw?.previous_investment_platforms || [],
+    previousInvestmentOther: finProfile?.previousInvestmentOther || raw?.previous_investment_other || '',
     investmentExperience: formatExperienceLabel(raw?.investment_experience),
     hasHealthInsurance: Boolean(raw?.has_health_insurance),
     hasLifeInsurance: Boolean(raw?.has_life_insurance),
@@ -373,27 +376,55 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
           <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <PieChart className="w-4 h-4 text-emerald-500" />
-            6. Investments & Experience
+            6. Investment Experience & Historical Portfolio
           </h3>
-          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=3')}>
+          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=2')}>
             Edit
           </Button>
         </div>
 
-        <div className="space-y-3 text-xs">
-          <div>
-            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Active Investment Footprint</span>
-            <div className="flex flex-wrap gap-1.5">
-              {displayData.investmentCategories.map((cat) => (
-                <Badge key={cat} variant="neutral" className="text-[10px]">
-                  {cat}
-                </Badge>
-              ))}
+        <div className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Previously Invested Capital</span>
+              <span className="text-base font-extrabold font-mono text-emerald-500">
+                {displayData.previousInvestmentAmount > 0
+                  ? formatINR(displayData.previousInvestmentAmount)
+                  : 'New Investor (₹0)'}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Investing Experience Level</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">
+                {displayData.investmentExperience}
+              </span>
             </div>
           </div>
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Investing Experience</span>
-            <span className="font-bold text-emerald-500">{displayData.investmentExperience}</span>
+
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1.5">Previous Investment Types / Platforms</span>
+            {displayData.previousInvestmentPlatforms && displayData.previousInvestmentPlatforms.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {displayData.previousInvestmentPlatforms.map((platform) => (
+                  <span
+                    key={platform}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs shadow-2xs"
+                  >
+                    <Check className="w-3 h-3" />
+                    <span>{platform}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 font-mono text-xs">No previous investment platforms specified.</p>
+            )}
+
+            {displayData.previousInvestmentOther && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 italic">
+                Other specified: <span className="font-medium text-slate-700 dark:text-slate-300">{displayData.previousInvestmentOther}</span>
+              </p>
+            )}
           </div>
         </div>
       </Card>
