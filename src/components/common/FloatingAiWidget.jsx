@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, X, Move, EyeOff, RotateCcw, Bot } from 'lucide-react';
 
-const STORAGE_KEY = 'finlabs_robot_position_v3';
-const MARGIN = 24;
+const STORAGE_KEY = 'finlabs_robot_position_v4';
+const MARGIN = 16;
 const ROBOT_WIDTH = 110;
 const ROBOT_HEIGHT = 140;
 
@@ -19,14 +19,22 @@ export default function FloatingAiWidget() {
   const [isDragging, setIsDragging] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { x, y }
 
-  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0, hasMoved: false });
+  const dragStartRef = useRef({
+    mouseX: 0,
+    mouseY: 0,
+    posX: 0,
+    posY: 0,
+    startTime: 0,
+    hasMoved: false
+  });
+
   const widgetRef = useRef(null);
   const contextMenuRef = useRef(null);
 
   // Hide the floating widget when the user is actively on the /ai chat page
   const isAiPage = location.pathname === '/ai';
 
-  // 1. Initial State: Always default to visible bottom-right unless explicitly moved/hidden by user
+  // 1. Initial State: Always default to visible bottom-right unless explicitly moved/hidden
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -61,7 +69,7 @@ export default function FloatingAiWidget() {
     }
   }, []);
 
-  // 2. Clamp position on window resize so robot is never off-screen
+  // 2. Clamp position on window resize
   useEffect(() => {
     const handleResize = () => {
       setPosition((prev) => {
@@ -123,16 +131,12 @@ export default function FloatingAiWidget() {
     };
   }, [contextMenu, isDragging]);
 
-  // Handle Left Click
-  const handleClick = (e) => {
-    if (dragStartRef.current.hasMoved) {
-      e?.preventDefault?.();
-      return;
-    }
+  // 1-CLICK OPEN ACTION: Navigate directly to AI Assistant
+  const openAiChat = useCallback(() => {
     if (!isAiPage) {
       navigate('/ai');
     }
-  };
+  }, [isAiPage, navigate]);
 
   // Handle Right Click -> Open Context Menu
   const handleContextMenu = (e) => {
@@ -147,39 +151,32 @@ export default function FloatingAiWidget() {
     setContextMenu({ x: Math.max(10, menuX), y: Math.max(10, menuY) });
   };
 
-  // Dragging logic
-  const startDrag = (clientX, clientY) => {
+  // Pointer & Touch Dragging Handlers
+  const handlePointerDown = (e) => {
+    if (e.button === 2) return; // Ignore right-click
+
     dragStartRef.current = {
-      mouseX: clientX,
-      mouseY: clientY,
+      mouseX: e.clientX,
+      mouseY: e.clientY,
       posX: position.x ?? (window.innerWidth - ROBOT_WIDTH - MARGIN),
       posY: position.y ?? (window.innerHeight - ROBOT_HEIGHT - MARGIN),
+      startTime: Date.now(),
       hasMoved: false
     };
+
     setIsDragging(true);
     setContextMenu(null);
-  };
-
-  const handleMouseDown = (e) => {
-    if (e.button === 0) {
-      startDrag(e.clientX, e.clientY);
-    }
-  };
-
-  const handleTouchStart = (e) => {
-    if (e.touches.length === 1) {
-      startDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }
   };
 
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e) => {
+    const handlePointerMove = (e) => {
       const deltaX = e.clientX - dragStartRef.current.mouseX;
       const deltaY = e.clientY - dragStartRef.current.mouseY;
+      const dist = Math.hypot(deltaX, deltaY);
 
-      if (Math.hypot(deltaX, deltaY) > 4) {
+      if (dist > 8) {
         dragStartRef.current.hasMoved = true;
       }
 
@@ -192,8 +189,21 @@ export default function FloatingAiWidget() {
       setPosition({ x: targetX, y: targetY });
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = (e) => {
       setIsDragging(false);
+
+      const deltaX = e.clientX - dragStartRef.current.mouseX;
+      const deltaY = e.clientY - dragStartRef.current.mouseY;
+      const dist = Math.hypot(deltaX, deltaY);
+      const duration = Date.now() - dragStartRef.current.startTime;
+
+      // IF IT WAS A CLICK (Micro-movement <= 8px AND duration < 350ms) -> OPEN CHAT IN 1 CLICK!
+      if (!dragStartRef.current.hasMoved || (dist <= 8 && duration < 350)) {
+        openAiChat();
+        return;
+      }
+
+      // OTHERWISE: IT WAS A DRAG -> SAVE NEW POSITION
       setPosition((currentPos) => {
         setLastVisiblePos(currentPos);
         const edge = currentPos.x < window.innerWidth / 2 ? 'left' : 'right';
@@ -203,25 +213,16 @@ export default function FloatingAiWidget() {
       });
     };
 
-    const handleTouchMove = (e) => {
-      if (e.touches.length === 1) {
-        e.preventDefault();
-        handleMouseMove(e.touches[0]);
-      }
-    };
-
-    window.addEventListener('mousemove', handleMouseMove, { passive: false });
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
-  }, [isDragging, persistState]);
+  }, [isDragging, openAiChat, persistState]);
 
   // Context Menu Actions
   const handleHideRobot = () => {
@@ -263,7 +264,7 @@ export default function FloatingAiWidget() {
       <style>{`
         @keyframes finlabs-float {
           0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
+          50% { transform: translateY(-8px); }
         }
         @keyframes finlabs-shadow {
           0%, 100% { transform: scale(1); opacity: 0.55; }
@@ -326,8 +327,7 @@ export default function FloatingAiWidget() {
           ref={widgetRef}
           aria-label="FinLabs AI Assistant"
           onContextMenu={handleContextMenu}
-          onMouseDown={handleMouseDown}
-          onTouchStart={handleTouchStart}
+          onPointerDown={handlePointerDown}
           style={{
             position: 'fixed',
             left: position.x !== null ? `${position.x}px` : undefined,
@@ -337,14 +337,14 @@ export default function FloatingAiWidget() {
             zIndex: 45,
             touchAction: 'none'
           }}
-          className={`flex flex-col items-end gap-2.5 select-none ${
-            isDragging ? 'cursor-grabbing opacity-90 scale-102' : 'cursor-grab'
-          } transition-transform duration-100 animate-in fade-in duration-300`}
+          className={`flex flex-col items-end gap-2 select-none ${
+            isDragging ? 'cursor-grabbing opacity-90 scale-102' : 'cursor-grab hover:scale-104'
+          } transition-transform duration-150 animate-in fade-in`}
         >
           {/* Dragging indicator badge */}
           {isDragging && (
-            <div className="self-center px-2.5 py-0.5 rounded-full bg-slate-900/90 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/40 shadow-lg pointer-events-none whitespace-nowrap animate-pulse">
-              📍 Dragging Robot...
+            <div className="self-center px-2.5 py-0.5 rounded-full bg-slate-900/95 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/40 shadow-lg pointer-events-none whitespace-nowrap animate-pulse">
+              📍 Moving Robot...
             </div>
           )}
 
@@ -353,9 +353,9 @@ export default function FloatingAiWidget() {
             <div
               role="button"
               tabIndex={0}
-              onClick={handleClick}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') handleClick();
+              onClick={(e) => {
+                e.stopPropagation();
+                openAiChat();
               }}
               className="pointer-events-auto cursor-pointer relative max-w-[240px] sm:max-w-[270px] p-3 sm:p-3.5 rounded-2xl bg-slate-900/90 dark:bg-slate-900/95 backdrop-blur-md text-slate-100 border border-emerald-500/40 shadow-xl shadow-emerald-950/30 text-xs leading-relaxed transition-all hover:scale-102 hover:border-emerald-400 hover:shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mr-2"
             >
@@ -376,7 +376,7 @@ export default function FloatingAiWidget() {
                 <span className="tracking-tight font-extrabold text-[12px]">Hi! I'm FinLabs AI 👋</span>
               </div>
               <p className="text-[11px] text-slate-300 font-medium">
-                I'm free — ask me any financial question!
+                Click me to ask any financial question!
               </p>
 
               {/* Speech bubble pointer arrow */}
@@ -384,13 +384,13 @@ export default function FloatingAiWidget() {
             </div>
           )}
 
-          {/* Prominent Original 3D FinLabs Robot Companion */}
+          {/* Prominent 3D FinLabs Robot Companion */}
           <div className="pointer-events-auto relative flex flex-col items-center">
-            <button
-              type="button"
-              aria-label="Open FinLabs AI Copilot (Right-click to move/hide)"
-              onClick={handleClick}
-              className="group relative w-22 h-26 sm:w-26 sm:h-30 md:w-28 md:h-32 flex items-center justify-center transition-transform duration-200 hover:scale-106 active:scale-95 focus:outline-none cursor-pointer p-0 bg-transparent border-0"
+            <div
+              role="button"
+              tabIndex={0}
+              title="1-Click to open AI Chat (Drag to move, right-click for settings)"
+              className="group relative w-22 h-26 sm:w-26 sm:h-30 md:w-28 md:h-32 flex items-center justify-center transition-transform duration-200 hover:scale-106 active:scale-95 cursor-grab active:cursor-grabbing p-0 bg-transparent border-0"
             >
               {/* Ambient Glow Aura */}
               <div className="absolute inset-2 rounded-full bg-emerald-500/30 blur-2xl finlabs-glow-ambient group-hover:bg-emerald-400/50 transition-colors pointer-events-none" />
@@ -611,7 +611,7 @@ export default function FloatingAiWidget() {
                   <ellipse cx="40" cy="71" rx="5" ry="1.8" fill="#a7f3d0" />
                 </svg>
               </div>
-            </button>
+            </div>
 
             {/* 3D Floating Contact Shadow */}
             <div className="finlabs-robot-shadow w-14 sm:w-18 md:w-20 h-2.5 sm:h-3 -mt-1.5 rounded-full bg-emerald-950/70 dark:bg-emerald-900/60 blur-[4px]" />
