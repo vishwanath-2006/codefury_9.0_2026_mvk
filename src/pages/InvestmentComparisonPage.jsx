@@ -7,283 +7,187 @@ import {
   Search,
   Plus,
   X,
-  TrendingUp,
-  TrendingDown,
   Sparkles,
-  ShieldCheck,
-  Building2,
-  BarChart3,
-  Calendar,
-  Layers,
-  ArrowRight,
+  Scale,
   RefreshCw,
   Info,
-  AlertCircle,
-  Activity,
-  PieChart,
-  Sliders,
-  DollarSign,
-  Scale
+  AlertCircle
 } from 'lucide-react';
 import {
-  STOCKS_UNIVERSE,
-  IPOS_UNIVERSE,
-  loadStockComparisonData,
-  loadIpoComparisonData,
-  getComparisonLeaderCards,
-  generateComparisonInsights
+  searchAllInvestments,
+  loadUnifiedComparison,
+  generateKeyDifferences
 } from '../services/comparisonService';
-import MultiAssetLineChart from '../components/comparison/MultiAssetLineChart';
-import ComparisonBarChart from '../components/comparison/ComparisonBarChart';
 
 export default function InvestmentComparisonPage() {
-  const [activeTab, setActiveTab] = useState('stocks'); // 'stocks' | 'ipos'
+  // Asset filter for search
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'stocks' | 'mf' | 'ipos'
 
-  // Selected tickers / IDs
-  const [selectedStocks, setSelectedStocks] = useState(['TCS', 'INFY', 'RELIANCE']);
-  const [selectedIpos, setSelectedIpos] = useState(['ipo-1', 'ipo-2', 'ipo-3']);
+  // Selected investments (Default: 1 stock + 1 mutual fund for cross-asset clarity)
+  const [selectedItems, setSelectedItems] = useState([
+    { type: 'stock', key: 'TCS', name: 'Tata Consultancy Services' },
+    { type: 'mf', key: 'mf-parag-parikh', name: 'Parag Parikh Flexi Cap Fund' }
+  ]);
 
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  const [timeFilter, setTimeFilter] = useState('1Y'); // '1M' | '6M' | '1Y'
-  const [analyticsCategory, setAnalyticsCategory] = useState('returns'); // 'returns' | 'valuation' | 'risk' | 'size' | 'volume'
-
-  // Loaded comparison data & state
-  const [comparisonItems, setComparisonItems] = useState([]);
+  const [comparisonData, setComparisonData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [maxWarning, setMaxWarning] = useState(false);
 
-  // Active selections based on tab
-  const activeSelectedKeys = activeTab === 'stocks' ? selectedStocks : selectedIpos;
-
-  // Load comparison data whenever active tab or selections change
-  const loadComparison = async () => {
-    if (activeSelectedKeys.length < 2) {
-      setComparisonItems([]);
+  // Load comparison data whenever selectedItems change
+  const loadData = async () => {
+    if (selectedItems.length < 2) {
+      setComparisonData([]);
       return;
     }
 
     setLoading(true);
-    setError(null);
-
     try {
-      if (activeTab === 'stocks') {
-        const data = await loadStockComparisonData(selectedStocks);
-        setComparisonItems(data);
-      } else {
-        const data = loadIpoComparisonData(selectedIpos);
-        setComparisonItems(data);
-      }
-    } catch (err) {
-      console.error('Failed to load comparison data:', err);
-      setError('Unable to fetch live market comparison data. Please try again.');
+      const data = await loadUnifiedComparison(selectedItems);
+      setComparisonData(data);
+    } catch (e) {
+      console.error('Comparison load error:', e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadComparison();
-  }, [activeTab, selectedStocks, selectedIpos]);
+    loadData();
+  }, [selectedItems]);
 
-  // Autocomplete search filtering
+  // Autocomplete search
   const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
+    if (!searchQuery.trim()) return [];
+    const all = searchAllInvestments(searchQuery, filterType);
+    return all.filter((res) => !selectedItems.some((s) => s.key === res.key));
+  }, [searchQuery, filterType, selectedItems]);
 
-    if (activeTab === 'stocks') {
-      return STOCKS_UNIVERSE.filter(
-        (s) =>
-          !selectedStocks.includes(s.symbol) &&
-          (s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.sector.toLowerCase().includes(q))
-      );
-    } else {
-      return IPOS_UNIVERSE.filter(
-        (ipo) =>
-          !selectedIpos.includes(ipo.id) &&
-          !selectedIpos.includes(ipo.symbol) &&
-          (ipo.company.toLowerCase().includes(q) ||
-            ipo.symbol.toLowerCase().includes(q) ||
-            ipo.sector.toLowerCase().includes(q))
-      );
-    }
-  }, [searchQuery, activeTab, selectedStocks, selectedIpos]);
-
-  // Handle adding an item
   const handleAddItem = (item) => {
-    if (activeTab === 'stocks') {
-      if (selectedStocks.length >= 5) {
-        setMaxWarning(true);
-        setTimeout(() => setMaxWarning(false), 3500);
-        return;
-      }
-      if (!selectedStocks.includes(item.symbol)) {
-        setSelectedStocks((prev) => [...prev, item.symbol]);
-        setSearchQuery('');
-      }
-    } else {
-      if (selectedIpos.length >= 5) {
-        setMaxWarning(true);
-        setTimeout(() => setMaxWarning(false), 3500);
-        return;
-      }
-      if (!selectedIpos.includes(item.id)) {
-        setSelectedIpos((prev) => [...prev, item.id]);
-        setSearchQuery('');
-      }
+    if (selectedItems.length >= 5) {
+      setMaxWarning(true);
+      setTimeout(() => setMaxWarning(false), 3000);
+      return;
     }
+    setSelectedItems((prev) => [...prev, { type: item.type, key: item.key, name: item.name, rawItem: item.rawItem }]);
+    setSearchQuery('');
   };
 
-  // Handle removing an item
   const handleRemoveItem = (keyToRemove) => {
-    if (activeTab === 'stocks') {
-      setSelectedStocks((prev) => prev.filter((k) => k !== keyToRemove));
-    } else {
-      setSelectedIpos((prev) => prev.filter((k) => k !== keyToRemove));
-    }
+    setSelectedItems((prev) => prev.filter((i) => i.key !== keyToRemove));
   };
 
-  // Summary leader cards & insights
-  const leaderCards = useMemo(() => {
-    return getComparisonLeaderCards(activeTab, comparisonItems);
-  }, [activeTab, comparisonItems]);
+  // Generate 2–3 concise takeaway points
+  const keyDifferences = useMemo(() => {
+    return generateKeyDifferences(comparisonData);
+  }, [comparisonData]);
 
-  const insights = useMemo(() => {
-    return generateComparisonInsights(activeTab, comparisonItems);
-  }, [activeTab, comparisonItems]);
-
-  const formatINR = (val) =>
-    val != null
-      ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(val)
-      : 'N/A';
-
-  // Compute row standouts for subtle neutral highlighting in matrix table
-  const rowHighlights = useMemo(() => {
-    if (activeTab !== 'stocks' || comparisonItems.length === 0) return {};
-
-    const highest1Y = [...comparisonItems].sort((a, b) => b.return1Y - a.return1Y)[0]?.symbol;
-    const lowestPe = [...comparisonItems].filter((i) => i.peRatioNum > 0).sort((a, b) => a.peRatioNum - b.peRatioNum)[0]?.symbol;
-    const lowestBeta = [...comparisonItems].sort((a, b) => a.betaNum - b.betaNum)[0]?.symbol;
-    const highestMcap = [...comparisonItems].sort((a, b) => b.marketCapNum - a.marketCapNum)[0]?.symbol;
-
-    return { highest1Y, lowestPe, lowestBeta, highestMcap };
-  }, [activeTab, comparisonItems]);
+  // Visual dot color gradient mapping based on existing risk data:
+  // 🟢 Green = Low risk | 🟡 Yellow = Moderate risk | 🟠 Orange = High risk | 🔴 Red = Very High risk
+  const getRiskDotClass = (risk) => {
+    const r = (risk || '').toLowerCase();
+    if (r.includes('low') && !r.includes('moderate')) return 'bg-emerald-500 shadow-xs shadow-emerald-500/50';
+    if (r.includes('low to moderate') || (r.includes('moderate') && !r.includes('high'))) return 'bg-amber-400 shadow-xs shadow-amber-400/50';
+    if (r.includes('moderately high') || r.includes('moderate to high') || (r.includes('high') && !r.includes('very'))) return 'bg-orange-500 shadow-xs shadow-orange-500/50';
+    if (r.includes('very high')) return 'bg-rose-500 shadow-xs shadow-rose-500/50';
+    return 'bg-orange-500 shadow-xs shadow-orange-500/50';
+  };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-150 pb-16">
-      {/* Header */}
+    <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto pb-16">
+      {/* 1. Header */}
       <PageHeader
-        title="Investment Comparison Studio"
-        subtitle="Professional multi-security comparison platform for Indian equities and IPOs with real-time quotes, valuation metrics, and normalized performance."
-        tag="Analytics Platform"
+        title="Investment Comparison"
+        subtitle="Compare investments by risk, returns, cost, and suitability."
+        tag="Smart Compare"
       />
 
-      {/* Mode Selector Tabs & Global Live Status */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
-          <button
-            onClick={() => {
-              setActiveTab('stocks');
-              setSearchQuery('');
-            }}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-              activeTab === 'stocks'
-                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Direct Equities (NSE)</span>
-          </button>
+      {/* 2. Asset Type Filter & Search Bar */}
+      <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3.5">
+        {/* Category Pills */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold">
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                filterType === 'all' ? 'bg-emerald-500 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              All Assets
+            </button>
+            <button
+              onClick={() => setFilterType('stocks')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                filterType === 'stocks' ? 'bg-emerald-500 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              Stocks
+            </button>
+            <button
+              onClick={() => setFilterType('mf')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                filterType === 'mf' ? 'bg-emerald-500 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              Mutual Funds
+            </button>
+            <button
+              onClick={() => setFilterType('ipos')}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                filterType === 'ipos' ? 'bg-emerald-500 text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              IPOs
+            </button>
+          </div>
 
           <button
-            onClick={() => {
-              setActiveTab('ipos');
-              setSearchQuery('');
-            }}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-              activeTab === 'ipos'
-                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>IPO Radar</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={loadComparison}
-            disabled={loading || activeSelectedKeys.length < 2}
-            className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-500 text-xs font-semibold flex items-center gap-2 transition disabled:opacity-50 cursor-pointer shadow-xs"
+            onClick={loadData}
+            disabled={loading || selectedItems.length < 2}
+            className="text-xs text-slate-500 hover:text-emerald-500 font-semibold flex items-center gap-1.5 transition disabled:opacity-40 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-500' : ''}`} />
-            <span>Refresh Market Quotes</span>
+            <span>Refresh</span>
           </button>
         </div>
-      </div>
 
-      {/* Max Selection Alert */}
-      {maxWarning && (
-        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs flex items-center gap-2 animate-in fade-in">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>You can compare up to 5 investments simultaneously for optimal visual readability.</span>
-        </div>
-      )}
-
-      {/* Search & Active Selection Studio Bar */}
-      <Card className="p-5 space-y-4 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/70 backdrop-blur-xs shadow-xs">
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Search & Select {activeTab === 'stocks' ? 'Stocks' : 'IPOs'} to Compare
-          </label>
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder={
-                activeTab === 'stocks'
-                  ? 'Search securities by company name or ticker (e.g. TCS, Reliance, Infosys, HDFC, Tata Motors)...'
-                  : 'Search IPOs by company name, sector, or exchange...'
-              }
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
+        {/* Search Input */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search investments by name or symbol (e.g. TCS, Parag Parikh, Premier Energies)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
 
           {/* Autocomplete Dropdown */}
           {searchResults.length > 0 && (
-            <div className="mt-2 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl space-y-1 max-h-64 overflow-y-auto custom-scrollbar">
-              {searchResults.map((item) => (
+            <div className="absolute top-full left-0 right-0 z-30 mt-1.5 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl space-y-1 max-h-56 overflow-y-auto custom-scrollbar">
+              {searchResults.map((res) => (
                 <div
-                  key={item.symbol || item.id}
-                  onClick={() => handleAddItem(item)}
-                  className="flex items-center justify-between p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/80 transition cursor-pointer text-xs"
+                  key={res.id}
+                  onClick={() => handleAddItem(res)}
+                  className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer text-xs"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 dark:text-slate-100">{item.symbol}</span>
-                      <span className="text-slate-400">·</span>
-                      <span className="text-slate-600 dark:text-slate-300 truncate">{item.name || item.company}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={res.badgeVariant} className="text-[10px] uppercase">
+                      {res.badge}
+                    </Badge>
+                    <div>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">{res.name}</span>
+                      <span className="text-[11px] text-slate-400 ml-2 font-mono">({res.symbol})</span>
                     </div>
-                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">{item.sector} · {item.exchange}</p>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {item.basePrice && (
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                        ₹{item.basePrice.toLocaleString('en-IN')}
-                      </span>
-                    )}
-                    {item.gmpLabel && (
-                      <span className="font-mono font-bold text-purple-400">{item.gmpLabel} GMP</span>
-                    )}
+                    <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300">
+                      {res.priceDisplay}
+                    </span>
                     <button
                       type="button"
-                      className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white font-bold transition flex items-center gap-1 text-[11px]"
+                      className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white font-bold transition text-[11px] flex items-center gap-1"
                     >
                       <Plus className="w-3 h-3" />
                       <span>Add</span>
@@ -296,692 +200,292 @@ export default function InvestmentComparisonPage() {
         </div>
 
         {/* Selected Investment Chips */}
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400 mr-1">
-              Selected ({activeSelectedKeys.length}/5):
-            </span>
-            {activeSelectedKeys.map((key) => {
-              const matched =
-                activeTab === 'stocks'
-                  ? STOCKS_UNIVERSE.find((s) => s.symbol === key) || { symbol: key, name: key }
-                  : IPOS_UNIVERSE.find((i) => i.id === key || i.symbol === key) || { symbol: key, company: key };
-
-              return (
-                <div
-                  key={key}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700/80 text-xs font-bold transition group shadow-xs"
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-slate-400 font-semibold mr-1">Selected ({selectedItems.length}/5):</span>
+            {selectedItems.map((item) => (
+              <div
+                key={item.key}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold"
+              >
+                <span>{item.name}</span>
+                <button
+                  onClick={() => handleRemoveItem(item.key)}
+                  className="text-slate-400 hover:text-rose-500 transition cursor-pointer"
                 >
-                  <span>{matched.symbol || matched.company}</span>
-                  <button
-                    onClick={() => handleRemoveItem(key)}
-                    className="p-0.5 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition cursor-pointer"
-                    title="Remove from comparison"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
           </div>
 
-          {activeSelectedKeys.length < 2 && (
-            <span className="text-xs text-amber-500 font-medium">
-              Select at least 2 investments to compare
-            </span>
+          {selectedItems.length < 2 && (
+            <span className="text-amber-500 font-medium">Select at least 2 investments to compare</span>
           )}
         </div>
       </Card>
 
+      {/* Max Warning Alert */}
+      {maxWarning && (
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs flex items-center gap-2 animate-in fade-in">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>Maximum 5 investments allowed for a clean side-by-side comparison.</span>
+        </div>
+      )}
+
       {/* Loading State */}
       {loading && (
-        <div className="p-12 text-center space-y-3 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800">
-          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto" />
-          <p className="text-xs font-semibold text-slate-400">Loading market quotes from Angel One SmartAPI...</p>
+        <div className="p-10 text-center space-y-2 bg-white dark:bg-slate-900/40 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <RefreshCw className="w-6 h-6 text-emerald-500 animate-spin mx-auto" />
+          <p className="text-xs font-semibold text-slate-400">Comparing selected investments...</p>
         </div>
       )}
 
       {/* Empty State */}
-      {!loading && activeSelectedKeys.length < 2 && (
-        <div className="p-12 text-center space-y-3 bg-white dark:bg-slate-900/40 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800">
-          <GitCompare className="w-10 h-10 text-slate-400 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Select Investments to Compare</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Add at least 2 {activeTab === 'stocks' ? 'stocks' : 'IPOs'} from the search box above to unlock side-by-side performance charts and valuation metrics.
+      {!loading && selectedItems.length < 2 && (
+        <div className="p-10 text-center space-y-2 bg-white dark:bg-slate-900/40 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800">
+          <GitCompare className="w-8 h-8 text-slate-400 mx-auto" />
+          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Select Investments</h3>
+          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            Choose any combination of Stocks, Mutual Funds, or IPOs above to compare risk, returns, cost, and liquidity.
           </p>
         </div>
       )}
 
-      {/* Main Comparison Body */}
-      {!loading && comparisonItems.length >= 2 && (
-        <div className="space-y-8 animate-in fade-in duration-200">
-          {/* 1. Comparison Summary Hero Cards */}
-          {leaderCards.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Comparison Summary
-                </h3>
-                <span className="text-[11px] text-slate-500 font-mono">
-                  Calculated from active cohort
-                </span>
+      {/* MAIN COMPACT COMPARISON */}
+      {!loading && comparisonData.length >= 2 && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* 3. Quick Comparison Matrix Card */}
+          <Card className="overflow-hidden border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/80 shadow-xs">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Scale className="w-4 h-4 text-emerald-500" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Quick Comparison</h3>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                {leaderCards.map((card, idx) => (
-                  <Card
-                    key={idx}
-                    className="p-4 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                          {card.title}
-                        </span>
-                        <Badge variant="brand" className="text-[10px]">
-                          {card.symbol}
-                        </Badge>
-                      </div>
-                      <div className="text-lg font-extrabold font-mono text-slate-900 dark:text-slate-100 mb-1">
-                        {card.value}
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-500 leading-snug pt-2 border-t border-slate-100 dark:border-slate-800">
-                      {card.description}
-                    </p>
-                  </Card>
-                ))}
+              <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Low</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Moderate</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500 inline-block" /> High</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> Very High</span>
               </div>
             </div>
-          )}
 
-          {/* 2. Selected Securities Overview Cards */}
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-              Selected Securities Overview
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
-              {comparisonItems.map((item) => {
-                const isPositive = (item.changePct || 0) >= 0;
-                return (
-                  <Card
-                    key={item.symbol || item.id}
-                    className="p-4 bg-white dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between hover:border-emerald-500/40 transition"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
-                          {item.symbol}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {activeTab === 'stocks' && (
-                            <span
-                              className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide ${
-                                item.isLive
-                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
-                              }`}
-                            >
-                              {item.isLive ? 'LIVE ●' : 'BENCHMARK'}
-                            </span>
-                          )}
-                          <Badge variant="default" className="text-[10px]">
-                            {item.exchange || 'NSE'}
-                          </Badge>
-                        </div>
-                      </div>
-                      <p className="text-[11px] text-slate-400 truncate mb-3">{item.name}</p>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-baseline justify-between">
-                      {activeTab === 'stocks' ? (
-                        <>
-                          <span className="font-mono font-bold text-sm text-slate-900 dark:text-slate-100">
-                            {formatINR(item.currentPrice)}
-                          </span>
-                          <span
-                            className={`text-xs font-mono font-bold flex items-center ${
-                              isPositive ? 'text-emerald-500' : 'text-rose-500'
-                            }`}
-                          >
-                            {isPositive ? '+' : ''}
-                            {item.changePct}%
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
-                            {item.priceBand}
-                          </span>
-                          <span className="text-xs font-mono font-bold text-purple-400">
-                            {item.gmpLabel}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 3. Performance & Relative Benchmarking Chart (Stocks Mode) */}
-          {activeTab === 'stocks' && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    Relative Normalized Performance Chart
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    All securities normalized to Base = 100 at the start of the timeframe to compare relative capital return.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200/80 dark:border-slate-800">
-                  {['1M', '6M', '1Y'].map((tf) => (
-                    <button
-                      key={tf}
-                      onClick={() => setTimeFilter(tf)}
-                      className={`px-3.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        timeFilter === tf
-                          ? 'bg-emerald-500 text-white shadow-xs'
-                          : 'text-slate-500 hover:text-slate-200'
-                      }`}
-                    >
-                      {tf}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Multi-asset Canvas Line Chart */}
-              <Card className="p-5 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/70">
-                <MultiAssetLineChart items={comparisonItems} timeFilter={timeFilter} />
-              </Card>
-
-              {/* 4. Visual Analytics Breakdown */}
-              <div className="space-y-3 pt-2">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    Visual Analytics Breakdown
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs font-semibold">
-                    <button
-                      onClick={() => setAnalyticsCategory('returns')}
-                      className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                        analyticsCategory === 'returns' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Returns
-                    </button>
-                    <button
-                      onClick={() => setAnalyticsCategory('valuation')}
-                      className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                        analyticsCategory === 'valuation' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Valuation
-                    </button>
-                    <button
-                      onClick={() => setAnalyticsCategory('risk')}
-                      className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                        analyticsCategory === 'risk' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Risk & Volatility
-                    </button>
-                    <button
-                      onClick={() => setAnalyticsCategory('size')}
-                      className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                        analyticsCategory === 'size' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      Size & Volume
-                    </button>
-                  </div>
-                </div>
-
-                {/* Switchable Analytics View */}
-                {analyticsCategory === 'returns' && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <ComparisonBarChart
-                      title="1-Month Return (%)"
-                      subtitle="Short-term price momentum"
-                      data={comparisonItems}
-                      metricKey="return1M"
-                      unit="%"
-                      isReturn={true}
-                    />
-                    <ComparisonBarChart
-                      title="6-Month Return (%)"
-                      subtitle="Medium-term trend"
-                      data={comparisonItems}
-                      metricKey="return6M"
-                      unit="%"
-                      isReturn={true}
-                    />
-                    <ComparisonBarChart
-                      title="1-Year Return (%)"
-                      subtitle="Annualized performance"
-                      data={comparisonItems}
-                      metricKey="return1Y"
-                      unit="%"
-                      isReturn={true}
-                    />
-                  </div>
-                )}
-
-                {analyticsCategory === 'valuation' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ComparisonBarChart
-                      title="Price-to-Earnings Ratio (P/E)"
-                      subtitle="Lower ratio indicates cheaper multiple relative to earnings"
-                      data={comparisonItems}
-                      metricKey="peRatioNum"
-                      unit="x"
-                      isReturn={false}
-                      theme="indigo"
-                    />
-                    <ComparisonBarChart
-                      title="Price-to-Book Ratio (P/B)"
-                      subtitle="Valuation relative to net asset balance sheet value"
-                      data={comparisonItems}
-                      metricKey="pbRatioNum"
-                      unit="x"
-                      isReturn={false}
-                      theme="teal"
-                    />
-                  </div>
-                )}
-
-                {analyticsCategory === 'risk' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ComparisonBarChart
-                      title="Beta (Market Sensitivity)"
-                      subtitle="Beta < 1.0 indicates lower volatility than Nifty 50 benchmark"
-                      data={comparisonItems}
-                      metricKey="betaNum"
-                      unit=""
-                      prefix="β "
-                      isReturn={false}
-                      theme="amber"
-                    />
-                    <ComparisonBarChart
-                      title="1-Year Return Volatility Spread (%)"
-                      subtitle="Annual return variation across selected peers"
-                      data={comparisonItems}
-                      metricKey="return1Y"
-                      unit="%"
-                      isReturn={true}
-                    />
-                  </div>
-                )}
-
-                {analyticsCategory === 'size' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ComparisonBarChart
-                      title="Market Capitalization (₹ Cr)"
-                      subtitle="Total company equity valuation on Indian exchanges"
-                      data={comparisonItems}
-                      metricKey="marketCapNum"
-                      unit=" Cr"
-                      prefix="₹"
-                      isReturn={false}
-                      theme="indigo"
-                    />
-                    <ComparisonBarChart
-                      title="Daily Trading Volume (Shares)"
-                      subtitle="Daily market liquidity on National Stock Exchange"
-                      data={comparisonItems}
-                      metricKey="volumeNum"
-                      unit=""
-                      isReturn={false}
-                      theme="teal"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Interactive Charts Section (IPO Mode) */}
-          {activeTab === 'ipos' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ComparisonBarChart
-                title="Grey Market Premium (GMP %)"
-                subtitle="Expected listing day gain premium based on grey market trades"
-                data={comparisonItems}
-                metricKey="gmpPct"
-                unit="%"
-                isReturn={true}
-              />
-              <ComparisonBarChart
-                title="Public Offering Issue Size (₹ Cr)"
-                subtitle="Total capital raised in the primary market offering"
-                data={comparisonItems}
-                metricKey="issueSizeNum"
-                unit=" Cr"
-                prefix="₹"
-                isReturn={false}
-                theme="indigo"
-              />
-            </div>
-          )}
-
-          {/* 5. Detailed Comparison Matrix Table */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                Detailed Comparison Matrix
-              </h3>
-              <span className="text-xs text-slate-400">
-                Subtle highlight indicates cohort leader for each metric
-              </span>
-            </div>
-
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-xs custom-scrollbar">
+            <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-100 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
-                    <th className="p-4 min-w-[200px]">Metric / Parameter</th>
-                    {comparisonItems.map((item) => (
-                      <th key={item.symbol || item.id} className="p-4 min-w-[140px] font-bold text-slate-800 dark:text-slate-200">
-                        {item.symbol || item.name}
+                  <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200/80 dark:border-slate-800/80 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
+                    <th className="p-3.5 min-w-[150px]">Factor</th>
+                    {comparisonData.map((item) => (
+                      <th key={item.id} className="p-3.5 min-w-[160px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-slate-900 dark:text-slate-100 truncate">{item.name}</span>
+                        </div>
+                        <span className="text-[10px] font-normal text-slate-400 block mt-0.5">{item.typeBadge}</span>
                       </th>
                     ))}
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                  {/* STOCKS TABLE ROWS */}
-                  {activeTab === 'stocks' && (
-                    <>
-                      {/* Section: Basic Info */}
-                      <tr className="bg-slate-50/70 dark:bg-slate-900/40">
-                        <td colSpan={comparisonItems.length + 1} className="p-3 font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-[10px]">
-                          1. Price & Daily Performance
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Current Market Price (LTP)</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className="p-4 font-mono font-bold text-slate-900 dark:text-slate-100">
-                            {formatINR(i.currentPrice)}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Day Change (₹ / %)</td>
-                        {comparisonItems.map((i) => {
-                          const isPos = (i.changePct || 0) >= 0;
-                          return (
-                            <td key={i.symbol} className={`p-4 font-mono font-bold ${isPos ? 'text-emerald-500' : 'text-rose-500'}`}>
-                              {isPos ? '+' : ''}{i.dayChange} ({isPos ? '+' : ''}{i.changePct}%)
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Previous Close</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className="p-4 font-mono text-slate-700 dark:text-slate-300">
-                            {formatINR(i.prevClose)}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Day High / Low Range</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className="p-4 font-mono text-slate-700 dark:text-slate-300">
-                            {formatINR(i.dayLow)} – {formatINR(i.dayHigh)}
-                          </td>
-                        ))}
-                      </tr>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
+                  {/* Risk Profile Row (with colored indicator dot) */}
+                  <tr>
+                    <td className="p-3.5 font-semibold text-slate-500">Risk Profile</td>
+                    {comparisonData.map((item) => (
+                      <td key={item.id} className="p-3.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`w-2 h-2 rounded-full inline-block shrink-0 ${getRiskDotClass(item.risk)}`}
+                            title={`Risk Level: ${item.risk}`}
+                          />
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{item.risk}</span>
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
 
-                      {/* Section: Valuation Multiples */}
-                      <tr className="bg-slate-50/70 dark:bg-slate-900/40">
-                        <td colSpan={comparisonItems.length + 1} className="p-3 font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-[10px]">
-                          2. Valuation & Fundamentals
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Market Capitalization</td>
-                        {comparisonItems.map((i) => {
-                          const isLead = i.symbol === rowHighlights.highestMcap;
-                          return (
-                            <td key={i.symbol} className={`p-4 font-mono font-bold ${isLead ? 'text-emerald-400 bg-emerald-500/5' : 'text-slate-800 dark:text-slate-200'}`}>
-                              {i.marketCap} {isLead && '★'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">P/E Ratio (Price / Earnings)</td>
-                        {comparisonItems.map((i) => {
-                          const isLead = i.symbol === rowHighlights.lowestPe;
-                          return (
-                            <td key={i.symbol} className={`p-4 font-mono font-bold ${isLead ? 'text-indigo-400 bg-indigo-500/5' : 'text-slate-800 dark:text-slate-200'}`}>
-                              {i.peRatio}x {isLead && '★'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">P/B Ratio (Price / Book)</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className="p-4 font-mono text-slate-700 dark:text-slate-300">
-                            {i.pbRatio}x
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Dividend Yield</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className="p-4 font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                            {i.divYield}
-                          </td>
-                        ))}
-                      </tr>
+                  {/* 1-Year Return / Expected Gain Row (with subtle risk dot) */}
+                  <tr>
+                    <td className="p-3.5 font-semibold text-slate-500">1-Year Return / Gain</td>
+                    {comparisonData.map((item) => (
+                      <td key={item.id} className="p-3.5">
+                        <div className="flex items-center gap-2 font-mono font-bold text-emerald-500 text-sm">
+                          <span>{item.returnDisplay}</span>
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 opacity-80 ${getRiskDotClass(item.risk)}`}
+                            title={`Associated Risk: ${item.risk}`}
+                          />
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
 
-                      {/* Section: Historical Performance */}
-                      <tr className="bg-slate-50/70 dark:bg-slate-900/40">
-                        <td colSpan={comparisonItems.length + 1} className="p-3 font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-[10px]">
-                          3. Historical Returns
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">1-Month Return</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className={`p-4 font-mono font-bold ${i.return1M >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {i.return1M >= 0 ? '+' : ''}{i.return1M}%
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">6-Month Return</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className={`p-4 font-mono font-bold ${i.return6M >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {i.return6M >= 0 ? '+' : ''}{i.return6M}%
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">1-Year Return</td>
-                        {comparisonItems.map((i) => {
-                          const isLead = i.symbol === rowHighlights.highest1Y;
-                          return (
-                            <td key={i.symbol} className={`p-4 font-mono font-bold ${isLead ? 'text-emerald-400 bg-emerald-500/5' : i.return1Y >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                              {i.return1Y >= 0 ? '+' : ''}{i.return1Y}% {isLead && '★'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">52-Week High / Low</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className="p-4 font-mono text-slate-700 dark:text-slate-300">
-                            {formatINR(i.w52Low)} / {formatINR(i.w52High)}
-                          </td>
-                        ))}
-                      </tr>
+                  {/* Cost & Expenses */}
+                  <tr>
+                    <td className="p-3.5 font-semibold text-slate-500">Cost & Expenses</td>
+                    {comparisonData.map((item) => (
+                      <td key={item.id} className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">
+                        {item.cost}
+                      </td>
+                    ))}
+                  </tr>
 
-                      {/* Section: Risk & Volatility */}
-                      <tr className="bg-slate-50/70 dark:bg-slate-900/40">
-                        <td colSpan={comparisonItems.length + 1} className="p-3 font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-[10px]">
-                          4. Trading Volume & Volatility
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Beta (Market Volatility)</td>
-                        {comparisonItems.map((i) => {
-                          const isLead = i.symbol === rowHighlights.lowestBeta;
-                          return (
-                            <td key={i.symbol} className={`p-4 font-mono font-bold ${isLead ? 'text-teal-400 bg-teal-500/5' : 'text-slate-800 dark:text-slate-200'}`}>
-                              {i.beta} {isLead && '★'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Daily Trading Volume</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className="p-4 font-mono text-slate-700 dark:text-slate-300">
-                            {i.volume} shares
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Sector / Industry</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.symbol} className="p-4 text-slate-800 dark:text-slate-200 font-medium">
-                            {i.sector}
-                          </td>
-                        ))}
-                      </tr>
-                    </>
-                  )}
+                  {/* Liquidity */}
+                  <tr>
+                    <td className="p-3.5 font-semibold text-slate-500">Liquidity</td>
+                    {comparisonData.map((item) => (
+                      <td key={item.id} className="p-3.5 text-slate-700 dark:text-slate-300">
+                        {item.liquidity}
+                      </td>
+                    ))}
+                  </tr>
 
-                  {/* IPOS TABLE ROWS */}
-                  {activeTab === 'ipos' && (
-                    <>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">IPO Status</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4">
-                            <Badge variant={i.status === 'Open Now' ? 'success' : i.status === 'Upcoming' ? 'purple' : 'info'}>
-                              {i.status}
-                            </Badge>
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Grey Market Premium (GMP)</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4 font-mono font-bold text-purple-400">
-                            {i.gmpLabel}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Price Band</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4 font-mono font-bold text-slate-900 dark:text-slate-100">
-                            {i.priceBand}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Total Issue Size</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4 font-mono font-bold text-slate-800 dark:text-slate-200">
-                            {i.issueSize}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Subscription Demand</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4 font-mono text-emerald-500 font-bold">
-                            {i.subscription}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Min. Lot Investment</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4 font-mono text-slate-800 dark:text-slate-200">
-                            {i.minInvestment} ({i.lotSize})
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Subscription Dates</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4 text-slate-700 dark:text-slate-300">
-                            {i.dates}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Sector / Category</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4 text-slate-800 dark:text-slate-200">
-                            {i.sector}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td className="p-4 font-semibold text-slate-500">Suitability Indicator</td>
-                        {comparisonItems.map((i) => (
-                          <td key={i.id} className="p-4 text-emerald-600 dark:text-emerald-400 font-bold">
-                            {i.suitability}
-                          </td>
-                        ))}
-                      </tr>
-                    </>
-                  )}
+                  {/* Diversification */}
+                  <tr>
+                    <td className="p-3.5 font-semibold text-slate-500">Diversification</td>
+                    {comparisonData.map((item) => (
+                      <td key={item.id} className="p-3.5 text-slate-700 dark:text-slate-300">
+                        {item.diversification}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Minimum Investment */}
+                  <tr>
+                    <td className="p-3.5 font-semibold text-slate-500">Minimum Entry</td>
+                    {comparisonData.map((item) => (
+                      <td key={item.id} className="p-3.5 font-mono font-bold text-slate-900 dark:text-slate-100">
+                        {item.minInvestment}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Recommended Horizon */}
+                  <tr>
+                    <td className="p-3.5 font-semibold text-slate-500">Recommended Horizon</td>
+                    {comparisonData.map((item) => (
+                      <td key={item.id} className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">
+                        {item.horizon}
+                      </td>
+                    ))}
+                  </tr>
+
+                  {/* Best Suited For */}
+                  <tr className="bg-slate-50/50 dark:bg-slate-950/40">
+                    <td className="p-3.5 font-semibold text-slate-500">Best Suited For</td>
+                    {comparisonData.map((item) => (
+                      <td key={item.id} className="p-3.5 font-bold text-emerald-600 dark:text-emerald-400">
+                        {item.suitability}
+                      </td>
+                    ))}
+                  </tr>
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
 
-          {/* 6. "What stands out?" Insights Section */}
-          {insights.length > 0 && (
-            <Card className="p-5 border border-emerald-500/25 bg-slate-900/60 backdrop-blur-xs space-y-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-sm font-bold text-slate-100">What stands out?</h4>
+          {/* 4. Risk & Return Visuals */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Risk Spectrum Visual */}
+            <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Risk Spectrum
+                  </h4>
+                  <span className="text-[11px] text-slate-500">Conservative → Aggressive</span>
+                </div>
+
+                {/* Horizontal Spectrum Bar */}
+                <div className="relative my-6">
+                  <div className="w-full h-3 rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 via-orange-500 to-rose-500 opacity-85 shadow-xs" />
+
+                  <div className="flex justify-between text-[10px] text-slate-400 mt-2 font-semibold">
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Low</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> Moderate</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-500" /> High</span>
+                    <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Very High</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                {insights.map((ins, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-200">{ins.title}</span>
-                      <Badge variant="brand" className="text-[10px]">
-                        {ins.badge}
-                      </Badge>
+              {/* Pinpoint list with colored risk dots */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                {comparisonData.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className={`w-2 h-2 rounded-full inline-block shrink-0 ${getRiskDotClass(item.risk)}`} />
+                      <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{item.name}</span>
                     </div>
-                    <p className="text-slate-400 leading-relaxed">{ins.detail}</p>
+                    <span className="font-semibold text-slate-500 shrink-0 ml-2">{item.risk} Risk</span>
                   </div>
                 ))}
               </div>
+            </Card>
 
-              {/* Transparency & Regulatory Disclaimer */}
-              <div className="pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500 border-t border-slate-800">
-                <div className="flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                  <span>Based on the selected metrics. Data-driven comparison for informational and analytical purposes only. Not investment advice.</span>
+            {/* Return Comparison Bar Visual */}
+            <Card className="p-4 sm:p-5 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    1-Year Return / Yield
+                  </h4>
+                  <span className="text-[11px] text-slate-500">Historical / Estimated</span>
                 </div>
-                <span className="font-mono text-slate-400">
-                  Historical normalized trends · Real-time LTP via Angel One
-                </span>
+
+                <div className="space-y-3 my-2">
+                  {comparisonData.map((item) => {
+                    const maxReturn = Math.max(...comparisonData.map((d) => d.return1Y || 1), 10);
+                    const widthPct = Math.min(100, Math.max(12, (item.return1Y / maxReturn) * 100));
+
+                    return (
+                      <div key={item.id} className="space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 truncate">
+                            <span className={`w-1.5 h-1.5 rounded-full inline-block shrink-0 ${getRiskDotClass(item.risk)}`} />
+                            <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{item.name}</span>
+                          </div>
+                          <span className="font-mono font-bold text-emerald-500 shrink-0 ml-2">{item.returnDisplay}</span>
+                        </div>
+                        <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
+                            style={{ width: `${widthPct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+
+              <p className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+                Returns based on 1-year historical CAGR or estimated IPO listing premium.
+              </p>
+            </Card>
+          </div>
+
+          {/* 5. Key Differences Summary (2–3 bullet points) */}
+          {keyDifferences.length > 0 && (
+            <Card className="p-4 sm:p-5 bg-emerald-500/5 dark:bg-slate-900/60 border border-emerald-500/20 space-y-2.5">
+              <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Key Differences at a Glance</span>
+              </div>
+              <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300 leading-relaxed list-disc list-inside">
+                {keyDifferences.map((diff, idx) => (
+                  <li key={idx} className="font-medium">
+                    {diff}
+                  </li>
+                ))}
+              </ul>
             </Card>
           )}
+
+          {/* 6. Regulatory Disclaimer */}
+          <div className="flex items-center gap-2 text-[11px] text-slate-500 justify-center text-center pt-2">
+            <Info className="w-3.5 h-3.5 shrink-0" />
+            <span>Comparison is for informational purposes only and is not investment advice.</span>
+          </div>
         </div>
       )}
     </div>
