@@ -24,3 +24,8 @@ dist-ssr/
 *.log
 
 .vercel
+
+# Python Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
