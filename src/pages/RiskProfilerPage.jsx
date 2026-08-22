@@ -128,6 +128,26 @@ export default function RiskProfilerPage() {
 
   const profilerContent = (
     <div className="space-y-8">
+      {/* EXPLANATORY VALUE PROPOSITION BANNER */}
+      <div className="p-5 rounded-3xl bg-slate-900 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3.5">
+          <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0 mt-0.5">
+            <HeartHandshake className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+              How the Risk Profiler Helps You
+              <Badge variant="brand" className="text-[10px] bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                Personal Wealth Shield
+              </Badge>
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed font-medium mt-1">
+              By analyzing your <strong>Goal Urgency</strong>, <strong>Investment Timeline</strong>, and <strong>Market Comfort Level</strong>, this engine computes your <strong>Personal Risk Score (0–100)</strong>. It protects you from panic selling during market dips and tells you exactly when to rebalance into fixed income as your milestone date nears.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* SECTION A: SCORE CARD & SUB-SCORE BREAKDOWN */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* SCORE DISPLAY CARD WITH DONUT SCORE */}
