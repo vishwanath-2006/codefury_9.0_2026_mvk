@@ -246,7 +246,7 @@ class TokenSyncRequest(BaseModel):
     demo: Optional[bool] = False
 
 @app.post("/api/broker/angelone/holdings-by-token")
-async def get_holdings_by_token(payload: TokenSyncRequest):
+def get_holdings_by_token(payload: TokenSyncRequest):
     auth_token = payload.auth_token
     
     if payload.demo or auth_token == "demo":
@@ -258,34 +258,51 @@ async def get_holdings_by_token(payload: TokenSyncRequest):
         
     api_key = payload.apiKey or os.getenv('ANGELONE_API_KEY') or "OPvmoROA"
     
+    import requests
     try:
-        # Build headers for Angel One REST API call
+        url = "https://apiconnect.angelone.in/rest/secure/angelbroking/portfolio/v1/getHolding"
         headers = {
+            "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "Authorization": f"Bearer {auth_token}",
-            "X-PrivateKey": api_key,
+            "X-UserType": "USER",
+            "X-SourceID": "WEB",
+            "X-ClientLocalIP": "127.0.0.1",
             "X-ClientPublicIP": "127.0.0.1",
-            "X-MACAddress": "02:00:00:00:00:00",
-            "X-UserType": "USER"
+            "X-MACAddress": "fe80::1",
+            "X-PrivateKey": api_key,
         }
+        response = requests.get(url, headers=headers)
+        data = response.json()
         
-        url = "https://apiconnect.angelone.in/rest/secure/angelbroking/portfolio/v1/getHolding"
+        # Check if the API request was successful and returned status True
+        is_success = (response.status_code == 200 and data.get("status") is True)
         
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers)
-            
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=f"Angel One API error: {response.text}")
-            
-        res_json = response.json()
+        raw_holdings = data.get("data", []) if is_success else [
+            {
+                "tradingsymbol": "TATAMOTORS-EQ",
+                "quantity": 25,
+                "averageprice": 950.0,
+                "ltp": 985.4,
+                "profitandloss": 885.0
+            },
+            {
+                "tradingsymbol": "RELIANCE-EQ",
+                "quantity": 10,
+                "averageprice": 2850.0,
+                "ltp": 2980.0,
+                "profitandloss": 1300.0
+            },
+            {
+                "tradingsymbol": "HDFCBANK-EQ",
+                "quantity": 15,
+                "averageprice": 1600.0,
+                "ltp": 1675.0,
+                "profitandloss": 1125.0
+            }
+        ]
         
-        if not res_json.get('status'):
-            raise HTTPException(status_code=400, detail=res_json.get('message', 'Angel One reported failure'))
-            
-        raw_holdings = res_json.get('data', [])
         processed_holdings = []
-        
         for stock in raw_holdings:
             raw_symbol = stock.get('tradingsymbol', 'UNKNOWN')
             symbol = raw_symbol.split('-')[0]
@@ -293,10 +310,12 @@ async def get_holdings_by_token(payload: TokenSyncRequest):
             quantity = float(stock.get('quantity', 0))
             average_price = float(stock.get('averageprice', 0))
             ltp = float(stock.get('ltp', 0))
+            pnl = float(stock.get('profitandloss', stock.get('pnl', 0)))
             
             invested_value = quantity * average_price
             current_value = quantity * ltp
-            pnl = current_value - invested_value
+            if pnl == 0:
+                pnl = current_value - invested_value
             pnl_percentage = (pnl / invested_value * 100) if invested_value > 0 else 0.0
             
             processed_holdings.append({
@@ -312,18 +331,61 @@ async def get_holdings_by_token(payload: TokenSyncRequest):
             
         return {
             "status": "success",
-            "source": "live_angelone",
-            "holdings": processed_holdings
+            "source": "live_angelone" if is_success else "mock_demo_fallback",
+            "holdings": processed_holdings,
+            "warning": None if is_success else "API call did not return holdings. Served mock portfolio fallback."
         }
         
-    except HTTPException as he:
-        raise he
     except Exception as e:
-        # Fallback to mock data on invalid credentials/tokens to keep UI interactive
         print(f"Holding sync failed: {str(e)}. Falling back to mock data.")
+        # Fallback to mock data on invalid credentials/tokens to keep UI interactive
+        processed_holdings = []
+        fallback_holdings = [
+            {
+                "tradingsymbol": "TATAMOTORS-EQ",
+                "quantity": 25,
+                "averageprice": 950.0,
+                "ltp": 985.4,
+                "profitandloss": 885.0
+            },
+            {
+                "tradingsymbol": "RELIANCE-EQ",
+                "quantity": 10,
+                "averageprice": 2850.0,
+                "ltp": 2980.0,
+                "profitandloss": 1300.0
+            },
+            {
+                "tradingsymbol": "HDFCBANK-EQ",
+                "quantity": 15,
+                "averageprice": 1600.0,
+                "ltp": 1675.0,
+                "profitandloss": 1125.0
+            }
+        ]
+        for stock in fallback_holdings:
+            raw_symbol = stock.get('tradingsymbol')
+            symbol = raw_symbol.split('-')[0]
+            quantity = float(stock.get('quantity'))
+            average_price = float(stock.get('averageprice'))
+            ltp = float(stock.get('ltp'))
+            pnl = float(stock.get('profitandloss'))
+            invested_value = quantity * average_price
+            current_value = quantity * ltp
+            pnl_percentage = (pnl / invested_value * 100) if invested_value > 0 else 0.0
+            processed_holdings.append({
+                "symbol": symbol,
+                "quantity": quantity,
+                "averagePrice": round(average_price, 2),
+                "ltp": round(ltp, 2),
+                "investedValue": round(invested_value, 2),
+                "currentValue": round(current_value, 2),
+                "pnl": round(pnl, 2),
+                "pnlPercentage": round(pnl_percentage, 2)
+            })
         return {
             "status": "success",
             "source": "mock_demo_fallback",
-            "holdings": MOCK_HOLDINGS,
-            "warning": f"Synced using mock fallback due to API error: {str(e)}"
+            "holdings": processed_holdings,
+            "warning": f"Synced using mock fallback due to connection error: {str(e)}"
         }
