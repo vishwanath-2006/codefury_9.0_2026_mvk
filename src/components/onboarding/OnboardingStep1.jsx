@@ -1,9 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { User, Calendar, MapPin, IndianRupee, ShieldAlert, Sparkles, Briefcase, Mail, Send, ShieldCheck, CheckCircle2, Loader2 } from 'lucide-react';
-import { supabase } from '../../lib/supabaseClient';
+import React from 'react';
+import { User, Calendar, MapPin, IndianRupee, ShieldAlert, Sparkles, Briefcase } from 'lucide-react';
 import { Input, Select } from '../ui/Input';
-import Button from '../ui/Button';
-import Badge from '../ui/Badge';
 
 export default function OnboardingStep1({ data, onChange }) {
   const occupations = [
@@ -25,93 +22,6 @@ export default function OnboardingStep1({ data, onChange }) {
     { id: 'Moderate Variation', label: 'Moderate Variation', desc: 'Base pay + performance bonuses/commission' },
     { id: 'Freelance / Irregular', label: 'Freelance / Irregular', desc: 'Project-based income or variable business revenue' },
   ];
-
-  // OTP Verification States
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [userOtpInput, setUserOtpInput] = useState('');
-  const [otpError, setOtpError] = useState('');
-  const [resendTimer, setResendTimer] = useState(0);
-
-  useEffect(() => {
-    let interval = null;
-    if (resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-    } else {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [resendTimer]);
-
-  const handleSendEmailOtp = async () => {
-    setOtpError('');
-    const targetEmail = (data.email || '').trim();
-
-    if (!targetEmail || !targetEmail.includes('@')) {
-      setOtpError('Please enter a valid email address.');
-      return;
-    }
-
-    setOtpLoading(true);
-
-    try {
-      // Trigger real Supabase Auth Email OTP (100% Free)
-      const { error: emailErr } = await supabase.auth.signInWithOtp({
-        email: targetEmail
-      });
-
-      if (emailErr) {
-        console.warn('Supabase Email Auth notice:', emailErr.message);
-        throw new Error(emailErr.message);
-      }
-
-      onChange('email', targetEmail);
-      setOtpSent(true);
-      setUserOtpInput('');
-      setResendTimer(60);
-    } catch (err) {
-      console.error('Error sending Email OTP:', err);
-      setOtpError(err.message || 'Failed to send verification code to your email. Please try again.');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleVerifyEmailOtp = async () => {
-    setOtpError('');
-    const token = userOtpInput.trim();
-    if (!token || token.length < 6) {
-      setOtpError('Please enter the 6-digit OTP code received in your email inbox.');
-      return;
-    }
-
-    setOtpLoading(true);
-    const targetEmail = (data.email || '').trim();
-
-    try {
-      const { error: verifyErr } = await supabase.auth.verifyOtp({
-        email: targetEmail,
-        token,
-        type: 'email'
-      });
-
-      if (!verifyErr) {
-        onChange('emailVerified', true);
-        setOtpSent(false);
-        setUserOtpInput('');
-        return;
-      }
-
-      setOtpError(verifyErr.message || 'Invalid or expired Email OTP code. Please check your inbox.');
-    } catch (err) {
-      console.error('Error verifying Email OTP:', err);
-      setOtpError('Failed to verify Email OTP code.');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
 
   const totalInflow = Number(data.primaryMonthlyIncome || 0) + Number(data.secondaryMonthlyIncome || 0);
 
@@ -156,15 +66,6 @@ export default function OnboardingStep1({ data, onChange }) {
             onChange={(e) => onChange('age', Number(e.target.value))}
           />
         </div>
-
-        <Input
-          label="Email Address (For Reports)"
-          type="email"
-          placeholder="e.g. user@gmail.com"
-          icon={Mail}
-          value={data.email || ''}
-          onChange={(e) => onChange('email', e.target.value)}
-        />
 
         <Select
           label="Current Employment / Occupation"

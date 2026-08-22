@@ -22,23 +22,8 @@ import {
   Activity,
   Lock,
   Check,
-  Loader2,
-  Mail,
-  Send,
-  ShieldCheck,
-  KeyRound,
-  Camera,
-  FileText,
-  Building2,
-  CreditCard,
-  Landmark,
-  Coins,
-  RefreshCw,
-  Upload,
-  CheckCircle,
-  AlertCircle
+  Loader2
 } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
 import { getFinancialProfile, saveFinancialProfile, createEmptyOnboardingData } from '../services/onboardingService';
 
 export default function OnboardingPage() {
@@ -53,26 +38,7 @@ export default function OnboardingPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Email OTP States
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [userOtpInput, setUserOtpInput] = useState('');
-  const [otpError, setOtpError] = useState('');
-  const [resendTimer, setResendTimer] = useState(0);
-
-  // PAN & e-KYC Verification States
-  const [verifyingPan, setVerifyingPan] = useState(false);
-  const [panError, setPanError] = useState('');
-  const [showDigiLockerModal, setShowDigiLockerModal] = useState(false);
-  const [digiLockerProgress, setDigiLockerProgress] = useState(0);
-  const [digiLockerStepText, setDigiLockerStepText] = useState('');
-
-  // Account Aggregator (AA) States
-  const [showBankConsentModal, setShowBankConsentModal] = useState(false);
-  const [connectingBank, setConnectingBank] = useState(false);
-
   const currentUserIdRef = useRef(user?.id);
-  const selfieInputRef = useRef(null);
 
   // Form State initialized to clean empty structure
   const [formData, setFormData] = useState(() => createEmptyOnboardingData(user, profile));
@@ -110,14 +76,6 @@ export default function OnboardingPage() {
             ...createEmptyOnboardingData(user, profile),
             user_id: user.id,
             fullName: saved.full_name || saved.fullName || profile?.full_name || user?.user_metadata?.full_name || '',
-            email: saved.email || user?.email || '',
-            emailVerified: Boolean(saved.emailVerified ?? true),
-            selfiePhoto: saved.selfiePhoto || '',
-            selfieVerified: Boolean(saved.selfieVerified),
-            panNumber: saved.panNumber || '',
-            panVerified: Boolean(saved.panVerified),
-            kycStatus: saved.kycStatus || (saved.panVerified ? 'Verified (Tier-1 Compliant)' : 'Unverified'),
-            taxStatus: saved.taxStatus || 'Resident Individual',
             age: saved.age ? String(saved.age) : '',
             employmentStatus: saved.employment_status || saved.employmentStatus || 'Employed',
             occupation: saved.occupation || '',
@@ -129,19 +87,10 @@ export default function OnboardingPage() {
             monthlyDiscretionaryExpenses: saved.monthly_discretionary_expenses != null ? String(saved.monthly_discretionary_expenses) : (saved.monthlyDiscretionaryExpenses || ''),
             currentSavings: saved.current_savings != null ? String(saved.current_savings) : (saved.currentSavings || ''),
             emergencyFund: saved.emergency_fund != null ? String(saved.emergency_fund) : (saved.emergencyFund || ''),
-            aaConnected: Boolean(saved.aaConnected),
-            connectedBankName: saved.connectedBankName || '',
             hasDebt: Boolean(saved.has_debt ?? saved.hasDebt),
             totalDebt: saved.total_debt != null ? String(saved.total_debt) : (saved.totalDebt || '0'),
             monthlyDebtPayments: saved.monthly_debt_payments != null ? String(saved.monthly_debt_payments) : (saved.monthlyDebtPayments || '0'),
             debtType: saved.debt_type || saved.debtType || 'Home',
-            creditCardsHeld: saved.creditCardsHeld || '0',
-            creditCardRolloverBalance: saved.creditCardRolloverBalance || '0',
-            portfolioMutualFunds: saved.portfolioMutualFunds != null ? String(saved.portfolioMutualFunds) : '',
-            portfolioStocks: saved.portfolioStocks != null ? String(saved.portfolioStocks) : '',
-            portfolioFd: saved.portfolioFd != null ? String(saved.portfolioFd) : '',
-            portfolioGold: saved.portfolioGold != null ? String(saved.portfolioGold) : '',
-            externalPlatforms: Array.isArray(saved.externalPlatforms) ? saved.externalPlatforms : ['Zerodha', 'Groww'],
             investmentExperience: saved.investment_experience || saved.investmentExperience || 'beginner',
             hasHealthInsurance: Boolean(saved.has_health_insurance ?? saved.hasHealthInsurance ?? true),
             hasLifeInsurance: Boolean(saved.has_life_insurance ?? saved.hasLifeInsurance ?? true),
@@ -150,6 +99,7 @@ export default function OnboardingPage() {
             goals: Array.isArray(saved.goals) ? saved.goals : []
           });
         } else {
+          // Fresh, unpopulated form for a new user
           setFormData(createEmptyOnboardingData(user, profile));
         }
       } catch (err) {
@@ -174,103 +124,6 @@ export default function OnboardingPage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-  };
-
-  // Selfie Camera & File Capture Handler
-  const handleSelfieCapture = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData((prev) => ({
-        ...prev,
-        selfiePhoto: reader.result,
-        selfieVerified: true
-      }));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // PAN Registry Check Simulator
-  const handleVerifyPan = () => {
-    setPanError('');
-    const rawPan = (formData.panNumber || '').trim().toUpperCase();
-    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-    if (!panRegex.test(rawPan)) {
-      setPanError('Invalid PAN format. Standard format is 5 Letters, 4 Digits, 1 Letter (e.g. ABCDE1234F).');
-      return;
-    }
-
-    setVerifyingPan(true);
-    setTimeout(() => {
-      setFormData((prev) => ({
-        ...prev,
-        panNumber: rawPan,
-        panVerified: true,
-        kycStatus: prev.kycStatus === 'Unverified' ? 'Verified (PAN Registry Match)' : prev.kycStatus
-      }));
-      setVerifyingPan(false);
-    }, 1200);
-  };
-
-  // DigiLocker / Aadhaar OTP Fast-Track Simulator
-  const triggerDigiLockerVerification = () => {
-    setShowDigiLockerModal(true);
-    setDigiLockerProgress(15);
-    setDigiLockerStepText('Connecting to UIDAI & DigiLocker Gateway...');
-
-    setTimeout(() => {
-      setDigiLockerProgress(50);
-      setDigiLockerStepText('Validating Aadhaar e-KYC Demographic Hash...');
-    }, 1000);
-
-    setTimeout(() => {
-      setDigiLockerProgress(85);
-      setDigiLockerStepText('Synchronizing NSDL / CAMS KRA Registry...');
-    }, 2200);
-
-    setTimeout(() => {
-      setDigiLockerProgress(100);
-      setDigiLockerStepText('e-KYC Verified Successfully!');
-      setFormData((prev) => ({
-        ...prev,
-        kycStatus: 'Verified (Tier-1 Compliant)',
-        panVerified: true,
-        panNumber: prev.panNumber || 'ABCDE1234F'
-      }));
-
-      setTimeout(() => {
-        setShowDigiLockerModal(false);
-      }, 800);
-    }, 3400);
-  };
-
-  // Account Aggregator (AA) Bank Consent Simulator
-  const handleConnectBank = (bankName) => {
-    setConnectingBank(true);
-    setTimeout(() => {
-      setFormData((prev) => ({
-        ...prev,
-        aaConnected: true,
-        connectedBankName: bankName,
-        monthlyIncome: prev.monthlyIncome || '85000',
-        monthlyEssentialExpenses: prev.monthlyEssentialExpenses || '32000',
-        currentSavings: prev.currentSavings || '145000',
-        emergencyFund: prev.emergencyFund || '100000'
-      }));
-      setConnectingBank(false);
-      setShowBankConsentModal(false);
-    }, 1500);
-  };
-
-  // Platform Chip Toggle
-  const handlePlatformToggle = (platformName) => {
-    setFormData((prev) => {
-      const current = prev.externalPlatforms || [];
-      const exists = current.includes(platformName);
-      const updated = exists ? current.filter((p) => p !== platformName) : [...current, platformName];
-      return { ...prev, externalPlatforms: updated };
-    });
   };
 
   // Goal Helpers
@@ -300,85 +153,14 @@ export default function OnboardingPage() {
     }));
   };
 
-  // OTP Countdown Timer Effect
-  useEffect(() => {
-    let interval = null;
-    if (resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-    } else {
-      clearInterval(interval);
-    }
-    return () => clearInterval(interval);
-  }, [resendTimer]);
-
-  const handleSendEmailOtp = async () => {
-    setErrorMsg('');
-    setOtpError('');
-    const targetEmail = (formData.email || user?.email || '').trim();
-
-    if (!targetEmail || !targetEmail.includes('@')) {
-      setErrorMsg('Please enter a valid email address before requesting an OTP code.');
-      return;
-    }
-
-    setOtpLoading(true);
-
-    try {
-      const { error: emailErr } = await supabase.auth.signInWithOtp({
-        email: targetEmail
-      });
-
-      if (emailErr) {
-        console.warn('Supabase Email Auth notice:', emailErr.message);
-        throw new Error(emailErr.message);
-      }
-
-      setFormData((prev) => ({ ...prev, email: targetEmail }));
-      setOtpSent(true);
-      setUserOtpInput('');
-      setResendTimer(60);
-    } catch (err) {
-      console.error('Error sending Email OTP:', err);
-      setErrorMsg(err.message || 'Failed to send verification code to your email. Please try again.');
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleVerifyEmailOtp = async () => {
-    setOtpError('');
-    const token = userOtpInput.trim();
-    if (!token || token.length < 6) {
-      setOtpError('Please enter the 6-digit OTP code received in your email inbox.');
-      return;
-    }
-
-    setOtpLoading(true);
-    const targetEmail = (formData.email || user?.email || '').trim();
-
-    try {
-      const { error: verifyErr } = await supabase.auth.verifyOtp({
-        email: targetEmail,
-        token,
-        type: 'email'
-      });
-
-      if (!verifyErr) {
-        setFormData((prev) => ({ ...prev, emailVerified: true }));
-        setOtpSent(false);
-        setUserOtpInput('');
-        return;
-      }
-
-      setOtpError(verifyErr.message || 'Invalid or expired Email OTP code. Please check your inbox.');
-    } catch (err) {
-      console.error('Error verifying Email OTP:', err);
-      setOtpError('Failed to verify Email OTP code.');
-    } finally {
-      setOtpLoading(false);
-    }
+  const handleCategoryToggle = (category) => {
+    setFormData((prev) => {
+      const exists = prev.investmentCategories.includes(category);
+      const updated = exists
+        ? prev.investmentCategories.filter((c) => c !== category)
+        : [...prev.investmentCategories, category];
+      return { ...prev, investmentCategories: updated, hasInvestments: updated.length > 0 };
+    });
   };
 
   // Step Navigations
@@ -386,7 +168,7 @@ export default function OnboardingPage() {
     setErrorMsg('');
     if (currentStep === 1) {
       if (!formData.fullName.trim()) {
-        setErrorMsg('Please enter your full legal name to personalize your profile.');
+        setErrorMsg('Please enter your full name to personalize your dashboard.');
         return;
       }
       if (!formData.age || parseInt(formData.age, 10) < 18) {
@@ -407,7 +189,7 @@ export default function OnboardingPage() {
     setCurrentStep((prev) => Math.max(1, prev - 1));
   };
 
-  // Final Profile Submission & Direct Redirect to /financial-health
+  // Submission
   const handleSubmit = async () => {
     setErrorMsg('');
     setSaving(true);
@@ -427,7 +209,7 @@ export default function OnboardingPage() {
         await refreshOnboardingState();
       }
 
-      navigate('/financial-health');
+      navigate('/dashboard');
     } catch (err) {
       console.error('Error completing onboarding submission:', err);
       setErrorMsg(err.message || 'Failed to submit profile. Please try again.');
@@ -451,15 +233,7 @@ export default function OnboardingPage() {
 
   const emiRatioCalc = totalIncomeCalc > 0 ? Math.round((debtPaymentNum / totalIncomeCalc) * 100) : 0;
   const emergencyNum = parseFloat(formData.emergencyFund) || 0;
-  const savingsNum = parseFloat(formData.currentSavings) || 0;
   const emergencyMonthsCalc = totalExpensesCalc > 0 ? (emergencyNum / totalExpensesCalc).toFixed(1) : '0.0';
-
-  // Dynamic Consolidated Net Worth
-  const mfNum = parseFloat(formData.portfolioMutualFunds) || 0;
-  const stocksNum = parseFloat(formData.portfolioStocks) || 0;
-  const fdNum = parseFloat(formData.portfolioFd) || 0;
-  const goldNum = parseFloat(formData.portfolioGold) || 0;
-  const totalNetWorthCalc = savingsNum + emergencyNum + mfNum + stocksNum + fdNum + goldNum;
 
   if (loadingProfile) {
     return (
@@ -474,16 +248,16 @@ export default function OnboardingPage() {
     <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto pb-12">
       <PageHeader
         title="Personalized Financial Blueprint"
-        subtitle="Set up your verified income, e-KYC, cash flows, and consolidated portfolio to generate a production-grade diagnostic index."
+        subtitle="Set up your verified income, monthly expenses, active goals, and risk parameters to generate an accurate diagnostic index."
         tag="Onboarding Wizard"
       />
 
-      {/* STRICT 3-STEP PROGRESS WIZARD BAR */}
+      {/* STEP PROGRESS BAR */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { step: 1, title: '1. Identity & e-KYC', icon: User },
-          { step: 2, title: '2. Cash Flow & Banking', icon: Wallet },
-          { step: 3, title: '3. Portfolio & Goals', icon: Target }
+          { step: 1, title: '1. Identity & Details', icon: User },
+          { step: 2, title: '2. Cash Flow & Debt', icon: Wallet },
+          { step: 3, title: '3. Goals & Risk Profile', icon: Target }
         ].map((s) => {
           const Icon = s.icon;
           const isActive = currentStep === s.step;
@@ -532,599 +306,294 @@ export default function OnboardingPage() {
       {/* MAIN TWO-COLUMN CONTENT: FORM + LIVE PREVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-6">
-
-          {/* STEP 1: IDENTITY, DEMOGRAPHICS & e-KYC VERIFICATION */}
+          {/* STEP 1: IDENTITY & PERSONAL DETAILS */}
           {currentStep === 1 && (
             <Card className="p-6 space-y-6">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <User className="w-4 h-4 text-emerald-500" />
-                  Step 1: Identity, Demographics & e-KYC Verification
+                  Personal Information & Background
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Verify your identity, PAN registry hash, and tax status for regulatory compliance.
+                  Your demographic info shapes the baseline actuarial benchmarks for health scores.
                 </p>
               </div>
 
-              {/* SECTION A: DEMOGRAPHIC PROFILE & SELFIE CAPTURE */}
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200/80 dark:border-slate-800">
-                  {/* Selfie Photo Capture Avatar Widget */}
-                  <div className="relative group shrink-0">
-                    <input
-                      type="file"
-                      ref={selfieInputRef}
-                      accept="image/*"
-                      capture="user"
-                      onChange={handleSelfieCapture}
-                      className="hidden"
-                    />
-                    <div
-                      onClick={() => selfieInputRef.current?.click()}
-                      className="w-16 h-16 rounded-full border-2 border-dashed border-emerald-500/60 bg-emerald-500/5 hover:bg-emerald-500/10 transition flex items-center justify-center cursor-pointer overflow-hidden relative"
-                      title="Click to capture selfie or upload photo"
-                    >
-                      {formData.selfiePhoto ? (
-                        <img src={formData.selfiePhoto} alt="Selfie Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-emerald-500">
-                          <Camera className="w-5 h-5" />
-                          <span className="text-[9px] font-bold mt-0.5">Selfie</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Live Photo / Selfie Verification</span>
-                      {formData.selfieVerified ? (
-                        <Badge variant="success" className="text-[10px] font-mono">● Photo Verified</Badge>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-medium">Click circle to capture</span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Standard biometric compliance check for SEBI / RBI registered advisory accounts.
-                    </p>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Full Legal Name <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    name="fullName"
+                    placeholder="e.g. Vicky Vishwanath"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                      Full Legal Name <span className="text-rose-500">*</span>
-                    </label>
-                    <Input
-                      name="fullName"
-                      placeholder="e.g. Vicky Vishwanath"
-                      value={formData.fullName}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                      Age <span className="text-rose-500">*</span>
-                    </label>
-                    <Input
-                      name="age"
-                      type="number"
-                      placeholder="e.g. 28"
-                      value={formData.age}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                      Email Address <span className="text-slate-400 font-normal">(For Monthly Reports)</span>
-                    </label>
-                    <Input
-                      name="email"
-                      type="email"
-                      placeholder="e.g. user@gmail.com"
-                      value={formData.email}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Employment Status</label>
-                    <select
-                      name="employmentStatus"
-                      value={formData.employmentStatus}
-                      onChange={handleChange}
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200"
-                    >
-                      <option value="Employed">Salaried / Corporate</option>
-                      <option value="Self-Employed">Self-Employed / Business Owner</option>
-                      <option value="Freelance">Freelancer / Creator</option>
-                      <option value="Student">Student</option>
-                      <option value="Retired">Retired</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Occupation / Profession</label>
-                    <Input
-                      name="occupation"
-                      placeholder="e.g. Software Engineer"
-                      value={formData.occupation}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Financial Dependents</label>
-                    <select
-                      name="dependents"
-                      value={formData.dependents}
-                      onChange={handleChange}
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200"
-                    >
-                      <option value="0">0 (Financially Independent)</option>
-                      <option value="1">1 Dependent</option>
-                      <option value="2">2 Dependents</option>
-                      <option value="3+">3+ Dependents</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Income Stability</label>
-                    <select
-                      name="incomeStability"
-                      value={formData.incomeStability}
-                      onChange={handleChange}
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200"
-                    >
-                      <option value="Stable">Stable (Fixed monthly salary)</option>
-                      <option value="Moderate">Moderate (Salary + Variable bonus)</option>
-                      <option value="Variable">Variable (Business / Project-based)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION B: INDIAN e-KYC VERIFICATION (PAN / DIGILOCKER) */}
-              <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                    Indian e-KYC & Regulatory Compliance (NSDL / DigiLocker)
-                  </h4>
-                  {formData.kycStatus.includes('Verified') && (
-                    <Badge variant="success" className="text-[10px] font-mono">
-                      ✓ {formData.kycStatus}
-                    </Badge>
-                  )}
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Age <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    name="age"
+                    type="number"
+                    placeholder="e.g. 28"
+                    value={formData.age}
+                    onChange={handleChange}
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  {/* PAN Card Verification Input */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                      PAN Card Number <span className="text-slate-400 font-normal">(Format: ABCDE1234F)</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        name="panNumber"
-                        maxLength={10}
-                        placeholder="ABCDE1234F"
-                        value={formData.panNumber}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, panNumber: e.target.value.toUpperCase() }))}
-                        className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-mono text-xs font-bold uppercase focus:border-emerald-500 focus:outline-none"
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        disabled={verifyingPan || formData.panVerified}
-                        onClick={handleVerifyPan}
-                        className="shrink-0 font-bold text-xs"
-                      >
-                        {verifyingPan ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : formData.panVerified ? (
-                          'Verified ✓'
-                        ) : (
-                          'Verify PAN'
-                        )}
-                      </Button>
-                    </div>
-                    {panError && <p className="text-[11px] text-rose-500 font-medium">{panError}</p>}
-                    {formData.panVerified && (
-                      <p className="text-[11px] text-emerald-500 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> NSDL Registry Match Verified
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Investor Tax Status */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block">
-                      Investor Tax Status (FATCA Declaration)
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['Resident Individual', 'NRI / PIO'].map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => setFormData((prev) => ({ ...prev, taxStatus: status }))}
-                          className={`p-2.5 rounded-xl border text-center font-bold text-xs transition ${
-                            formData.taxStatus === status
-                              ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                          }`}
-                        >
-                          {status}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* DigiLocker Fast-Track Banner Button */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-950 text-white border border-slate-800 flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <span className="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5">
-                      <Landmark className="w-4 h-4" /> Fast-Track e-KYC via DigiLocker / Aadhaar OTP
-                    </span>
-                    <p className="text-[11px] text-slate-400">
-                      1-click instant verification fetching Aadhaar demographic proof & CAMS KRA registry.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    onClick={triggerDigiLockerVerification}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shrink-0"
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Employment Status</label>
+                  <select
+                    name="employmentStatus"
+                    value={formData.employmentStatus}
+                    onChange={handleChange}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
-                    {formData.kycStatus === 'Verified (Tier-1 Compliant)' ? 'KYC Verified ✓' : 'Fast-Track KYC'}
-                  </Button>
+                    <option value="Employed">Salaried / Corporate</option>
+                    <option value="Self-Employed">Self-Employed / Business</option>
+                    <option value="Freelancer">Freelancer / Consultant</option>
+                    <option value="Student">Student / Academic</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Occupation</label>
+                  <Input
+                    name="occupation"
+                    placeholder="e.g. Software Engineer"
+                    value={formData.occupation}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Financial Dependents</label>
+                  <Input
+                    name="dependents"
+                    type="number"
+                    placeholder="0"
+                    value={formData.dependents}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Income Stability</label>
+                  <select
+                    name="incomeStability"
+                    value={formData.incomeStability}
+                    onChange={handleChange}
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="Stable">High / Predictable (Salaried)</option>
+                    <option value="Variable">Moderate / Variable</option>
+                    <option value="Highly Variable">Volatile / Project-based</option>
+                  </select>
                 </div>
               </div>
             </Card>
           )}
 
-          {/* STEP 2: CASH FLOW, BANKING & ACCOUNT AGGREGATOR (AA) */}
+          {/* STEP 2: CASH FLOW, SAVINGS & DEBT */}
           {currentStep === 2 && (
             <Card className="p-6 space-y-6">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Wallet className="w-4 h-4 text-emerald-500" />
-                  Step 2: Cash Flow, Banking & Account Aggregator (AA)
+                  Monthly Cash Flow, Savings & Liabilities
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Map your monthly income inflows, fixed living burn rate, and active credit obligations.
+                  Accurate income and expenses ensure realistic investment allocation and debt ratio checks.
                 </p>
               </div>
 
-              {/* ACCOUNT AGGREGATOR (AA) BANK CONSENT BANNER */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-slate-900 border border-emerald-500/30 text-white space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs">
-                      RBI
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold text-slate-100">Connect Bank via RBI Account Aggregator for Auto-Sync</h4>
-                      <p className="text-[11px] text-slate-400">Securely fetch monthly salary inflows & average living outlays from Setu / OneMoney.</p>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setShowBankConsentModal(true)}
-                    className="bg-emerald-500 hover:bg-emerald-600 font-bold text-xs shrink-0"
-                  >
-                    {formData.aaConnected ? `Connected (${formData.connectedBankName}) ✓` : 'Connect Primary Bank'}
-                  </Button>
-                </div>
-
-                {formData.aaConnected && (
-                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Bank Consent Active: <strong>{formData.connectedBankName}</strong> • Auto-Synced Monthly Inflows & Balances</span>
-                  </div>
-                )}
-              </div>
-
-              {/* CASH FLOW & INCOMES */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Monthly In-Hand Salary / Business Inflow (₹) <span className="text-rose-500">*</span>
-                  </label>
-                  <Input
-                    name="monthlyIncome"
-                    type="number"
-                    placeholder="e.g. 85000"
-                    value={formData.monthlyIncome}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Other Secondary Income (₹) <span className="text-slate-400 font-normal">(Rental, Dividends)</span>
-                  </label>
-                  <Input
-                    name="otherIncome"
-                    type="number"
-                    placeholder="e.g. 10000"
-                    value={formData.otherIncome}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Essential Living Outflows (₹) <span className="text-slate-400 font-normal">(Rent, Groceries, Utilities)</span>
-                  </label>
-                  <Input
-                    name="monthlyEssentialExpenses"
-                    type="number"
-                    placeholder="e.g. 32000"
-                    value={formData.monthlyEssentialExpenses}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Discretionary Outflows (₹) <span className="text-slate-400 font-normal">(Dining, Shopping, Travel)</span>
-                  </label>
-                  <Input
-                    name="monthlyDiscretionaryExpenses"
-                    type="number"
-                    placeholder="e.g. 15000"
-                    value={formData.monthlyDiscretionaryExpenses}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Bank Savings Account Balance (₹)
-                  </label>
-                  <Input
-                    name="currentSavings"
-                    type="number"
-                    placeholder="e.g. 145000"
-                    value={formData.currentSavings}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                    Dedicated Emergency Reserve Buffer (₹)
-                  </label>
-                  <Input
-                    name="emergencyFund"
-                    type="number"
-                    placeholder="e.g. 100000"
-                    value={formData.emergencyFund}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              {/* CREDIT & CARD OBLIGATIONS (REFINED) */}
-              <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex items-center justify-between">
+              <div className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100 text-xs flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-emerald-500" />
-                      Credit & Debt Obligations
-                    </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Do you have active EMIs, loans, or credit card balances?</p>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Monthly Take-Home Salary (₹) <span className="text-rose-500">*</span>
+                    </label>
+                    <Input
+                      name="monthlyIncome"
+                      type="number"
+                      placeholder="e.g. 75000"
+                      value={formData.monthlyIncome}
+                      onChange={handleChange}
+                    />
                   </div>
 
-                  <label className="relative inline-flex items-center cursor-pointer">
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Other Monthly Inflow / Secondary (₹)
+                    </label>
+                    <Input
+                      name="otherIncome"
+                      type="number"
+                      placeholder="e.g. 0"
+                      value={formData.otherIncome}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Essential Monthly Expenses (₹) (Rent, Bills, Food)
+                    </label>
+                    <Input
+                      name="monthlyEssentialExpenses"
+                      type="number"
+                      placeholder="e.g. 30000"
+                      value={formData.monthlyEssentialExpenses}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Discretionary Spending (₹) (Shopping, Dining, Subs)
+                    </label>
+                    <Input
+                      name="monthlyDiscretionaryExpenses"
+                      type="number"
+                      placeholder="e.g. 7069"
+                      value={formData.monthlyDiscretionaryExpenses}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Current Bank Savings & Liquid Cash (₹)
+                    </label>
+                    <Input
+                      name="currentSavings"
+                      type="number"
+                      placeholder="e.g. 150000"
+                      value={formData.currentSavings}
+                      onChange={handleChange}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Dedicated Emergency Fund Reserve (₹)
+                    </label>
+                    <Input
+                      name="emergencyFund"
+                      type="number"
+                      placeholder="e.g. 100000"
+                      value={formData.emergencyFund}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                {/* Debt Toggle */}
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 block">Do you have active loans or credit obligations?</span>
+                      <span className="text-[11px] text-slate-400">Home loan, car EMI, education loan, or personal loan.</span>
+                    </div>
                     <input
                       type="checkbox"
                       name="hasDebt"
                       checked={formData.hasDebt}
                       onChange={handleChange}
-                      className="sr-only peer"
+                      className="w-4 h-4 rounded-md text-emerald-500 focus:ring-emerald-500"
                     />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                  </label>
-                </div>
-
-                {formData.hasDebt && (
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900/80 rounded-2xl border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs animate-in fade-in">
-                    <div>
-                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Credit Cards Held</label>
-                      <select
-                        name="creditCardsHeld"
-                        value={formData.creditCardsHeld}
-                        onChange={handleChange}
-                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200"
-                      >
-                        <option value="0">0 Cards</option>
-                        <option value="1-2">1–2 Cards</option>
-                        <option value="3-5">3–5 Cards</option>
-                        <option value="5+">5+ Cards</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Total Monthly EMI Outflow (₹)</label>
-                      <Input
-                        name="monthlyDebtPayments"
-                        type="number"
-                        placeholder="e.g. 18000"
-                        value={formData.monthlyDebtPayments}
-                        onChange={handleChange}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">CC Rollover Balance (₹)</label>
-                      <Input
-                        name="creditCardRolloverBalance"
-                        type="number"
-                        placeholder="e.g. 0"
-                        value={formData.creditCardRolloverBalance}
-                        onChange={handleChange}
-                      />
-                    </div>
                   </div>
-                )}
+
+                  {formData.hasDebt && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200 dark:border-slate-800 animate-in fade-in">
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Total Loan Balance (₹)</label>
+                        <Input
+                          name="totalDebt"
+                          type="number"
+                          placeholder="e.g. 1500000"
+                          value={formData.totalDebt}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Monthly EMI Outflow (₹)</label>
+                        <Input
+                          name="monthlyDebtPayments"
+                          type="number"
+                          placeholder="e.g. 15000"
+                          value={formData.monthlyDebtPayments}
+                          onChange={handleChange}
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Primary Loan Type</label>
+                        <select
+                          name="debtType"
+                          value={formData.debtType}
+                          onChange={handleChange}
+                          className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200"
+                        >
+                          <option value="Home">Home Loan</option>
+                          <option value="Education">Education Loan</option>
+                          <option value="Vehicle">Auto / Vehicle</option>
+                          <option value="Personal">Personal Loan</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </Card>
           )}
 
-          {/* STEP 3: GOALS, CONSOLIDATED PORTFOLIO & RISK */}
+          {/* STEP 3: GOALS, RISK TOLERANCE & PREFERENCES */}
           {currentStep === 3 && (
             <Card className="p-6 space-y-6">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Target className="w-4 h-4 text-emerald-500" />
-                  Step 3: Goals, Consolidated Portfolio & Risk Profile
+                  Financial Goals & Risk Profile
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Consolidate existing investments across external platforms and set your target horizon.
+                  Configure active milestones to receive automated monthly SIP targets and tailored fund allocations.
                 </p>
               </div>
 
-              {/* CONSOLIDATED PORTFOLIO HOLDINGS BREAKDOWN */}
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <PieChart className="w-4 h-4 text-emerald-500" />
-                    Consolidated Portfolio Holdings (External Apps & Banks)
-                  </h4>
-                  <span className="text-[10px] font-mono text-emerald-500 font-bold">Groww • Zerodha • Upstox • CAMS</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                      Mutual Funds / Active SIPs Total Value (₹)
-                    </label>
-                    <Input
-                      name="portfolioMutualFunds"
-                      type="number"
-                      placeholder="e.g. 250000"
-                      value={formData.portfolioMutualFunds}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                      Direct Equity / Stocks Holdings (₹)
-                    </label>
-                    <Input
-                      name="portfolioStocks"
-                      type="number"
-                      placeholder="e.g. 180000"
-                      value={formData.portfolioStocks}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                      Fixed Deposits / Bonds Total Value (₹)
-                    </label>
-                    <Input
-                      name="portfolioFd"
-                      type="number"
-                      placeholder="e.g. 100000"
-                      value={formData.portfolioFd}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                      Digital Gold / Physical Reserves (₹)
-                    </label>
-                    <Input
-                      name="portfolioGold"
-                      type="number"
-                      placeholder="e.g. 35000"
-                      value={formData.portfolioGold}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-
-                {/* HELPER CHIP ROW: PLATFORMS USED */}
-                <div className="space-y-1.5 pt-1">
-                  <label className="font-bold text-slate-700 dark:text-slate-300 text-xs block">
-                    Platforms & Brokers Used to Invest:
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {['Zerodha', 'Groww', 'Upstox', 'Bank NetBanking', 'CAMS Pay', 'INDmoney'].map((platform) => {
-                      const isSelected = (formData.externalPlatforms || []).includes(platform);
-                      return (
-                        <button
-                          key={platform}
-                          type="button"
-                          onClick={() => handlePlatformToggle(platform)}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 ${
-                            isSelected
-                              ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : 'border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/40'
-                          }`}
-                        >
-                          {isSelected && <Check className="w-3 h-3 text-emerald-500" />}
-                          {platform}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* FINANCIAL GOALS BUILDER */}
-              <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+              {/* Goals List */}
+              <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Financial Milestones</h4>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleAddGoal('Home Purchase')}
-                      className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-lg hover:bg-emerald-500/20"
-                    >
-                      + Home
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddGoal('Wealth Creation')}
-                      className="text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-lg hover:bg-emerald-500/20"
-                    >
-                      + Wealth
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAddGoal('Custom Goal')}
-                      className="text-[11px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg"
-                    >
-                      + Custom
-                    </button>
-                  </div>
+                  <span className="font-bold text-slate-700 dark:text-slate-300">Active Financial Goals</span>
+                  <Button variant="outline" size="xs" onClick={() => handleAddGoal()}>
+                    + Add Custom Goal
+                  </Button>
                 </div>
 
                 {formData.goals.length === 0 ? (
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800">
-                    No active goals added yet. Click one of the quick preset buttons above to add a goal.
+                  <div className="p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-800 text-center space-y-2">
+                    <p className="text-slate-400">No specific goals added yet.</p>
+                    <div className="flex justify-center gap-2">
+                      <Button variant="ghost" size="xs" onClick={() => handleAddGoal('Home Down Payment')}>
+                        + Add Home Down Payment
+                      </Button>
+                      <Button variant="ghost" size="xs" onClick={() => handleAddGoal('Emergency Fund Buffer')}>
+                        + Add Emergency Fund
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   formData.goals.map((goal) => (
                     <div
                       key={goal.id}
-                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-4 gap-2 items-center text-xs"
+                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-4 gap-2 items-center"
                     >
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">Goal Title</span>
@@ -1178,7 +647,7 @@ export default function OnboardingPage() {
                 )}
 
                 {/* Risk Tolerance & Investment Experience */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <div>
                     <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
                       Risk Tolerance Persona
@@ -1187,7 +656,7 @@ export default function OnboardingPage() {
                       name="riskTolerance"
                       value={formData.riskTolerance}
                       onChange={handleChange}
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200"
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200"
                     >
                       <option value="Conservative">Conservative (Capital preservation priority)</option>
                       <option value="Moderate">Moderate (Balanced equity & debt growth)</option>
@@ -1203,7 +672,7 @@ export default function OnboardingPage() {
                       name="timeHorizon"
                       value={formData.timeHorizon}
                       onChange={handleChange}
-                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200"
+                      className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200"
                     >
                       <option value="1–3 years">Short Term (1–3 years)</option>
                       <option value="3–5 years">Medium Term (3–5 years)</option>
@@ -1214,7 +683,7 @@ export default function OnboardingPage() {
                 </div>
 
                 {/* Insurance Checkboxes */}
-                <div className="grid grid-cols-2 gap-4 pt-3 text-xs">
+                <div className="grid grid-cols-2 gap-4 pt-3">
                   <label className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1309,13 +778,6 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-slate-400">Consolidated Net Worth:</span>
-                <span className="font-mono font-bold text-slate-100">
-                  ₹{totalNetWorthCalc.toLocaleString('en-IN')}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center">
                 <span className="text-slate-400">Savings Rate:</span>
                 <span className="font-mono font-bold text-slate-100">{savingsRatePctCalc}%</span>
               </div>
@@ -1325,103 +787,16 @@ export default function OnboardingPage() {
                 <span className="font-mono font-bold text-slate-100">{emergencyMonthsCalc} Mos</span>
               </div>
 
-              <div className="flex justify-between items-center pt-2 border-t border-slate-800/80 text-[11px]">
-                <span className="text-slate-400">KYC Compliance Status:</span>
-                <span className={`font-bold font-mono ${formData.kycStatus.includes('Verified') ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {formData.kycStatus}
-                </span>
-              </div>
+              {formData.hasDebt && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Debt-to-Income (DTI):</span>
+                  <span className="font-mono font-bold text-amber-400">{emiRatioCalc}%</span>
+                </div>
+              )}
             </div>
           </Card>
         </div>
       </div>
-
-      {/* DIGILOCKER SIMULATION MODAL OVERLAY */}
-      {showDigiLockerModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 text-white max-w-md w-full p-6 rounded-2xl border border-slate-800 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-                🏛️
-              </div>
-              <div>
-                <h3 className="font-extrabold text-sm text-slate-100">DigiLocker / UIDAI e-KYC Fast-Track</h3>
-                <p className="text-xs text-slate-400">Government of India Identity Gateway</p>
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <div className="flex justify-between text-xs font-mono">
-                <span className="text-slate-300">{digiLockerStepText}</span>
-                <span className="text-emerald-400 font-bold">{digiLockerProgress}%</span>
-              </div>
-              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-300"
-                  style={{ width: `${digiLockerProgress}%` }}
-                />
-              </div>
-            </div>
-
-            {digiLockerProgress === 100 && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>e-KYC Verification Complete! Status: Tier-1 Compliant.</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ACCOUNT AGGREGATOR (AA) BANK SELECTOR MODAL OVERLAY */}
-      {showBankConsentModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 text-white max-w-md w-full p-6 rounded-2xl border border-slate-800 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-extrabold text-sm">Select Primary Bank for AA Consent</h3>
-              </div>
-              <button
-                onClick={() => setShowBankConsentModal(false)}
-                className="text-slate-400 hover:text-white text-xs font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              Choose your primary Indian bank to grant 1-click encrypted consent via Setu / OneMoney Account Aggregator API.
-            </p>
-
-            {connectingBank ? (
-              <div className="py-8 flex flex-col items-center justify-center space-y-3">
-                <Loader2 className="w-7 h-7 text-emerald-400 animate-spin" />
-                <p className="text-xs font-bold text-slate-200">Connecting to RBI Account Aggregator Gateway...</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                {[
-                  { name: 'HDFC Bank', logo: '🏦 HDFC' },
-                  { name: 'ICICI Bank', logo: '🏛️ ICICI' },
-                  { name: 'State Bank of India', logo: '🏢 SBI' },
-                  { name: 'Axis Bank', logo: '🏬 Axis' }
-                ].map((bank) => (
-                  <button
-                    key={bank.name}
-                    type="button"
-                    onClick={() => handleConnectBank(bank.name)}
-                    className="p-3.5 rounded-xl border border-slate-800 bg-slate-800/40 hover:bg-emerald-500/10 hover:border-emerald-500/50 transition text-left space-y-1"
-                  >
-                    <span className="text-xs font-extrabold text-slate-100 block">{bank.logo}</span>
-                    <span className="text-[11px] text-slate-400 block font-medium">{bank.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

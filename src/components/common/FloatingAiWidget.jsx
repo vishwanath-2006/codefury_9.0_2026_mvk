@@ -1,89 +1,64 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import { Sparkles, X, Move, EyeOff, RotateCcw, Bot, Send, User, Loader2, Maximize2 } from 'lucide-react';
-import { generateAiResponse } from '../../services/aiService';
+import { Sparkles, X, Move, EyeOff, RotateCcw, Bot } from 'lucide-react';
 
-const STORAGE_KEY = 'finlabs_robot_state_v4';
+const STORAGE_KEY = 'finlabs_robot_position_v3';
 const MARGIN = 24;
 const ROBOT_WIDTH = 110;
 const ROBOT_HEIGHT = 140;
 
 export default function FloatingAiWidget() {
-  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [bubbleDismissed, setBubbleDismissed] = useState(false);
-  const [position, setPosition] = useState({ x: null, y: null }); // null means default CSS right:24px bottom:24px
+  const [position, setPosition] = useState({ x: null, y: null });
   const [isHidden, setIsHidden] = useState(false);
   const [hiddenEdge, setHiddenEdge] = useState('right');
   const [lastVisiblePos, setLastVisiblePos] = useState({ x: null, y: null });
   const [isDragging, setIsDragging] = useState(false);
   const [contextMenu, setContextMenu] = useState(null); // { x, y }
 
-  // Interactive AI Chat Modal State
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      sender: 'ai',
-      text: "Hello! 👋 I'm your FinLabs AI financial copilot. Ask me anything about mutual funds, your health score, or monthly surplus!"
-    }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-
   const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0, hasMoved: false });
   const widgetRef = useRef(null);
   const contextMenuRef = useRef(null);
-  const chatModalRef = useRef(null);
-  const chatEndRef = useRef(null);
 
-  // Hide floating robot widget on the dedicated /ai chat page
+  // Hide the floating widget when the user is actively on the /ai chat page
   const isAiPage = location.pathname === '/ai';
 
-  // Scroll chat messages to bottom
-  useEffect(() => {
-    if (isChatOpen) {
-      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatMessages, chatLoading, isChatOpen]);
-
-  // 1. Initial State: Always default to VISIBLE bottom-right unless explicitly moved/hidden by user in v4
+  // 1. Initial State: Always default to visible bottom-right unless explicitly moved/hidden by user
   useEffect(() => {
     try {
-      // Clear legacy stale storage keys from prior buggy versions
-      localStorage.removeItem('finlabs_robot_position_v3');
-      localStorage.removeItem('finlabs_robot_position_v2');
-      localStorage.removeItem('finlabs_robot_position');
-
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-          const maxX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
-          const maxY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
-          const clampedX = Math.min(Math.max(MARGIN, parsed.x), maxX);
-          const clampedY = Math.min(Math.max(MARGIN, parsed.y), maxY);
+        const maxX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
+        const maxY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
 
-          setPosition({ x: clampedX, y: clampedY });
-          setIsHidden(Boolean(parsed.isHidden));
-          setHiddenEdge(parsed.hiddenEdge || (clampedX < window.innerWidth / 2 ? 'left' : 'right'));
-          setLastVisiblePos({
-            x: Math.min(Math.max(MARGIN, parsed.lastX ?? clampedX), maxX),
-            y: Math.min(Math.max(MARGIN, parsed.lastY ?? clampedY), maxY)
-          });
-          return;
-        }
+        const clampedX = Math.min(Math.max(MARGIN, parsed.x ?? maxX), maxX);
+        const clampedY = Math.min(Math.max(MARGIN, parsed.y ?? maxY), maxY);
+
+        setPosition({ x: clampedX, y: clampedY });
+        setIsHidden(Boolean(parsed.isHidden));
+        setHiddenEdge(parsed.hiddenEdge || (clampedX < window.innerWidth / 2 ? 'left' : 'right'));
+        setLastVisiblePos({
+          x: Math.min(Math.max(MARGIN, parsed.lastX ?? clampedX), maxX),
+          y: Math.min(Math.max(MARGIN, parsed.lastY ?? clampedY), maxY)
+        });
+      } else {
+        const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
+        const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
+        setPosition({ x: defaultX, y: defaultY });
+        setLastVisiblePos({ x: defaultX, y: defaultY });
+        setIsHidden(false);
       }
-    } catch (e) {
-      console.warn('Error reading robot state', e);
+    } catch {
+      const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
+      const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
+      setPosition({ x: defaultX, y: defaultY });
+      setLastVisiblePos({ x: defaultX, y: defaultY });
+      setIsHidden(false);
     }
-
-    // Default state: strictly visible at bottom-right
-    setPosition({ x: null, y: null });
-    setLastVisiblePos({ x: null, y: null });
-    setIsHidden(false);
   }, []);
 
   // 2. Clamp position on window resize so robot is never off-screen
@@ -106,24 +81,6 @@ export default function FloatingAiWidget() {
   // 3. Persist State
   const persistState = useCallback((newPos, hiddenState, edge, lastPos) => {
     try {
-      if (newPos.x === null || newPos.y === null) {
-        if (hiddenState) {
-          localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({
-              x: window.innerWidth - ROBOT_WIDTH - MARGIN,
-              y: window.innerHeight - ROBOT_HEIGHT - MARGIN,
-              isHidden: true,
-              hiddenEdge: edge,
-              lastX: window.innerWidth - ROBOT_WIDTH - MARGIN,
-              lastY: window.innerHeight - ROBOT_HEIGHT - MARGIN
-            })
-          );
-        } else {
-          localStorage.removeItem(STORAGE_KEY);
-        }
-        return;
-      }
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
@@ -136,52 +93,45 @@ export default function FloatingAiWidget() {
         })
       );
     } catch (e) {
-      console.warn('Failed to save robot state', e);
+      console.warn('Failed to save robot position to localStorage', e);
     }
   }, []);
 
-  // 4. Close context menu or chat on outside click or Escape
+  // 4. Close context menu on outside click or Escape
   useEffect(() => {
     const handleGlobalClick = (e) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
         setContextMenu(null);
-      }
-      if (
-        isChatOpen &&
-        chatModalRef.current &&
-        !chatModalRef.current.contains(e.target) &&
-        widgetRef.current &&
-        !widgetRef.current.contains(e.target)
-      ) {
-        setIsChatOpen(false);
       }
     };
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setContextMenu(null);
-        setIsChatOpen(false);
         if (isDragging) setIsDragging(false);
       }
     };
 
-    document.addEventListener('mousedown', handleGlobalClick);
-    document.addEventListener('keydown', handleKeyDown);
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleGlobalClick);
+      document.addEventListener('keydown', handleKeyDown);
+    }
 
     return () => {
       document.removeEventListener('mousedown', handleGlobalClick);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [contextMenu, isChatOpen, isDragging]);
+  }, [contextMenu, isDragging]);
 
-  // Handle Left Click -> Open Inline Interactive Chatbox
+  // Handle Left Click
   const handleClick = (e) => {
     if (dragStartRef.current.hasMoved) {
       e?.preventDefault?.();
       return;
     }
-    setContextMenu(null);
-    setIsChatOpen((prev) => !prev);
+    if (!isAiPage) {
+      navigate('/ai');
+    }
   };
 
   // Handle Right Click -> Open Context Menu
@@ -199,14 +149,11 @@ export default function FloatingAiWidget() {
 
   // Dragging logic
   const startDrag = (clientX, clientY) => {
-    const currentX = position.x !== null ? position.x : (window.innerWidth - ROBOT_WIDTH - MARGIN);
-    const currentY = position.y !== null ? position.y : (window.innerHeight - ROBOT_HEIGHT - MARGIN);
-
     dragStartRef.current = {
       mouseX: clientX,
       mouseY: clientY,
-      posX: currentX,
-      posY: currentY,
+      posX: position.x ?? (window.innerWidth - ROBOT_WIDTH - MARGIN),
+      posY: position.y ?? (window.innerHeight - ROBOT_HEIGHT - MARGIN),
       hasMoved: false
     };
     setIsDragging(true);
@@ -248,15 +195,11 @@ export default function FloatingAiWidget() {
     const handleMouseUp = () => {
       setIsDragging(false);
       setPosition((currentPos) => {
-        const finalPos = currentPos.x !== null ? currentPos : {
-          x: window.innerWidth - ROBOT_WIDTH - MARGIN,
-          y: window.innerHeight - ROBOT_HEIGHT - MARGIN
-        };
-        setLastVisiblePos(finalPos);
-        const edge = finalPos.x < window.innerWidth / 2 ? 'left' : 'right';
+        setLastVisiblePos(currentPos);
+        const edge = currentPos.x < window.innerWidth / 2 ? 'left' : 'right';
         setHiddenEdge(edge);
-        persistState(finalPos, false, edge, finalPos);
-        return finalPos;
+        persistState(currentPos, false, edge, currentPos);
+        return currentPos;
       });
     };
 
@@ -283,16 +226,11 @@ export default function FloatingAiWidget() {
   // Context Menu Actions
   const handleHideRobot = () => {
     setContextMenu(null);
-    setIsChatOpen(false);
-    const currentX = position.x !== null ? position.x : (window.innerWidth - ROBOT_WIDTH - MARGIN);
-    const currentY = position.y !== null ? position.y : (window.innerHeight - ROBOT_HEIGHT - MARGIN);
-    const edge = currentX < window.innerWidth / 2 ? 'left' : 'right';
-    const posObj = { x: currentX, y: currentY };
-
+    const edge = (position.x ?? window.innerWidth / 2) < window.innerWidth / 2 ? 'left' : 'right';
     setHiddenEdge(edge);
-    setLastVisiblePos(posObj);
+    setLastVisiblePos({ ...position });
     setIsHidden(true);
-    persistState(posObj, true, edge, posObj);
+    persistState(position, true, edge, position);
   };
 
   const handleRestoreRobot = () => {
@@ -307,52 +245,13 @@ export default function FloatingAiWidget() {
 
   const handleResetPosition = () => {
     setContextMenu(null);
-    setPosition({ x: null, y: null });
-    setLastVisiblePos({ x: null, y: null });
+    const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
+    const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
+    const defaultPos = { x: defaultX, y: defaultY };
+    setPosition(defaultPos);
+    setLastVisiblePos(defaultPos);
     setIsHidden(false);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-  };
-
-  // Chat message submission
-  const handleSendChatMessage = async (presetText) => {
-    const textToSend = presetText || chatInput;
-    if (!textToSend.trim() || chatLoading) return;
-
-    const userMsg = { sender: 'user', text: textToSend.trim() };
-    setChatMessages((prev) => [...prev, userMsg]);
-    if (!presetText) setChatInput('');
-    setChatLoading(true);
-
-    try {
-      const userContext = {
-        monthlyIncome: profile?.monthly_income || 50000,
-        fixedExpenses: profile?.fixed_expenses || 20000,
-        savings: profile?.current_savings || 100000,
-        riskScore: profile?.risk_score || 60,
-        knowledgeLevel: profile?.knowledge_level || 'Intermediate'
-      };
-
-      const history = chatMessages.map((m) => ({
-        role: m.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: m.text }]
-      }));
-
-      const reply = await generateAiResponse(textToSend, userContext, history);
-      setChatMessages((prev) => [...prev, { sender: 'ai', text: reply }]);
-    } catch (e) {
-      console.error('Chat error:', e);
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          sender: 'ai',
-          text: "I'm having a brief connection pause. Please try asking again in a moment or visit the full AI page!"
-        }
-      ]);
-    } finally {
-      setChatLoading(false);
-    }
+    persistState(defaultPos, false, 'right', defaultPos);
   };
 
   if (isAiPage) {
@@ -421,7 +320,7 @@ export default function FloatingAiWidget() {
         }
       `}</style>
 
-      {/* 1. Visible Robot Viewport Component (Defaults strictly to bottom-right: 24px) */}
+      {/* 1. Visible Robot Viewport Component */}
       {!isHidden && (
         <aside
           ref={widgetRef}
@@ -431,9 +330,10 @@ export default function FloatingAiWidget() {
           onTouchStart={handleTouchStart}
           style={{
             position: 'fixed',
-            ...(position.x !== null && position.y !== null
-              ? { left: `${position.x}px`, top: `${position.y}px` }
-              : { right: '24px', bottom: '24px' }),
+            left: position.x !== null ? `${position.x}px` : undefined,
+            top: position.y !== null ? `${position.y}px` : undefined,
+            bottom: position.x === null ? '24px' : undefined,
+            right: position.x === null ? '24px' : undefined,
             zIndex: 45,
             touchAction: 'none'
           }}
@@ -449,7 +349,7 @@ export default function FloatingAiWidget() {
           )}
 
           {/* Speech Bubble */}
-          {!bubbleDismissed && !isDragging && !isChatOpen && (
+          {!bubbleDismissed && !isDragging && (
             <div
               role="button"
               tabIndex={0}
@@ -476,7 +376,7 @@ export default function FloatingAiWidget() {
                 <span className="tracking-tight font-extrabold text-[12px]">Hi! I'm FinLabs AI 👋</span>
               </div>
               <p className="text-[11px] text-slate-300 font-medium">
-                Click me to chat or ask any financial question!
+                I'm free — ask me any financial question!
               </p>
 
               {/* Speech bubble pointer arrow */}
@@ -488,7 +388,7 @@ export default function FloatingAiWidget() {
           <div className="pointer-events-auto relative flex flex-col items-center">
             <button
               type="button"
-              aria-label="Open FinLabs AI Chat (Right-click to move/hide)"
+              aria-label="Open FinLabs AI Copilot (Right-click to move/hide)"
               onClick={handleClick}
               className="group relative w-22 h-26 sm:w-26 sm:h-30 md:w-28 md:h-32 flex items-center justify-center transition-transform duration-200 hover:scale-106 active:scale-95 focus:outline-none cursor-pointer p-0 bg-transparent border-0"
             >
@@ -719,136 +619,7 @@ export default function FloatingAiWidget() {
         </aside>
       )}
 
-      {/* 2. Interactive AI Chat Modal */}
-      {isChatOpen && !isHidden && (
-        <div
-          ref={chatModalRef}
-          style={{
-            position: 'fixed',
-            right: position.x !== null ? `${Math.max(16, window.innerWidth - position.x - ROBOT_WIDTH)}px` : '24px',
-            bottom: position.y !== null ? `${Math.max(16, window.innerHeight - position.y + 10)}px` : '150px',
-            zIndex: 50
-          }}
-          className="w-[90vw] sm:w-[360px] md:w-[390px] h-[460px] max-h-[75vh] bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-xl border border-emerald-500/40 rounded-3xl shadow-2xl shadow-emerald-950/50 flex flex-col p-4 animate-in fade-in zoom-in-95 duration-200"
-        >
-          {/* Modal Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-xs">
-                <Sparkles className="w-4 h-4 text-white animate-pulse" />
-              </div>
-              <div>
-                <h4 className="font-extrabold text-xs text-slate-100 flex items-center gap-1.5">
-                  FinLabs AI Copilot
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                </h4>
-                <p className="text-[10px] text-emerald-400 font-mono">● Online & Ready</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsChatOpen(false);
-                  navigate('/ai');
-                }}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition cursor-pointer"
-                title="Expand to Full Page"
-              >
-                <Maximize2 className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsChatOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer"
-                title="Close Chat"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Chat Messages List */}
-          <div className="flex-1 overflow-y-auto py-3 space-y-3 custom-scrollbar text-xs">
-            {chatMessages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex items-start gap-2 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}
-              >
-                <div
-                  className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold ${
-                    msg.sender === 'user'
-                      ? 'bg-indigo-500 text-white'
-                      : 'bg-emerald-500 text-white shadow-xs'
-                  }`}
-                >
-                  {msg.sender === 'user' ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
-                </div>
-                <div
-                  className={`max-w-[82%] p-2.5 rounded-2xl text-[11px] leading-relaxed whitespace-pre-wrap ${
-                    msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white rounded-tr-none'
-                      : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700/80'
-                  }`}
-                >
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-
-            {chatLoading && (
-              <div className="flex items-center gap-2 text-slate-400 text-[11px] font-mono p-2">
-                <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                <span>FinLabs AI is typing...</span>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Quick Prompt Pills */}
-          <div className="py-2 border-t border-slate-800/80 flex gap-1.5 overflow-x-auto custom-scrollbar no-scrollbar shrink-0">
-            {['Which funds match my risk?', 'My Health Score', 'Monthly Surplus'].map((prompt, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => handleSendChatMessage(prompt)}
-                disabled={chatLoading}
-                className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-300 border border-slate-700/60 whitespace-nowrap transition cursor-pointer"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
-
-          {/* Bottom Chat Input Form */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendChatMessage();
-            }}
-            className="pt-2 flex gap-1.5 shrink-0"
-          >
-            <input
-              type="text"
-              placeholder="Ask a financial question..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              disabled={chatLoading}
-              className="flex-1 bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-            />
-            <button
-              type="submit"
-              disabled={chatLoading || !chatInput.trim()}
-              className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center transition cursor-pointer"
-            >
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* 3. Hidden State: Edge Handle Tab */}
+      {/* 2. Hidden State: Edge Handle Tab */}
       {isHidden && (
         <div
           style={{
@@ -873,7 +644,7 @@ export default function FloatingAiWidget() {
         </div>
       )}
 
-      {/* 4. Glassmorphic Context Menu */}
+      {/* 3. Glassmorphic Context Menu */}
       {contextMenu && (
         <div
           ref={contextMenuRef}
