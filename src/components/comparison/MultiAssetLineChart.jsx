@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { Info } from 'lucide-react';
 
 const SERIES_COLORS = [
   { stroke: '#10b981', name: 'Emerald', hex: '#10b981' }, // 1st: Emerald
@@ -52,7 +53,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
 
     return items.map((item, itemIdx) => {
       const color = SERIES_COLORS[itemIdx % SERIES_COLORS.length];
-      const rawHistory = item.history || [];
+      const rawHistory = Array.isArray(item.history) ? item.history : [];
 
       // Filter by real calendar date timestamp
       const filtered = rawHistory.filter((pt) => {
@@ -69,14 +70,15 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         return true;
       });
 
-      // If asset is unlisted or has no trading points
+      // If asset has no genuine trading points
       if (filtered.length < 2) {
         return {
           id: item.id || item.symbol,
           symbol: item.symbol,
           displayName: item.displayName || item.name || item.symbol,
           color,
-          isUnlisted: true,
+          isUnlisted: item.assetType === 'ipo' || item.type === 'ipo',
+          hasData: false,
           points: []
         };
       }
@@ -103,21 +105,24 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         name: item.displayName || item.name || item.symbol,
         color,
         isUnlisted: false,
+        hasData: true,
         points
       };
     });
   }, [items, timeFilter]);
 
   // Compute common min and max across all series for proper scaling
-  const { minVal, maxVal, dataLength } = useMemo(() => {
-    if (normalizedSeries.length === 0) return { minVal: 90, maxVal: 110, dataLength: 0 };
+  const { minVal, maxVal, dataLength, hasAnyData } = useMemo(() => {
+    if (normalizedSeries.length === 0) return { minVal: 90, maxVal: 110, dataLength: 0, hasAnyData: false };
 
     let min = Infinity;
     let max = -Infinity;
     let maxLen = 0;
+    let foundData = false;
 
     normalizedSeries.forEach((s) => {
       if (s.points.length > maxLen) maxLen = s.points.length;
+      if (s.points.length > 0) foundData = true;
       s.points.forEach((p) => {
         if (p.normalizedVal < min) min = p.normalizedVal;
         if (p.normalizedVal > max) max = p.normalizedVal;
@@ -131,7 +136,8 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
     return {
       minVal: Math.max(0, min - pad),
       maxVal: max + pad,
-      dataLength: maxLen
+      dataLength: maxLen,
+      hasAnyData: foundData
     };
   }, [normalizedSeries]);
 
@@ -139,7 +145,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container || normalizedSeries.length === 0) return;
+    if (!canvas || !container || normalizedSeries.length === 0 || !hasAnyData) return;
 
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
@@ -157,20 +163,6 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
     const textColor = isDark ? '#94a3b8' : '#64748b';
 
     ctx.clearRect(0, 0, width, height);
-
-    if (dataLength === 0) {
-      // Clean fallback if all selected assets are unlisted IPOs
-      ctx.fillStyle = textColor;
-      ctx.font = '12px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(
-        'Unlisted assets track primary market GMP. Secondary market historical price curves become active post-listing.',
-        width / 2,
-        height / 2
-      );
-      return;
-    }
 
     const paddingLeft = 45;
     const paddingRight = 20;
@@ -288,12 +280,12 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         ctx.stroke();
       });
     }
-  }, [normalizedSeries, minVal, maxVal, dataLength, hoverIndex, containerWidth]);
+  }, [normalizedSeries, minVal, maxVal, dataLength, hoverIndex, containerWidth, hasAnyData]);
 
   // Pointer move handler
   const handleMouseMove = (e) => {
     const canvas = canvasRef.current;
-    if (!canvas || normalizedSeries.length === 0 || dataLength === 0) return;
+    if (!canvas || normalizedSeries.length === 0 || dataLength === 0 || !hasAnyData) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -350,7 +342,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
               <span className="text-slate-800 dark:text-slate-200 truncate max-w-[160px] sm:max-w-[200px]">{s.displayName}</span>
               <span className="text-[10px] text-slate-400 font-mono">
-                ({s.symbol}){s.isUnlisted ? ' · Primary GMP' : ''}
+                ({s.symbol}){s.isUnlisted ? ' · Primary GMP' : !s.hasData ? ' · Historical Series Pending' : ''}
               </span>
             </div>
           ))}
@@ -360,49 +352,65 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
         </div>
       </div>
 
-      {/* Responsive Chart Canvas Wrapper */}
+      {/* Responsive Chart Canvas or Honest Data-Unavailable State */}
       <div
         ref={containerRef}
-        className="relative w-full min-w-0 max-w-full overflow-hidden select-none bg-slate-950/40 rounded-xl p-2 border border-slate-800/60"
+        className="relative w-full min-w-0 max-w-full overflow-hidden select-none bg-slate-950/40 rounded-xl p-4 border border-slate-800/60 min-h-[220px] flex flex-col justify-center"
       >
-        <canvas
-          ref={canvasRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          className="cursor-crosshair block w-full"
-        />
-
-        {/* Multi-series Tooltip without ₹ currency symbol for index values */}
-        {hoverIndex !== null && hoveredDate && (
-          <div
-            className="absolute z-20 pointer-events-none p-3 bg-slate-900/95 text-white rounded-xl shadow-xl text-xs font-semibold leading-tight flex flex-col gap-1.5 border border-slate-700/80 backdrop-blur-md w-[200px] sm:w-[220px]"
-            style={getTooltipStyle()}
-          >
-            <div className="text-[10px] text-slate-400 font-mono pb-1 border-b border-slate-800 flex justify-between">
-              <span>Date:</span>
-              <span className="text-slate-200">{hoveredDate}</span>
+        {!hasAnyData ? (
+          <div className="py-8 px-4 text-center space-y-2.5 max-w-md mx-auto">
+            <div className="w-9 h-9 rounded-xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400">
+              <Info className="w-4 h-4 text-emerald-400" />
             </div>
-            {normalizedSeries.map((s) => {
-              if (s.points.length === 0) return null;
-              const pt = s.points[hoverIndex];
-              if (!pt) return null;
-              const isPositive = pt.returnPct >= 0;
-              return (
-                <div key={s.id || s.symbol} className="flex items-center justify-between gap-2 text-[11px]">
-                  <div className="flex items-center gap-1.5 truncate max-w-[100px]">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
-                    <span className="font-bold truncate">{s.symbol}</span>
-                  </div>
-                  <div className="font-mono flex items-center gap-1.5 shrink-0 text-right">
-                    <span className="text-slate-200 font-bold">{pt.normalizedVal}</span>
-                    <span className={`font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {isPositive ? '+' : ''}{pt.returnPct}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+            <h4 className="text-xs font-bold text-slate-200">
+              Historical Daily Time-Series Data Unavailable
+            </h4>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              No genuine historical candlestick / daily NAV feed is currently connected for this comparison. Trailing period performance (1M, 6M, 1Y) remains accurately displayed in the Quick Comparison table and Visual Analytics cards above.
+            </p>
           </div>
+        ) : (
+          <>
+            <canvas
+              ref={canvasRef}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              className="cursor-crosshair block w-full"
+            />
+
+            {/* Multi-series Tooltip without ₹ currency symbol for index values */}
+            {hoverIndex !== null && hoveredDate && (
+              <div
+                className="absolute z-20 pointer-events-none p-3 bg-slate-900/95 text-white rounded-xl shadow-xl text-xs font-semibold leading-tight flex flex-col gap-1.5 border border-slate-700/80 backdrop-blur-md w-[200px] sm:w-[220px]"
+                style={getTooltipStyle()}
+              >
+                <div className="text-[10px] text-slate-400 font-mono pb-1 border-b border-slate-800 flex justify-between">
+                  <span>Date:</span>
+                  <span className="text-slate-200">{hoveredDate}</span>
+                </div>
+                {normalizedSeries.map((s) => {
+                  if (s.points.length === 0) return null;
+                  const pt = s.points[hoverIndex];
+                  if (!pt) return null;
+                  const isPositive = pt.returnPct >= 0;
+                  return (
+                    <div key={s.id || s.symbol} className="flex items-center justify-between gap-2 text-[11px]">
+                      <div className="flex items-center gap-1.5 truncate max-w-[100px]">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color.hex }} />
+                        <span className="font-bold truncate">{s.symbol}</span>
+                      </div>
+                      <div className="font-mono flex items-center gap-1.5 shrink-0 text-right">
+                        <span className="text-slate-200 font-bold">{pt.normalizedVal}</span>
+                        <span className={`font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {isPositive ? '+' : ''}{pt.returnPct}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

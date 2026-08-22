@@ -1,54 +1,12 @@
 /**
  * FINLABS FORENSIC CANONICAL MULTI-ASSET COMPARISON SERVICE
  * Single verified source of truth for Stocks, Mutual Funds, and IPOs.
+ * Truthful Financial Architecture:
+ * - Trailing canonical returns, valuation multiples, and risk profiles are source-backed.
+ * - No synthetic, random, or reverse-engineered daily price trajectories are manufactured.
+ * - If genuine historical observation series are not connected, history remains strictly empty ([])
+ *   and the UI reflects an honest data-unavailable state rather than fabricating market curves.
  */
-
-// Helper to construct real calendar date observations
-const createHistoricalSeries = (basePrice, return1Y, return6M, return1M, days = 250) => {
-  const series = [];
-  const today = new Date();
-  const startPrice = Number((basePrice / (1 + return1Y / 100)).toFixed(2));
-  const p6M = Number((basePrice / (1 + return6M / 100)).toFixed(2));
-  const p1M = Number((basePrice / (1 + return1M / 100)).toFixed(2));
-
-  // Trailing 250 trading day anchors with genuine historical trajectory
-  let tradingDaysCount = 0;
-  for (let i = 365; i >= 0 && tradingDaysCount <= days; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const dayOfWeek = d.getDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6) continue; // Skip weekends
-
-    const dayStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
-    const progress = tradingDaysCount / days;
-
-    // Piecewise historical price curve anchored at exact 1Y, 6M, 1M, and current milestones
-    let price = startPrice;
-    if (tradingDaysCount === 0) {
-      price = startPrice;
-    } else if (tradingDaysCount === days) {
-      price = basePrice;
-    } else if (progress <= 0.5) {
-      const p = progress / 0.5;
-      price = startPrice + (p6M - startPrice) * p;
-    } else if (progress <= 0.9) {
-      const p = (progress - 0.5) / 0.4;
-      price = p6M + (p1M - p6M) * p;
-    } else {
-      const p = (progress - 0.9) / 0.1;
-      price = p1M + (basePrice - p1M) * p;
-    }
-
-    series.push({
-      date: dayStr,
-      rawDate: d,
-      price: Number(price.toFixed(2))
-    });
-    tradingDaysCount++;
-  }
-
-  return series;
-};
 
 // 1. Top Indian Equities (NSE Bluechips)
 export const STOCKS_UNIVERSE = [
@@ -72,7 +30,7 @@ export const STOCKS_UNIVERSE = [
     horizon: '3–5+ Years',
     suitability: 'Direct Equity Growth',
     diversification: 'Single Company (Concentrated)',
-    history: createHistoricalSeries(4120.25, 24.8, 14.5, 4.2)
+    history: []
   },
   {
     id: 'stock-INFY',
@@ -94,7 +52,7 @@ export const STOCKS_UNIVERSE = [
     horizon: '3–5+ Years',
     suitability: 'Direct Equity Growth',
     diversification: 'Single Company (Concentrated)',
-    history: createHistoricalSeries(1840.10, 21.4, 12.8, 3.5)
+    history: []
   },
   {
     id: 'stock-RELIANCE',
@@ -116,7 +74,7 @@ export const STOCKS_UNIVERSE = [
     horizon: '3–5+ Years',
     suitability: 'Bluechip Capital Growth',
     diversification: 'Single Company (Conglomerate)',
-    history: createHistoricalSeries(2980.50, 18.9, 9.6, 2.8)
+    history: []
   },
   {
     id: 'stock-HDFCBANK',
@@ -138,7 +96,7 @@ export const STOCKS_UNIVERSE = [
     horizon: '3–5+ Years',
     suitability: 'Core Banking Compounding',
     diversification: 'Single Company (Banking)',
-    history: createHistoricalSeries(1665.00, 14.5, 7.4, 1.9)
+    history: []
   },
   {
     id: 'stock-TATAMOTORS',
@@ -160,7 +118,7 @@ export const STOCKS_UNIVERSE = [
     horizon: '3–5+ Years',
     suitability: 'EV Sector Growth',
     diversification: 'Single Company (Automotive)',
-    history: createHistoricalSeries(1012.20, 38.2, 22.4, 5.8)
+    history: []
   },
   {
     id: 'stock-ITC',
@@ -182,7 +140,7 @@ export const STOCKS_UNIVERSE = [
     horizon: '2–4+ Years',
     suitability: 'Defensive & Dividend Yield',
     diversification: 'Single Company (FMCG)',
-    history: createHistoricalSeries(490.40, 12.8, 6.5, 1.8)
+    history: []
   },
   {
     id: 'stock-SBIN',
@@ -204,7 +162,7 @@ export const STOCKS_UNIVERSE = [
     horizon: '3–5+ Years',
     suitability: 'PSU Banking Value',
     diversification: 'Single Company (PSU Bank)',
-    history: createHistoricalSeries(824.50, 28.6, 16.2, 4.1)
+    history: []
   }
 ];
 
@@ -230,7 +188,7 @@ export const MUTUAL_FUNDS_UNIVERSE = [
     horizon: '5–7+ Years',
     suitability: 'Automated Wealth Compounding',
     diversification: '35–50 Global & Indian Stocks',
-    history: createHistoricalSeries(76.63, 22.8, 12.2, 3.1)
+    history: []
   },
   {
     id: 'mf-nifty-50',
@@ -252,7 +210,7 @@ export const MUTUAL_FUNDS_UNIVERSE = [
     horizon: '5+ Years',
     suitability: 'Low-Cost Market Growth',
     diversification: 'Top 50 Indian Bluechips',
-    history: createHistoricalSeries(171.92, 18.4, 9.8, 2.4)
+    history: []
   },
   {
     id: 'mf-sbi-smallcap',
@@ -274,7 +232,7 @@ export const MUTUAL_FUNDS_UNIVERSE = [
     horizon: '7+ Years',
     suitability: 'Aggressive Small-Cap Alpha',
     diversification: '50+ High-Growth Small Caps',
-    history: createHistoricalSeries(187.20, 26.4, 15.4, 4.6)
+    history: []
   },
   {
     id: 'mf-sbi-bluechip',
@@ -296,7 +254,7 @@ export const MUTUAL_FUNDS_UNIVERSE = [
     horizon: '3–5+ Years',
     suitability: 'Stable Bluechip Appreciation',
     diversification: '40 Large Cap Leaders',
-    history: createHistoricalSeries(91.57, 16.8, 8.9, 2.1)
+    history: []
   },
   {
     id: 'mf-hdfc-debt',
@@ -318,7 +276,7 @@ export const MUTUAL_FUNDS_UNIVERSE = [
     horizon: '1–3 Years',
     suitability: 'Capital Preservation & Safety',
     diversification: 'AAA Rated Corporate Bonds',
-    history: createHistoricalSeries(29.59, 7.8, 3.9, 0.7)
+    history: []
   }
 ];
 
@@ -346,7 +304,7 @@ export const IPOS_UNIVERSE = [
     horizon: 'Listing Gain / 3–5 Yrs',
     suitability: 'Clean Energy IPO Alpha',
     diversification: 'Single Solar Enterprise',
-    history: [] // Unlisted: strictly empty history
+    history: []
   },
   {
     id: 'ipo-bajaj-housing',
@@ -418,7 +376,7 @@ export const IPOS_UNIVERSE = [
     horizon: '3–5 Years',
     suitability: 'Consumer Tech Ecommerce',
     diversification: 'Single Retail Network',
-    history: createHistoricalSeries(630.00, 40.0, 18.2, 4.8)
+    history: []
   }
 ];
 
@@ -578,7 +536,7 @@ export async function loadUnifiedComparison(selectedItems) {
           horizon: '3–5+ Years',
           suitability: 'Direct Equity Growth',
           diversification: 'Single Company (Concentrated)',
-          history: createHistoricalSeries(1000, 15.0, 8.0, 2.0)
+          history: []
         };
 
         const quote = await fetchLiveStockQuote(base.symbol);
@@ -635,7 +593,7 @@ export async function loadUnifiedComparison(selectedItems) {
           horizon: '5+ Years',
           suitability: 'Diversified Investing',
           diversification: '30–50 Stocks',
-          history: createHistoricalSeries(100, 16.0, 8.0, 2.0)
+          history: []
         };
 
         return {
