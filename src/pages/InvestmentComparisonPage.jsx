@@ -15,6 +15,7 @@ import {
   TrendingUp,
   LineChart,
   SlidersHorizontal,
+  BarChart3,
   ChevronDown
 } from 'lucide-react';
 import {
@@ -650,33 +651,56 @@ export default function InvestmentComparisonPage() {
         </div>
       )}
 
-      {/* 9. Floating Quick Menu in the bottom-right area */}
+      {/* 9. Modern Floating Quick Menu in the bottom-right area */}
       <div ref={quickMenuRef} className="fixed bottom-6 right-24 sm:right-28 md:right-32 z-40">
         {/* Floating Menu Popover */}
         {quickMenuOpen && (
           <div
             role="menu"
             aria-orientation="vertical"
-            className="absolute bottom-full right-0 mb-3 w-52 p-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-2xl shadow-emerald-500/10 space-y-1 animate-in fade-in zoom-in-95 duration-150"
+            className="absolute bottom-full right-0 mb-3 w-56 sm:w-60 p-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-200/90 dark:border-slate-800/90 shadow-2xl shadow-emerald-500/10 space-y-1 animate-in fade-in zoom-in-95 duration-150"
           >
-            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
-              Comparison Navigation
+            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 mb-1">
+              <span>Quick Navigation</span>
+              <span className="text-emerald-500">FinLabs</span>
             </div>
+
+            {/* Option 1: Visual Analytics */}
             <button
               role="menuitem"
               onClick={() => scrollToSection('visual-analytics')}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-150 text-left group cursor-pointer"
             >
-              <span>Returns / Valuation</span>
-              <span className="text-[10px] text-slate-400 font-mono">↓</span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <BarChart3 className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                  Visual Analytics
+                </div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  Returns / Valuation toggle
+                </div>
+              </div>
             </button>
+
+            {/* Option 2: Risk & Return */}
             <button
               role="menuitem"
               onClick={() => scrollToSection('risk-return')}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-500 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-150 text-left group cursor-pointer"
             >
-              <span>Risk & Return</span>
-              <span className="text-[10px] text-slate-400 font-mono">↓</span>
+              <div className="w-7 h-7 rounded-lg bg-teal-500/10 dark:bg-teal-500/20 text-teal-500 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Scale className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                  Risk & Return
+                </div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  Spectrum & 1-Year Yield
+                </div>
+              </div>
             </button>
           </div>
         )}
@@ -687,7 +711,9 @@ export default function InvestmentComparisonPage() {
           aria-expanded={quickMenuOpen}
           aria-haspopup="true"
           title="Comparison Quick Navigation Menu"
-          className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-emerald-500 dark:hover:text-emerald-400 hover:border-emerald-500/50 shadow-lg shadow-emerald-500/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/90 text-slate-600 dark:text-slate-300 hover:text-emerald-500 dark:hover:text-emerald-400 hover:border-emerald-500/50 shadow-lg shadow-emerald-500/10 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+            quickMenuOpen ? 'ring-2 ring-emerald-500/50 text-emerald-500 dark:text-emerald-400 bg-slate-100 dark:bg-slate-800' : ''
+          }`}
         >
           <SlidersHorizontal className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
