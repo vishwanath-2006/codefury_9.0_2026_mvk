@@ -23,7 +23,7 @@ export default function FloatingAiWidget() {
   return (
     <aside
       aria-label="FinLabs AI Assistant"
-      className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end gap-2 pointer-events-none select-none animate-in fade-in slide-in-from-bottom-4 duration-300"
+      className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-40 flex flex-col items-end gap-2.5 pointer-events-none select-none animate-in fade-in slide-in-from-bottom-4 duration-300"
     >
       <style>{`
         @keyframes finlabs-float {
@@ -31,7 +31,7 @@ export default function FloatingAiWidget() {
             transform: translateY(0px);
           }
           50% {
-            transform: translateY(-8px);
+            transform: translateY(-10px);
           }
         }
 
@@ -81,23 +81,8 @@ export default function FloatingAiWidget() {
             transform: scale(0.95);
           }
           50% {
-            opacity: 0.8;
-            transform: scale(1.1);
-          }
-        }
-
-        @keyframes finlabs-pulse-ring {
-          0% {
-            transform: scale(0.9);
-            opacity: 0.8;
-          }
-          50% {
+            opacity: 0.85;
             transform: scale(1.15);
-            opacity: 0.3;
-          }
-          100% {
-            transform: scale(0.9);
-            opacity: 0.8;
           }
         }
 
@@ -151,7 +136,7 @@ export default function FloatingAiWidget() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') handleClick();
           }}
-          className="pointer-events-auto cursor-pointer relative max-w-[240px] sm:max-w-[270px] p-3 sm:p-3.5 rounded-2xl bg-slate-900/90 dark:bg-slate-900/95 backdrop-blur-md text-slate-100 border border-emerald-500/40 shadow-xl shadow-emerald-950/30 text-xs leading-relaxed transition-all hover:scale-102 hover:border-emerald-400 hover:shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mr-1"
+          className="pointer-events-auto cursor-pointer relative max-w-[240px] sm:max-w-[270px] p-3 sm:p-3.5 rounded-2xl bg-slate-900/90 dark:bg-slate-900/95 backdrop-blur-md text-slate-100 border border-emerald-500/40 shadow-xl shadow-emerald-950/30 text-xs leading-relaxed transition-all hover:scale-102 hover:border-emerald-400 hover:shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mr-2"
         >
           {/* Dismiss button */}
           <button
@@ -175,23 +160,23 @@ export default function FloatingAiWidget() {
           </p>
 
           {/* Speech bubble pointer arrow */}
-          <div className="absolute -bottom-1.5 right-8 w-3 h-3 bg-slate-900 border-r border-b border-emerald-500/40 rotate-45" />
+          <div className="absolute -bottom-1.5 right-10 sm:right-12 w-3 h-3 bg-slate-900 border-r border-b border-emerald-500/40 rotate-45" />
         </div>
       )}
 
-      {/* Futuristic 3D FinLabs Robot Companion */}
+      {/* Prominent 3D FinLabs Robot Companion */}
       <div className="pointer-events-auto relative flex flex-col items-center">
         <button
           type="button"
           aria-label="Open FinLabs AI Copilot"
           onClick={handleClick}
-          className="group relative w-16 h-18 sm:w-18 sm:h-20 flex items-center justify-center transition-transform duration-200 hover:scale-108 active:scale-95 focus:outline-none cursor-pointer p-0 bg-transparent border-0"
+          className="group relative w-22 h-26 sm:w-26 sm:h-30 md:w-28 md:h-32 flex items-center justify-center transition-transform duration-200 hover:scale-106 active:scale-95 focus:outline-none cursor-pointer p-0 bg-transparent border-0"
         >
           {/* Ambient Glow Aura */}
-          <div className="absolute inset-1 rounded-full bg-emerald-500/25 blur-xl finlabs-glow-ambient group-hover:bg-emerald-400/40 transition-colors" />
+          <div className="absolute inset-2 rounded-full bg-emerald-500/30 blur-2xl finlabs-glow-ambient group-hover:bg-emerald-400/50 transition-colors" />
 
           {/* Floating Robot Body Structure */}
-          <div className="finlabs-robot-body w-full h-full relative flex items-center justify-center drop-shadow-[0_8px_16px_rgba(16,185,129,0.35)]">
+          <div className="finlabs-robot-body w-full h-full relative flex items-center justify-center drop-shadow-[0_10px_22px_rgba(16,185,129,0.4)]">
             <svg
               viewBox="0 0 80 90"
               className="w-full h-full overflow-visible"
@@ -409,7 +394,7 @@ export default function FloatingAiWidget() {
         </button>
 
         {/* 3D Floating Contact Shadow */}
-        <div className="finlabs-robot-shadow w-10 h-2 -mt-1 rounded-full bg-emerald-950/70 dark:bg-emerald-900/60 blur-[3px]" />
+        <div className="finlabs-robot-shadow w-14 sm:w-18 md:w-20 h-2.5 sm:h-3 -mt-1.5 rounded-full bg-emerald-950/70 dark:bg-emerald-900/60 blur-[4px]" />
       </div>
     </aside>
   );
