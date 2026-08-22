@@ -6,7 +6,10 @@ import {
   computeCashFlowMetrics,
   computeEmergencyStatus,
   computeGoalBreakdown,
-  computeHealthDiagnosticSummary
+  computeHealthDiagnosticSummary,
+  classifyQueryIntent,
+  extractProposedAmount,
+  computeInvestmentSimulation
 } from './aiFinancialEngine';
 
 /**
@@ -124,14 +127,29 @@ const formatINR = (val) =>
  */
 export async function generateAiResponse(query, userId, fallbackProfile = null) {
   const ctx = await buildUserFinancialContext(userId, fallbackProfile);
-  const qLower = query.toLowerCase();
+  const intent = classifyQueryIntent(query);
+  const proposedAmount = extractProposedAmount(query);
+
+  let simulationResult = null;
+  if (intent === 'CALCULATION_SIMULATION' && proposedAmount != null && ctx.monthlyIncome > 0) {
+    simulationResult = computeInvestmentSimulation(
+      proposedAmount,
+      ctx.monthlyIncome,
+      ctx.totalExpenses,
+      ctx.monthlyDebtPayments
+    );
+  }
 
   // 1. Invoke Supabase Edge Function with client-verified context fallback
   try {
     const { data: edgeResult, error: funcError } = await supabase.functions.invoke('finlabs-ai-copilot', {
       body: {
         query,
-        clientContext: ctx
+        clientContext: {
+          ...ctx,
+          queryIntent: intent,
+          simulationResult
+        }
       }
     });
 
@@ -149,6 +167,12 @@ export async function generateAiResponse(query, userId, fallbackProfile = null) 
 
   // 2. Client-side deterministic contextual financial engine (Zero-mock fallback using verified user numbers)
   const nameGreeting = ctx.fullName ? ctx.fullName.split(' ')[0] : 'there';
+  const qLower = query.toLowerCase();
+
+  if (intent === 'CALCULATION_SIMULATION' && simulationResult) {
+    const sim = simulationResult;
+    return `If you invest **${formatINR(sim.proposedInvestmentAmount)}** every month, your remaining monthly unallocated surplus will be **${formatINR(sim.remainingSurplusAfterInvestment)}**.\n\n**Exact Calculation Breakdown:**\n- **Total Monthly Inflow**: ${formatINR(sim.currentMonthlyIncome)}\n- **Monthly Expenses**: -${formatINR(sim.currentMonthlyExpenses)}\n- **Monthly Loan EMI / Debt**: -${formatINR(sim.currentMonthlyDebt)}\n- **Base Monthly Surplus**: **${formatINR(sim.currentMonthlySurplus)}**\n- **Proposed Monthly Investment**: -${formatINR(sim.proposedInvestmentAmount)}\n- **Remaining Unallocated Surplus**: **${formatINR(sim.remainingSurplusAfterInvestment)}**\n\n**Financial Assessment:**\n- You will be investing **${sim.surplusUtilizationPct}%** of your available monthly surplus.\n- Your effective investment rate will be **${sim.investmentRateOfIncomePct}%** of total monthly income.\n- ${sim.isDeficit ? `⚠️ This exceeds your current surplus by ${formatINR(sim.deficitAmount)}/month. Consider adjusting to stay within surplus.` : `✅ This investment is fully sustainable and leaves a liquid buffer of ${formatINR(sim.remainingSurplusAfterInvestment)}/month.`}`;
+  }
 
   if (qLower.includes('score') || qLower.includes('health')) {
     if (ctx.overallHealthScore != null && ctx.overallHealthScore > 0) {
@@ -191,10 +215,14 @@ export async function generateAiResponse(query, userId, fallbackProfile = null) 
     return `Hi ${nameGreeting}, you haven't added any specific financial goals yet. You can add goals under Onboarding Step 3 or Profile to track progress!`;
   }
 
-  if (qLower.includes('risk') || qLower.includes('category') || qLower.includes('suit') || qLower.includes('fund') || qLower.includes('invest')) {
+  if (intent === 'INVESTMENT_RECOMMENDATIONS' || qLower.includes('recommend') || qLower.includes('scheme') || qLower.includes('which fund')) {
     const risk = ctx.riskTolerance || 'Moderate';
     const horizon = ctx.timeHorizon || '3–5 years';
-    return `Based on your **${risk}** risk tolerance and **${horizon}** investment time horizon, a balanced portfolio of Large Cap Index Funds and Flexi Cap Mutual Funds provides optimal growth with controlled volatility.`;
+    return `Based on your **${risk}** risk tolerance and **${horizon}** investment time horizon, a balanced portfolio of Large Cap Index Funds (e.g. Nifty 50 Index) and Flexi Cap Mutual Funds (e.g. Parag Parikh Flexi Cap) provides optimal growth with controlled volatility.`;
+  }
+
+  if (intent === 'UNRELATED') {
+    return `I am your FinLabs AI Financial Copilot. I specialize in personal financial planning, cash flow analysis, investment suitability, and goal tracking. How can I help with your financial goals or portfolio today?`;
   }
 
   if (qLower.includes('summary') || qLower.includes('overview') || qLower.includes('complete')) {
