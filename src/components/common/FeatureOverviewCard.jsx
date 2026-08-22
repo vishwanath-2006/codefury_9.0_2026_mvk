@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Sparkles, CheckCircle2, ArrowRight, ShieldCheck, HelpCircle } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/Card';
+import { Lock, Sparkles, CheckCircle2, ArrowRight, HelpCircle } from 'lucide-react';
+import { Card, CardHeader } from '../ui/Card';
 import Button from '../ui/Button';
 
 export default function FeatureOverviewCard({
@@ -17,44 +17,44 @@ export default function FeatureOverviewCard({
 
   return (
     <div className="space-y-6">
-      {/* Capability Walkthrough Header Card */}
-      <Card className="bg-slate-900 border-slate-800 text-white relative overflow-hidden">
-        <div className="flex flex-col md:flex-row justify-between gap-6 p-2">
-          <div className="space-y-3 max-w-xl">
+      {/* Capability Walkthrough Header Card (High Contrast, Crisp Text) */}
+      <Card className="bg-slate-950 border border-slate-800 text-white relative overflow-hidden shadow-xl p-4 sm:p-6">
+        <div className="flex flex-col md:flex-row justify-between gap-6">
+          <div className="space-y-4 max-w-2xl">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-extrabold uppercase tracking-wider border border-emerald-500/30">
+              <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-extrabold uppercase tracking-wider border border-emerald-500/40 shadow-xs">
                 Engine Capabilities
               </span>
-              <span className="text-xs text-slate-400 font-mono">{moduleName}</span>
+              <span className="text-xs text-emerald-400 font-mono font-bold">{moduleName}</span>
             </div>
 
-            <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
+            <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
               What The {moduleName} Engine Does
             </h3>
 
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-100 font-semibold leading-relaxed">
               {subtitle}
             </p>
 
-            {/* Capability Pills */}
-            <div className="space-y-2 pt-1">
+            {/* High Contrast Capability Bullet Points */}
+            <div className="space-y-2.5 pt-2">
               {capabilities.map((cap, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-xs text-slate-200">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{cap}</span>
+                <div key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-100 font-bold">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <span className="leading-snug">{cap}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Contextual CTA Box */}
-          <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between space-y-4 shrink-0 max-w-xs w-full">
+          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-700/80 flex flex-col justify-between space-y-4 shrink-0 max-w-xs w-full shadow-lg">
             <div>
-              <div className="flex items-center gap-2 text-amber-400 text-xs font-bold mb-1">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-extrabold uppercase tracking-wider mb-1.5">
                 <Lock className="w-4 h-4" />
                 <span>Live Calculations Locked</span>
               </div>
-              <p className="text-xs text-slate-400 leading-normal">
+              <p className="text-xs text-slate-200 font-medium leading-relaxed">
                 Input your income & baseline financial metrics to generate live recommendations.
               </p>
             </div>
@@ -65,7 +65,7 @@ export default function FeatureOverviewCard({
               icon={ArrowRight}
               iconPosition="right"
               onClick={() => navigate(stepTarget)}
-              className="bg-emerald-500 hover:bg-emerald-600 shadow-md shadow-emerald-500/20 w-full justify-center text-xs font-bold"
+              className="bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/30 w-full justify-center text-xs font-extrabold text-white py-2.5"
             >
               {ctaLabel}
             </Button>
@@ -81,20 +81,20 @@ export default function FeatureOverviewCard({
         </div>
 
         {/* Lock Overlay Shield */}
-        <div className="absolute inset-0 z-20 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center">
+        <div className="absolute inset-0 z-20 bg-slate-950/65 backdrop-blur-xs flex flex-col items-center justify-center p-6 text-center">
           <div className="p-4 rounded-full bg-slate-900 border-2 border-emerald-500/50 text-emerald-400 shadow-2xl shadow-emerald-500/20 mb-3 animate-bounce">
             <Lock className="w-8 h-8" />
           </div>
 
-          <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-extrabold uppercase tracking-wider mb-2">
+          <span className="px-3.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-extrabold uppercase tracking-wider mb-2">
             Locked — Requires Onboarding Data
           </span>
 
-          <h4 className="text-base sm:text-lg font-bold text-white mb-1">
+          <h4 className="text-lg sm:text-xl font-extrabold text-white mb-1.5">
             Personalized {moduleName} Visualizations
           </h4>
 
-          <p className="text-xs text-slate-300 max-w-md mb-4 leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-200 font-medium max-w-md mb-4 leading-relaxed">
             Complete your baseline onboarding to render active charts, ratio stress tests, and automated asset allocation.
           </p>
 
@@ -104,7 +104,7 @@ export default function FeatureOverviewCard({
             icon={Sparkles}
             iconPosition="left"
             onClick={() => navigate(stepTarget)}
-            className="bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/25 px-6 font-bold"
+            className="bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/30 px-6 font-extrabold text-white py-2.5 text-xs"
           >
             {ctaLabel}
           </Button>
@@ -112,23 +112,23 @@ export default function FeatureOverviewCard({
       </div>
 
       {/* Why This Matters Educational Card */}
-      <Card className="bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800">
+      <Card className="bg-slate-900 border border-slate-800 text-white">
         <CardHeader>
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-            <HelpCircle className="w-4 h-4 text-emerald-500" />
+          <div className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-emerald-400 uppercase tracking-wider">
+            <HelpCircle className="w-4 h-4 text-emerald-400" />
             <span>Why This Financial Concept Matters</span>
           </div>
         </CardHeader>
-        <CardContent>
-          <ul className="space-y-2.5">
+        <div className="p-6 pt-0">
+          <ul className="space-y-3">
             {whyItMatters.map((point, idx) => (
-              <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
+              <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-100 font-semibold leading-relaxed">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 mt-1.5" />
                 <span>{point}</span>
               </li>
             ))}
           </ul>
-        </CardContent>
+        </div>
       </Card>
     </div>
   );
