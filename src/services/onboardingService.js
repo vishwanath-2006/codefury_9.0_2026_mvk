@@ -44,7 +44,7 @@ export function getUserFinancialProfile(raw) {
   
   const primaryIncome = Number(d.primaryMonthlyIncome ?? d.monthlyIncome ?? 75000) || 75000;
   const secondaryIncome = Number(d.secondaryMonthlyIncome ?? d.otherIncome ?? 0) || 0;
-  const monthlyIncome = primaryIncome + secondaryIncome || 75000;
+  const totalIncome = primaryIncome + secondaryIncome || 75000;
 
   const essentialExpenses = Number(d.essentialExpenses ?? d.monthlyEssentialExpenses ?? 30000) || 30000;
   const discretionaryExpenses = Number(d.discretionaryExpenses ?? d.monthlyDiscretionaryExpenses ?? 15000) || 15000;
@@ -78,37 +78,87 @@ export function getUserFinancialProfile(raw) {
     cashBuffer: bankSavings,
   };
 
+  const activeAssetClassesCount = [portfolio.mutualFunds, portfolio.stocks, portfolio.fixedDeposits, portfolio.gold].filter(v => v > 0).length || 2;
   const totalPortfolioNetWorth = (portfolio.mutualFunds + portfolio.stocks + portfolio.fixedDeposits + portfolio.gold + portfolio.cashBuffer) || rawTotalValue || 1;
 
-  const riskToleranceStr = String(d.riskTolerance || d.marketCorrectionReaction || 'Moderate').toLowerCase();
-  const riskScore = (riskToleranceStr.includes('conservative') || riskToleranceStr.includes('option a')) ? 1 : (riskToleranceStr.includes('aggressive') || riskToleranceStr.includes('option c')) ? 3 : 2;
+  // 1. Net Monthly Surplus & Savings Rate
+  const totalOutflows = essentialExpenses + discretionaryExpenses + totalMonthlyEmis;
+  const netMonthlySurplus = Math.max(0, totalIncome - totalOutflows);
+  const savingsRate = Math.min(100, Math.max(0, Math.round(((netMonthlySurplus / totalIncome) * 100) * 10) / 10));
 
+  // 2. Emergency Fund Runway (Months)
+  const totalEmergencyReserves = emergencyFundAmount + bankSavings;
+  const monthlyFixedNeeds = essentialExpenses + totalMonthlyEmis;
+  const emergencyRunwayMonths = Math.round((totalEmergencyReserves / (monthlyFixedNeeds || 1)) * 10) / 10;
+
+  // 3. Debt-to-Income Ratio (DTI %)
+  const dtiRatio = Math.min(100, Math.max(0, Math.round(((totalMonthlyEmis / totalIncome) * 100) * 10) / 10));
+
+  // 4. Primary Goal & Required Goal SIP (Future Value Formula)
   const primaryGoalName = d.primaryMilestone || (d.goals && d.goals[0]?.title) || 'Home Down Payment';
   const targetAmount = Number(d.targetGoalAmount || (d.goals && d.goals[0]?.targetAmount) || 1500000) || 1500000;
   const timeframeYears = Number(d.targetTimeframeYears || 5) || 5;
   const accumulatedAmount = Number((d.goals && d.goals[0]?.currentAmount) || Math.round(targetAmount * 0.3)) || Math.round(targetAmount * 0.3);
 
+  const n = Math.max(1, timeframeYears * 12);
+  const r = 0.01; // 12% annual return = 1% monthly
+  const requiredGoalSip = Math.round((targetAmount * r) / ((1 + r) * (Math.pow(1 + r, n) - 1))) || 15000;
+  const committedGoalSip = Number(d.monthlyCommitmentAmount || 15000) || 15000;
+
+  // 5. Risk Profile Mapping
+  const riskToleranceStr = String(d.riskTolerance || d.marketCorrectionReaction || 'Moderate').toLowerCase();
+  const riskScore = (riskToleranceStr.includes('conservative') || riskToleranceStr.includes('option a')) ? 1 : (riskToleranceStr.includes('aggressive') || riskToleranceStr.includes('option c')) ? 3 : 2;
+  const riskProfileLabel = riskScore === 1 ? 'Conservative' : riskScore === 3 ? 'Aggressive' : 'Moderate';
+
+  // 6. Financial Health Score (0-100 Weighted Matrix)
+  const savingsPts = Math.min(25, Math.round((savingsRate / 30) * 25));
+  const emergencyPts = emergencyRunwayMonths >= 6 ? 25 : emergencyRunwayMonths >= 3 ? 15 : 5;
+  const debtPts = dtiRatio === 0 ? 20 : dtiRatio <= 20 ? 15 : dtiRatio > 40 ? 5 : 10;
+  const investmentPts = activeAssetClassesCount >= 2 ? 15 : activeAssetClassesCount === 1 ? 8 : 0;
+  const goalPts = committedGoalSip <= netMonthlySurplus ? 15 : 5;
+  const weightedHealthScore = Math.min(100, savingsPts + emergencyPts + debtPts + investmentPts + goalPts);
+
+  // 7. Suitability Ranking (0-100 per Category)
+  let sipSuitabilityScore = 85;
+  if (timeframeYears >= 3) sipSuitabilityScore += 10;
+  if (timeframeYears < 1) sipSuitabilityScore -= 15;
+  sipSuitabilityScore = Math.min(99, Math.max(30, sipSuitabilityScore));
+
+  let stockSuitabilityScore = 50;
+  if (riskScore === 3) stockSuitabilityScore += 30;
+  if (riskScore === 1) stockSuitabilityScore = 25;
+  stockSuitabilityScore = Math.min(95, Math.max(20, stockSuitabilityScore));
+
+  let fixedSuitabilityScore = riskScore === 1 ? 85 : 45;
+
+  let ipoSuitabilityScore = 30;
+  if (riskScore === 3 && emergencyRunwayMonths >= 6) ipoSuitabilityScore += 35;
+
   const targetDateObj = new Date();
   targetDateObj.setFullYear(targetDateObj.getFullYear() + timeframeYears);
   const targetDate = targetDateObj.toISOString().split('T')[0];
 
-  const netMonthlySurplus = Math.max(0, monthlyIncome - essentialExpenses - discretionaryExpenses - totalMonthlyEmis);
-
   return {
-    fullName: d.fullName || d.full_name || 'FinLabs Investor',
+    fullName: d.fullName || d.full_name || 'Manoj',
     age: Number(d.age || 28) || 28,
     occupation: d.occupation || 'Software Engineer',
     cityTier: d.cityTier || 'Tier 1 Metro',
 
-    monthlyIncome,
+    monthlyIncome: totalIncome,
+    primaryIncome,
     secondaryIncome,
     essentialExpenses,
     discretionaryExpenses,
     netMonthlySurplus,
+    savingsRate,
+
+    emergencyReserves: totalEmergencyReserves,
+    emergencyRunwayMonths,
 
     hasCreditCard: Boolean(d.hasCreditCards ?? d.has_debt),
     activeCardsCount: Number(d.cardCount ? parseInt(d.cardCount) : 1) || 1,
     totalMonthlyEmis,
+    dtiRatio,
     outstandingDebt: Number(d.unpaidBalance ?? d.totalDebt ?? 0) || 0,
 
     bankSavings,
@@ -119,7 +169,16 @@ export function getUserFinancialProfile(raw) {
     portfolio,
     totalPortfolioNetWorth,
     riskScore, // 1, 2, 3
-    riskProfileLabel: riskScore === 1 ? 'Conservative' : riskScore === 3 ? 'Aggressive' : 'Moderate',
+    riskProfileLabel,
+    weightedHealthScore,
+
+    suitability: {
+      sipScore: sipSuitabilityScore,
+      stockScore: stockSuitabilityScore,
+      fixedScore: fixedSuitabilityScore,
+      ipoScore: ipoSuitabilityScore,
+    },
+
     primaryGoal: {
       name: primaryGoalName,
       category: 'Real Estate',
@@ -127,7 +186,9 @@ export function getUserFinancialProfile(raw) {
       targetAmount,
       targetDate,
       timeframeYears,
-      monthlyCommitmentAmount: Number(d.monthlyCommitmentAmount || 15000) || 15000,
+      requiredGoalSip,
+      committedGoalSip,
+      monthlyCommitmentAmount: committedGoalSip,
     }
   };
 }
