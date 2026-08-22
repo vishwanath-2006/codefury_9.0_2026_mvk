@@ -58,13 +58,8 @@ export function calculateSavingsRateScore(monthlyIncome, monthlyExpenses) {
  */
 export function calculateEmergencyFundScore(emergencyFund, monthlyEssentialExpenses, monthlyExpenses) {
   const fund = Math.max(0, emergencyFund || 0);
-  let baseExpenses = monthlyEssentialExpenses;
-  let fallbackUsed = false;
-
-  if (!baseExpenses || baseExpenses <= 0) {
-    baseExpenses = monthlyExpenses;
-    fallbackUsed = true;
-  }
+  const baseExpenses = monthlyExpenses || monthlyEssentialExpenses;
+  const fallbackUsed = !monthlyExpenses && Boolean(monthlyEssentialExpenses);
 
   if (!baseExpenses || baseExpenses <= 0) {
     return {

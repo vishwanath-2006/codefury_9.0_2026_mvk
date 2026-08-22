@@ -22,7 +22,7 @@ import {
   ArrowRight,
   Edit
 } from 'lucide-react';
-import { getFinancialProfile } from '../services/onboardingService';
+import { getFinancialProfile, getNormalizedFinancialProfile } from '../services/onboardingService';
 
 export default function ProfilePage() {
   const { user, profile, updateProfile } = useAuth();
@@ -41,13 +41,18 @@ export default function ProfilePage() {
   }, [profile]);
 
   useEffect(() => {
+    let mounted = true;
+    setFinProfile(null);
     async function loadFinData() {
       if (user?.id) {
-        const data = await getFinancialProfile(user.id);
-        if (data) setFinProfile(data);
+        const data = await getNormalizedFinancialProfile(user.id);
+        if (mounted && data) setFinProfile(data);
       }
     }
     loadFinData();
+    return () => {
+      mounted = false;
+    };
   }, [user?.id]);
 
   const handleUpdate = async (e) => {
@@ -82,45 +87,45 @@ export default function ProfilePage() {
   // Helper to format experience label
   const formatExperienceLabel = (exp) => {
     if (!exp) return 'Beginner — I\'m new to investing';
-    const lower = exp.toLowerCase();
-    if (lower.includes('beginner')) return 'Beginner — I\'m new to investing';
+    const lower = String(exp).toLowerCase();
+    if (lower.includes('beginner') || lower.includes('new')) return 'Beginner — I\'m new to investing';
     if (lower.includes('some')) return 'Some Experience — I\'ve been investing for a while';
     if (lower.includes('experienced')) return 'Experienced — I understand investing and manage my investments confidently';
     return exp;
   };
 
-  // Fallback view data if profile not fully completed yet
+  const raw = finProfile?.raw;
+  const isCompleted = Boolean(finProfile?.onboardingCompleted || raw?.onboarding_completed);
+
+  // Persisted view data if profile completed, with zero-safe nullish coalescing
   const displayData = {
-    age: finProfile?.age || 28,
-    employmentStatus: finProfile?.employment_status || 'Employed',
-    occupation: finProfile?.occupation || 'Software Engineer',
-    dependents: finProfile?.dependents ?? 0,
-    incomeStability: finProfile?.income_stability || 'Stable',
-    monthlyIncome: finProfile?.monthly_income || 50000,
-    otherIncome: finProfile?.other_income || 0,
-    essentialExpenses: finProfile?.monthly_essential_expenses || 25000,
-    discretionaryExpenses: finProfile?.monthly_discretionary_expenses || 10000,
-    totalExpenses: finProfile?.monthly_expenses || 35000,
-    currentSavings: finProfile?.current_savings || 150000,
-    emergencyFund: finProfile?.emergency_fund || 100000,
-    monthlySavings: finProfile?.monthly_savings || 15000,
-    hasDebt: Boolean(finProfile?.has_debt),
-    totalDebt: finProfile?.total_debt || 0,
-    monthlyDebtPayments: finProfile?.monthly_debt_payments || 0,
-    debtType: finProfile?.debt_type || 'N/A',
-    goals: finProfile?.goals || [
-      { title: 'Emergency Reserve Fund', targetAmount: 200000, currentAmount: 100000, deadline: '2026' },
-      { title: 'Home Downpayment', targetAmount: 1000000, currentAmount: 300000, deadline: '2028' }
-    ],
-    hasInvestments: finProfile?.has_investments ?? true,
-    investmentCategories: finProfile?.investment_categories || ['Mutual Funds', 'Stocks'],
-    investmentExperience: formatExperienceLabel(finProfile?.investment_experience),
-    hasHealthInsurance: finProfile?.has_health_insurance ?? true,
-    hasLifeInsurance: finProfile?.has_life_insurance ?? true,
-    timeHorizon: finProfile?.time_horizon || '5–10 years',
-    riskResponseFall20: finProfile?.risk_response_fall_20 || 'Hold',
-    investmentPriority: finProfile?.investment_priority || 'Balanced growth',
-    riskTolerance: finProfile?.risk_tolerance || 'Moderate'
+    age: raw?.age ?? (isCompleted ? 'N/A' : '—'),
+    employmentStatus: raw?.employment_status || (isCompleted ? 'Employed' : '—'),
+    occupation: raw?.occupation || (isCompleted ? 'N/A' : '—'),
+    dependents: raw?.dependents ?? 0,
+    incomeStability: raw?.income_stability || (isCompleted ? 'Stable' : '—'),
+    monthlyIncome: finProfile?.monthlyIncome ?? raw?.monthly_income ?? 0,
+    otherIncome: raw?.other_income ?? 0,
+    essentialExpenses: finProfile?.monthlyEssentialExpenses ?? raw?.monthly_essential_expenses ?? 0,
+    discretionaryExpenses: finProfile?.monthlyDiscretionaryExpenses ?? raw?.monthly_discretionary_expenses ?? 0,
+    totalExpenses: finProfile?.monthlyExpenses ?? raw?.monthly_expenses ?? 0,
+    currentSavings: finProfile?.currentSavings ?? raw?.current_savings ?? 0,
+    emergencyFund: finProfile?.emergencyFund ?? raw?.emergency_fund ?? 0,
+    monthlySavings: raw?.monthly_savings ?? Math.max(0, (finProfile?.monthlyIncome || 0) - (finProfile?.monthlyExpenses || 0)),
+    hasDebt: Boolean(raw?.has_debt),
+    totalDebt: raw?.total_debt ?? 0,
+    monthlyDebtPayments: finProfile?.monthlyDebtPayments ?? raw?.monthly_debt_payments ?? 0,
+    debtType: raw?.debt_type || (raw?.has_debt ? 'Personal' : 'None'),
+    goals: finProfile?.goals || [],
+    hasInvestments: Boolean(raw?.has_investments),
+    investmentCategories: raw?.investment_categories || [],
+    investmentExperience: formatExperienceLabel(raw?.investment_experience),
+    hasHealthInsurance: Boolean(raw?.has_health_insurance),
+    hasLifeInsurance: Boolean(raw?.has_life_insurance),
+    timeHorizon: raw?.time_horizon || (isCompleted ? '5–10 years' : '—'),
+    riskResponseFall20: raw?.risk_response_fall_20 || (isCompleted ? 'Hold' : '—'),
+    investmentPriority: raw?.investment_priority || (isCompleted ? 'Balanced growth' : '—'),
+    riskTolerance: finProfile?.riskProfile || raw?.risk_tolerance || (isCompleted ? 'Moderate' : 'Pending')
   };
 
   const totalIncome = displayData.monthlyIncome + displayData.otherIncome;
@@ -138,350 +143,293 @@ export default function ProfilePage() {
         </Button>
       </PageHeader>
 
-      {/* Account Header Identity Card */}
+      {/* Profile Identity Card */}
       <Card className="p-6">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800 text-center sm:text-left">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-500 font-extrabold flex items-center justify-center text-xl shrink-0 border border-emerald-500/30 shadow-md">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-6 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 text-emerald-500 font-extrabold flex items-center justify-center text-xl border border-emerald-500/30">
               {getInitials(fullName)}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">{fullName || 'FinLabs User'}</h3>
-              <p className="text-xs text-slate-400 font-mono mt-0.5">{user?.email}</p>
-              <div className="flex items-center gap-2 mt-2 justify-center sm:justify-start">
-                <Badge variant="brand" className="text-[10px]">Verified Account</Badge>
-                <Badge variant="neutral" className="text-[10px]">ID: {user?.id?.slice(0, 8)}...</Badge>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{fullName || 'FinLabs User'}</h2>
+                <Badge variant="brand" className="text-[10px]">Verified User</Badge>
               </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{user?.email || 'authenticated.user@finlabs.io'}</p>
             </div>
           </div>
 
-          <button
-            onClick={() => navigate('/onboarding')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition shrink-0"
-          >
-            <span>Update Onboarding Data</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <Badge variant={finProfile?.onboardingCompleted || finProfile?.onboarding_completed ? 'success' : 'neutral'} className="text-xs font-mono">
+            {finProfile?.onboardingCompleted || finProfile?.onboarding_completed ? 'Onboarding Complete' : 'Profile Initialized'}
+          </Badge>
         </div>
 
-        {/* Quick Name Update Form */}
-        <form onSubmit={handleUpdate} className="mt-6 flex flex-col sm:flex-row items-end gap-3 max-w-xl">
-          <div className="flex-1 w-full">
+        <form onSubmit={handleUpdate} className="space-y-4">
+          {successMsg && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-semibold flex items-center gap-2">
+              <Check className="w-4 h-4" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-semibold">
+              {errorMsg}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Full Name"
-              type="text"
-              required
               icon={User}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
+              placeholder="Your Full Name"
+              required
+            />
+            <Input
+              label="Email Address"
+              icon={Mail}
+              value={user?.email || ''}
+              disabled
+              className="opacity-70 cursor-not-allowed"
             />
           </div>
-          <Button type="submit" variant="primary" size="md" disabled={saving} icon={Save} className="w-full sm:w-auto">
-            {saving ? 'Saving...' : 'Save Name'}
-          </Button>
-        </form>
 
-        {successMsg && (
-          <p className="mt-2 text-xs font-semibold text-emerald-500 flex items-center gap-1">
-            <Check className="w-3.5 h-3.5" /> {successMsg}
-          </p>
-        )}
+          <div className="flex justify-end pt-2">
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={saving}
+              icon={Save}
+            >
+              {saving ? 'Saving Changes...' : 'Save Profile Name'}
+            </Button>
+          </div>
+        </form>
       </Card>
 
-      {/* SECTION 1: PERSONAL DETAILS */}
+      {/* SECTION 1: Personal Details */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <User className="w-4 h-4 text-emerald-500" />
-            Personal Details
-          </h4>
-          <button
-            onClick={() => navigate('/onboarding?step=1')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <Edit className="w-3.5 h-3.5" />
+            1. Personal Details
+          </h3>
+          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=1')}>
             Edit
-          </button>
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Age</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{displayData.age} years</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Age</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.age} Years</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Employment Status</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Employment</span>
             <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.employmentStatus}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Occupation / Industry</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Occupation</span>
             <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.occupation}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Financial Dependents</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{displayData.dependents}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Income Stability</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.incomeStability}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Dependents</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.dependents}</span>
           </div>
         </div>
       </Card>
 
-      {/* SECTION 2: INCOME & EXPENSES */}
+      {/* SECTION 2: Income & Expenses */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Wallet className="w-4 h-4 text-emerald-500" />
-            Income & Expenses
-          </h4>
-          <button
-            onClick={() => navigate('/onboarding?step=2')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <Edit className="w-3.5 h-3.5" />
+            2. Income & Expenses
+          </h3>
+          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=2')}>
             Edit
-          </button>
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Monthly Income</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.monthlyIncome)}</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5 font-sans">Monthly Take-Home</span>
+            <span className="font-bold text-emerald-500 text-sm">{formatINR(displayData.monthlyIncome)}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Other Income</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.otherIncome)}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5 font-sans">Other Income</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{formatINR(displayData.otherIncome)}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Essential Expenses</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.essentialExpenses)}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5 font-sans">Total Monthly Expenses</span>
+            <span className="font-bold text-rose-500 text-sm">{formatINR(displayData.totalExpenses)}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Discretionary</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.discretionaryExpenses)}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Total Expenses</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.totalExpenses)}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-            <span className="text-emerald-500 block mb-0.5 font-bold">Monthly Surplus</span>
-            <span className="font-extrabold font-mono text-emerald-500">{formatINR(monthlySurplus)}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5 font-sans">Monthly Surplus</span>
+            <span className="font-bold text-emerald-400 text-sm">{formatINR(monthlySurplus)}</span>
           </div>
         </div>
       </Card>
 
-      {/* SECTION 3: SAVINGS & EMERGENCY FUND */}
+      {/* SECTION 3: Savings & Emergency Reserve */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <PiggyBank className="w-4 h-4 text-emerald-500" />
-            Savings & Emergency Reserve
-          </h4>
-          <button
-            onClick={() => navigate('/onboarding?step=2')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <Edit className="w-3.5 h-3.5" />
+            3. Savings & Emergency Reserve
+          </h3>
+          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=2')}>
             Edit
-          </button>
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Total Savings</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.currentSavings)}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5 font-sans">Total Liquid Savings</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{formatINR(displayData.currentSavings)}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Emergency Reserve</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.emergencyFund)}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5 font-sans">Emergency Reserve</span>
+            <span className="font-bold text-emerald-500 text-sm">{formatINR(displayData.emergencyFund)}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Monthly Savings Target</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.monthlySavings)}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Emergency Coverage</span>
-            <span className="font-bold font-mono text-emerald-500">
-              {displayData.essentialExpenses > 0 ? (displayData.emergencyFund / displayData.essentialExpenses).toFixed(1) : 0} Months
-            </span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5 font-sans">Monthly Savings Target</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{formatINR(displayData.monthlySavings)}</span>
           </div>
         </div>
       </Card>
 
-      {/* SECTION 4: DEBT & LIABILITIES */}
+      {/* SECTION 4: Debt & Liabilities */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Activity className="w-4 h-4 text-emerald-500" />
-            Debt & Liabilities
-          </h4>
-          <button
-            onClick={() => navigate('/onboarding?step=2')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <Edit className="w-3.5 h-3.5" />
+            4. Debt & Liabilities
+          </h3>
+          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=2')}>
             Edit
-          </button>
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Debt Status</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.hasDebt ? 'Active Loans' : 'No Debt'}</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Active Liabilities</span>
+            <Badge variant={displayData.hasDebt ? 'warning' : 'brand'} className="text-[10px]">
+              {displayData.hasDebt ? 'Yes (Active Debt)' : 'Debt Free 🎉'}
+            </Badge>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Total Debt</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.totalDebt)}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Total Outstanding Debt</span>
+            <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{formatINR(displayData.totalDebt)}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Monthly EMI / Payments</span>
-            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">{formatINR(displayData.monthlyDebtPayments)}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Monthly EMI Payments</span>
+            <span className="font-mono font-bold text-rose-500">{formatINR(displayData.monthlyDebtPayments)}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Primary Debt Type</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Primary Debt Type</span>
             <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.debtType}</span>
           </div>
         </div>
       </Card>
 
-      {/* SECTION 5: FINANCIAL GOALS */}
+      {/* SECTION 5: Financial Goals */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Target className="w-4 h-4 text-emerald-500" />
-            Financial Goals ({displayData.goals.length})
-          </h4>
-          <button
-            onClick={() => navigate('/onboarding?step=3')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <Edit className="w-3.5 h-3.5" />
-            Edit
-          </button>
+            5. Financial Goals ({displayData.goals.length})
+          </h3>
+          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=3')}>
+            Edit Goals
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          {displayData.goals.map((g, idx) => (
-            <div key={idx} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center">
-              <div>
-                <span className="font-bold block text-slate-900 dark:text-slate-100">{g.title}</span>
-                <span className="text-[10px] text-slate-400">Target Year: {g.deadline}</span>
+        {displayData.goals.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            {displayData.goals.map((g, idx) => (
+              <div key={g.id || idx} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 space-y-1.5">
+                <div className="flex justify-between items-center font-bold">
+                  <span className="text-slate-900 dark:text-slate-100">{g.title}</span>
+                  <Badge variant="brand" className="text-[10px]">{g.priority || 'Medium'} Priority</Badge>
+                </div>
+                <div className="flex justify-between text-[11px] font-mono">
+                  <span className="text-slate-400">Target: {formatINR(g.targetAmount)}</span>
+                  <span className="text-emerald-500 font-bold">Saved: {formatINR(g.currentAmount)}</span>
+                </div>
               </div>
-              <div className="text-right font-mono">
-                <span className="font-bold text-emerald-500 block">{formatINR(g.currentAmount)}</span>
-                <span className="text-[10px] text-slate-400">of {formatINR(g.targetAmount)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 font-mono">No specific financial goals added yet.</p>
+        )}
       </Card>
 
-      {/* SECTION 6: INVESTMENTS & DIVERSIFICATION */}
+      {/* SECTION 6: Investments & Experience */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <PieChart className="w-4 h-4 text-emerald-500" />
-            Investments & Experience
-          </h4>
-          <button
-            onClick={() => navigate('/onboarding?step=3')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <Edit className="w-3.5 h-3.5" />
+            6. Investments & Experience
+          </h3>
+          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=3')}>
             Edit
-          </button>
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Active Investor</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.hasInvestments ? 'Yes' : 'Not yet'}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Investing Experience</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100 leading-snug block mt-0.5">
-              {displayData.investmentExperience}
-            </span>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-1">Categories</span>
-            <div className="flex flex-wrap gap-1">
-              {displayData.investmentCategories.map((c) => (
-                <span key={c} className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-bold">
-                  {c}
-                </span>
+        <div className="space-y-3 text-xs">
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-1">Active Investment Footprint</span>
+            <div className="flex flex-wrap gap-1.5">
+              {displayData.investmentCategories.map((cat) => (
+                <Badge key={cat} variant="neutral" className="text-[10px]">
+                  {cat}
+                </Badge>
               ))}
             </div>
           </div>
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Investing Experience</span>
+            <span className="font-bold text-emerald-500">{displayData.investmentExperience}</span>
+          </div>
         </div>
       </Card>
 
-      {/* SECTION 7: INSURANCE & SAFETY */}
+      {/* SECTION 7: Risk Profile & Insurance */}
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+          <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Shield className="w-4 h-4 text-emerald-500" />
-            Insurance & Financial Safety
-          </h4>
-          <button
-            onClick={() => navigate('/onboarding?step=3')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <Edit className="w-3.5 h-3.5" />
+            7. Risk Profile & Insurance Safety
+          </h3>
+          <Button variant="outline" size="xs" icon={Edit} onClick={() => navigate('/onboarding?step=3')}>
             Edit
-          </button>
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 text-xs">
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center">
-            <span>Health Insurance Coverage</span>
-            <span className={`font-bold ${displayData.hasHealthInsurance ? 'text-emerald-500' : 'text-slate-400'}`}>
-              {displayData.hasHealthInsurance ? 'Covered ✓' : 'Not Covered ✗'}
-            </span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Risk Appetite</span>
+            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.riskTolerance}</span>
           </div>
-          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50 flex justify-between items-center">
-            <span>Term / Life Insurance Coverage</span>
-            <span className={`font-bold ${displayData.hasLifeInsurance ? 'text-emerald-500' : 'text-slate-400'}`}>
-              {displayData.hasLifeInsurance ? 'Covered ✓' : 'Not Covered ✗'}
-            </span>
-          </div>
-        </div>
-      </Card>
-
-      {/* SECTION 8: RISK PROFILE */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-500" />
-            Risk Profile & Time Horizon
-          </h4>
-          <button
-            onClick={() => navigate('/onboarding?step=3')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
-          >
-            <Edit className="w-3.5 h-3.5" />
-            Edit
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Time Horizon</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Investment Horizon</span>
             <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.timeHorizon}</span>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">20% Market Dip Reaction</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.riskResponseFall20}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Health Insurance</span>
+            <Badge variant={displayData.hasHealthInsurance ? 'brand' : 'neutral'} className="text-[10px]">
+              {displayData.hasHealthInsurance ? 'Covered' : 'Not Covered'}
+            </Badge>
           </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Investment Priority</span>
-            <span className="font-bold text-slate-900 dark:text-slate-100">{displayData.investmentPriority}</span>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-800/50">
-            <span className="text-slate-400 block mb-0.5">Volatility Comfort</span>
-            <span className="font-bold text-emerald-500">{displayData.riskTolerance}</span>
+          <div>
+            <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Life / Term Insurance</span>
+            <Badge variant={displayData.hasLifeInsurance ? 'brand' : 'neutral'} className="text-[10px]">
+              {displayData.hasLifeInsurance ? 'Covered' : 'Not Covered'}
+            </Badge>
           </div>
         </div>
       </Card>

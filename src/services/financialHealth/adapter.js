@@ -1,63 +1,31 @@
 import { supabase } from '../../lib/supabaseClient';
 import { calculateFinancialHealthScore } from './engine';
-import { mockUserSummary, mockTopGoals, mockPortfolioAllocation } from '../../mock/finlabsMockData';
+import { getNormalizedFinancialProfile } from '../onboardingService';
 
 /**
  * Data Access Adapter for Financial Health Engine.
- * Isolates data fetching so future onboarding module updates do not break calculations.
+ * Single source of truth resolver delegating directly to getNormalizedFinancialProfile.
  */
-
-// Isolated dev fallback profile (used if user has not completed onboarding)
-export const mockFinancialProfile = Object.freeze({
-  monthlyIncome: 40000,
-  monthlyExpenses: 32000,
-  monthlyEssentialExpenses: 24000,
-  emergencyFund: 144000,
-  monthlyDebtPayments: 4800,
-  goals: mockTopGoals,
-  portfolioAllocation: mockPortfolioAllocation,
-  safetyData: {
-    hasHealthInsurance: true,
-    hasLifeInsurance: true,
-  },
-});
 
 /**
- * Retrieves financial profile inputs for calculation engine.
+ * Retrieves normalized financial profile inputs for calculation engine.
  */
 export async function getFinancialProfileInputs(userId) {
-  if (!userId) {
-    return mockFinancialProfile;
-  }
+  const normProfile = await getNormalizedFinancialProfile(userId);
 
-  try {
-    // Attempt to query Supabase onboarding/financial profile table if created
-    const { data, error } = await supabase
-      .from('financial_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (!error && data) {
-      return {
-        monthlyIncome: data.monthly_income,
-        monthlyExpenses: data.monthly_expenses,
-        monthlyEssentialExpenses: data.monthly_essential_expenses,
-        emergencyFund: data.emergency_fund,
-        monthlyDebtPayments: data.monthly_debt_payments,
-        goals: data.goals || [],
-        portfolioAllocation: data.portfolio_allocation || [],
-        safetyData: {
-          hasHealthInsurance: data.has_health_insurance || false,
-          hasLifeInsurance: data.has_life_insurance || false,
-        },
-      };
-    }
-  } catch (err) {
-    console.info('Using adapter fallback profile for user:', userId);
-  }
-
-  return mockFinancialProfile;
+  return {
+    monthlyIncome: normProfile.monthlyIncome,
+    monthlyExpenses: normProfile.monthlyExpenses,
+    monthlyEssentialExpenses: normProfile.monthlyEssentialExpenses,
+    emergencyFund: normProfile.emergencyFund,
+    monthlyDebtPayments: normProfile.monthlyDebtPayments,
+    goals: normProfile.goals || [],
+    portfolioAllocation: [],
+    safetyData: {
+      hasHealthInsurance: true,
+      hasLifeInsurance: true,
+    },
+  };
 }
 
 /**
