@@ -14,6 +14,7 @@ export default function PortfolioPage() {
 
   // Broker Credentials Inputs
   const [showConfig, setShowConfig] = useState(false);
+  const [apiKey, setApiKey] = useState('');
   const [clientId, setClientId] = useState('');
   const [pin, setPin] = useState('');
   const [totpSecret, setTotpSecret] = useState('');
@@ -28,6 +29,7 @@ export default function PortfolioPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          apiKey: useDemo ? 'demo' : apiKey || undefined,
           clientId: useDemo ? 'demo' : clientId || undefined,
           pin: useDemo ? 'demo' : pin || undefined,
           totpSecret: useDemo ? 'demo' : totpSecret || undefined,
@@ -180,7 +182,23 @@ export default function PortfolioPage() {
         <CardContent className="space-y-4">
           {/* Credentials Config Fields */}
           {showConfig && (
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">API Key</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Key className="w-3.5 h-3.5" />
+                  </span>
+                  <input
+                    type="password"
+                    placeholder="Enter SmartAPI Key"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-250/60 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:border-emerald-500 focus:outline-none transition font-semibold"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Client ID</label>
                 <div className="relative">
@@ -221,14 +239,14 @@ export default function PortfolioPage() {
                   </span>
                   <input
                     type="password"
-                    placeholder="TOTP Secret from 2FA Setup"
+                    placeholder="TOTP Secret Key"
                     value={totpSecret}
                     onChange={(e) => setTotpSecret(e.target.value)}
                     className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-250/60 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:border-emerald-500 focus:outline-none transition font-semibold"
                   />
                 </div>
               </div>
-              <p className="md:col-span-3 text-[10px] text-slate-400 font-semibold mt-1">
+              <p className="sm:col-span-2 lg:col-span-4 text-[10px] text-slate-400 font-semibold mt-1">
                 * Note: If fields are left blank, the API routes will fall back to environment secrets, or run in mock mode.
               </p>
             </div>
