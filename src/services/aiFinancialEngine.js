@@ -208,6 +208,92 @@ $$\\text{CAGR} = \\left(\\frac{\\text{Ending Value}}{\\text{Beginning Value}}\\r
 Unlike simple average returns, CAGR smooths out annual market volatility and accounts for the compounding effect of returns over time, making it the industry standard for evaluating mutual funds, stocks, and portfolios.`;
   }
 
+  if (q.includes('mutual fund') && !q.includes('stocks and mutual funds')) {
+    return `**A Mutual Fund** is an investment vehicle that pools money from multiple investors to invest in a diversified portfolio of stocks, bonds, or money market instruments, professionally managed by an Asset Management Company (AMC).
+
+**Core Principles:**
+- **Diversification**: Spreads capital across dozens of companies, reducing single-stock default or downturn risk.
+- **Professional Management**: Handled by SEBI-registered fund managers who conduct research and portfolio rebalancing.
+- **Liquidity**: Open-ended funds allow you to redeem units at the daily Net Asset Value (NAV) on any business day.
+- **Accessibility**: You can start investing via Systematic Investment Plans (SIP) with as little as ₹500/month.
+
+**Primary Types in India:**
+1. **Equity Funds** (Large Cap, Flexi Cap, Mid Cap): Aim for long-term wealth compounding (5+ years).
+2. **Debt Funds** (Liquid, Short Duration): Prioritize capital stability and predictable yields.
+3. **Hybrid Funds**: Blend equity and debt for balanced growth with controlled volatility.`;
+  }
+
+  if (q.includes('sip') && !q.includes('lump sum')) {
+    return `**A Systematic Investment Plan (SIP)** is a disciplined method of investing a fixed sum of money into a mutual fund scheme at regular recurring intervals (typically monthly).
+
+**Key Benefits:**
+- **Rupee Cost Averaging**: You automatically buy more units when market prices/NAVs are lower and fewer units when prices are higher, averaging out purchase cost without needing to time the market.
+- **Power of Compounding**: Investing recurring amounts month after month allows compounding to multiply returns exponentially over long horizons.
+- **Financial Discipline**: Automates savings directly from your bank account before discretionary spending occurs.
+- **Flexibility**: You can start, pause, increase (step-up SIP), or stop whenever your financial circumstances change without penalties.`;
+  }
+
+  if (q.includes('etf')) {
+    return `**An ETF (Exchange Traded Fund)** is a marketable security that tracks an underlying index, commodity, or basket of assets, but trades directly on stock exchanges (like NSE and BSE) just like an individual stock.
+
+**Key Features:**
+- **Real-Time Intraday Trading**: Unlike mutual funds which execute orders once a day at closing NAV, ETFs can be bought and sold throughout market trading hours at live market prices.
+- **Ultra-Low Expense Ratios**: Because ETFs passively track indices (e.g. Nifty 50 ETF, Gold ETF), their annual management fees are typically between **0.05% and 0.25%**.
+- **Transparency**: Portfolio holdings and underlying index compositions are published daily.
+- **Requirement**: A Demat and trading account is required to buy and sell ETF units on the exchange.`;
+  }
+
+  if (q.includes('p/e') || q.includes('pe ratio') || q.includes('price to earnings')) {
+    return `**The Price-to-Earnings (P/E) Ratio** is a core valuation metric used to determine whether a stock is overvalued, undervalued, or fairly priced relative to its actual earnings.
+
+**Formula:**
+$$\\text{P/E Ratio} = \\frac{\\text{Current Market Price per Share}}{\\text{Earnings Per Share (EPS)}}$$
+
+**How to Interpret:**
+- **High P/E**: Investors anticipate high future earnings growth, or the stock is trading at a premium valuation.
+- **Low P/E**: The stock may be undervalued (value opportunity), or the company is facing structural challenges.
+- **Context Matters**: Always compare a company's P/E ratio against its **historical 5-year average** and **sector peers** rather than looking at the number in isolation.`;
+  }
+
+  if (q.includes('diversification') || q.includes('diversify')) {
+    return `**Diversification** is the foundational risk-management strategy of spreading your capital across various asset classes, sectors, and instruments to reduce portfolio risk.
+
+**Why Diversification Works:**
+- **Minimizes Unsystematic Risk**: If one company, sector, or asset class underperforms, gains in other uncorrelated holdings cushion the downside.
+- **Smoother Return Profile**: Combining equities, fixed income, and gold creates steady wealth creation without violent drawdowns.
+
+**Practical Portfolio Allocation:**
+1. **Core Equities (60%–70%)**: Broad-market Index Funds (Nifty 50) and Flexi Cap Mutual Funds.
+2. **Fixed Income / Debt (20%–30%)**: PPF, Fixed Deposits, Liquid Funds for stability.
+3. **Hedges (5%–10%)**: Sovereign Gold Bonds (SGBs) or Gold ETFs for inflation protection.`;
+  }
+
+  if (q.includes('sip') && q.includes('lump sum')) {
+    return `**SIP vs. Lump Sum Investment: Direct Comparison**
+
+| Feature | SIP (Systematic Investment) | Lump Sum (One-Time) |
+| :--- | :--- | :--- |
+| **Mechanism** | Periodic monthly investments (e.g. ₹5,000/mo) | Single one-time investment (e.g. ₹2,00,000) |
+| **Market Timing** | Eliminates market timing via Rupee-Cost Averaging | High sensitivity to market entry timing |
+| **Best Suited For** | Regular salaried income & ongoing cash surplus | Windfalls, annual bonuses, or market corrections |
+| **Volatility Impact** | Buffers volatility by buying on market dips | Vulnerable to near-term market corrections |
+
+**Recommended Strategy**: If you have a large lump sum, consider parking it in a liquid fund and deploying it into equity funds via a **Systematic Transfer Plan (STP)** over 6–12 months to smooth entry risk.`;
+  }
+
+  if (q.includes('stocks') && q.includes('mutual fund') && (q.includes('difference') || q.includes('vs') || q.includes('between'))) {
+    return `**Direct Stocks vs. Mutual Funds: Core Differences**
+
+| Dimension | Direct Stocks | Mutual Funds |
+| :--- | :--- | :--- |
+| **Management** | Self-managed (requires fundamental & technical analysis) | Managed by professional SEBI-registered fund managers |
+| **Diversification** | High concentration risk unless owning 20+ stocks | Instant diversification across 40–80 companies |
+| **Time Commitment** | High (quarterly results, corporate governance monitoring) | Low (automated monthly SIPs & periodic reviews) |
+| **Risk Profile** | High volatility with single-company default risk | Moderated volatility across diversified sectors |
+
+**Best Approach**: Use **Mutual Funds as your Core Portfolio (70%–80%)** for reliable wealth compounding, and allocate a **Satellite Portfolio (20%–30%)** to high-conviction Direct Stocks.`;
+  }
+
   if (q.includes('dti') || q.includes('debt to income') || q.includes('debt-to-income')) {
     return `**Debt-to-Income (DTI) Ratio** is the percentage of your monthly income that goes toward servicing recurring debt obligations and loan EMIs.
 
@@ -254,7 +340,7 @@ Compounding accelerates wealth exponentially over time. Starting investments ear
 Financial planners recommend maintaining **3 to 6 months** of essential living expenses (rent, utilities, groceries, EMIs) in safe, liquid accounts such as high-yield savings accounts or liquid funds.`;
   }
 
-  return `Financial education concepts are designed to build long-term wealth through disciplined investing, prudent debt management, and appropriate risk allocation. Let me know if you would like an explanation of specific financial metrics such as CAGR, DTI ratio, Index Funds, Expense Ratios, or Compound Interest.`;
+  return `Financial education concepts are designed to build long-term wealth through disciplined investing, prudent debt management, and appropriate risk allocation. Let me know if you would like an explanation of specific financial metrics such as Mutual Funds, SIPs, ETFs, P/E ratio, Diversification, Index Funds, or Compound Interest.`;
 }
 
 /**

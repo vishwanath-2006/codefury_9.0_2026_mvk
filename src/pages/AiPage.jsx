@@ -178,129 +178,105 @@ export default function AiPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150 max-w-4xl mx-auto pb-12">
-      {!isOnboarded && <PlatformOverviewBanner />}
-
-      <PageHeader
-        title="FinLabs AI Copilot"
-        subtitle="Hybrid Decision Tree & Smart Gemini NLP Copilot. Tap structured topics or ask custom questions."
-        tag="Hybrid Intelligence"
-      />
-
-      {/* PRIORITIZED ACTION PLAN BANNER */}
-      {userAnalysis && (
-        <Card className="p-5 border border-emerald-500/20 bg-slate-900/60 backdrop-blur-xs">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-sm font-bold text-slate-100">Prioritized Financial Action Plan</h3>
-            </div>
-            {userAnalysis.healthDiagnostic?.overallScore != null && (
-              <Badge variant="brand" className="text-xs font-mono font-bold">
-                Health Score: {userAnalysis.healthDiagnostic.overallScore}/100
-              </Badge>
-            )}
+    <div className="space-y-4 animate-in fade-in duration-150 max-w-4xl mx-auto pb-12">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+              <Sparkles className="w-6 h-6 text-emerald-500 animate-pulse" />
+              <span>FinLabs AI Copilot</span>
+            </h1>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 dark:text-emerald-400 text-[10px] font-mono font-bold">
+              v2.0 Active
+            </span>
           </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+            Personalized wealth intelligence, cash-flow diagnostic, and financial education engine.
+          </p>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-rose-400 font-bold uppercase tracking-wider text-[10px]">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>1. Emergency Reserve First</span>
-              </div>
-              <p className="text-slate-200 font-medium leading-relaxed">
-                {userAnalysis.emergency?.status === 'Critically Underfunded'
-                  ? `Allocate surplus to emergency reserve (currently ${userAnalysis.emergency.emergencyMonths || '0'} months vs 6 months target).`
-                  : 'Emergency reserve is adequate (6+ months). Maintain in liquid account.'}
-              </p>
-            </div>
+        {/* Status Pill */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold self-start sm:self-auto">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+          <span className="text-slate-700 dark:text-slate-300 text-[11px]">
+            {user?.email ? `Connected: ${userName}` : 'Guest Session'}
+          </span>
+        </div>
+      </div>
 
-            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-amber-400 font-bold uppercase tracking-wider text-[10px]">
-                <Target className="w-3.5 h-3.5" />
-                <span>2. Active Goal Allocations</span>
-              </div>
-              <p className="text-slate-200 font-medium leading-relaxed">
-                {userAnalysis.goals && userAnalysis.goals.length > 0
-                  ? `Automate monthly goal SIP of ₹${(userAnalysis.goals[0].requiredMonthlyAmount || 0).toLocaleString('en-IN')}/mo.`
-                  : 'Add financial goals in Profile to compute required monthly SIPs.'}
-              </p>
-            </div>
+      {/* CHAT CONTAINER CARD */}
+      <Card className="flex flex-col h-[650px] sm:h-[700px] border-slate-200 dark:border-slate-800 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-md shadow-2xl overflow-hidden">
+        {/* MESSAGES VIEWPORT */}
+        <div
+          ref={chatContainerRef}
+          className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 scroll-smooth"
+        >
+          {messages.map((msg) => {
+            const isUser = msg.sender === 'user';
 
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-bold uppercase tracking-wider text-[10px]">
-                <TrendingUp className="w-3.5 h-3.5" />
-                <span>3. Surplus to Mutual Funds</span>
-              </div>
-              <p className="text-slate-200 font-medium leading-relaxed">
-                Invest remaining surplus into Index & Flexi Cap mutual funds for maximum compounding.
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* MAIN CHAT CONVERSATION CONTAINER */}
-      <Card className="min-h-[420px] max-h-[620px] flex flex-col justify-between p-4 sm:p-5 bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 shadow-2xl overflow-hidden rounded-2xl">
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-4 pr-1 sm:pr-2 custom-scrollbar">
-          {messages.map((msg) => (
-            <div
-              key={msg.id || Math.random()}
-              className={`flex items-start gap-3 animate-in fade-in duration-200 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}
-            >
-              {/* Avatar Icon */}
+            return (
               <div
-                className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 text-xs font-bold shadow-md ${
-                  msg.sender === 'user'
-                    ? 'bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-indigo-500/25'
-                    : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/30'
-                }`}
+                key={msg.id}
+                className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-150`}
               >
-                {msg.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-5 h-5" />}
-              </div>
+                {/* AI Avatar */}
+                {!isUser && (
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20 border border-emerald-400/30 mt-1">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                )}
 
-              {/* Message Bubble Card */}
-              <div className={`max-w-[88%] sm:max-w-[82%] space-y-2.5 ${msg.sender === 'user' ? 'items-end' : ''}`}>
+                {/* Message Bubble Card */}
                 <div
-                  className={`p-4 rounded-2xl text-[13px] leading-relaxed shadow-xs transition-all ${
-                    msg.sender === 'user'
-                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-tr-xs font-medium shadow-md shadow-indigo-950/20'
-                      : 'bg-slate-900/90 dark:bg-slate-900/95 text-slate-100 dark:text-slate-100 rounded-tl-xs border border-emerald-500/30 dark:border-emerald-500/25 shadow-lg shadow-emerald-950/20'
+                  className={`max-w-[88%] sm:max-w-[80%] rounded-2xl p-4 text-xs sm:text-[13px] leading-relaxed shadow-lg ${
+                    isUser
+                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-tr-none font-medium shadow-indigo-950/20'
+                      : 'bg-slate-900/90 dark:bg-slate-900/95 backdrop-blur-md border border-emerald-500/30 rounded-tl-none shadow-emerald-950/20 text-slate-100'
                   }`}
                 >
-                  {msg.sender === 'user' ? (
+                  {isUser ? (
                     <p className="whitespace-pre-wrap">{msg.text}</p>
                   ) : (
-                    <div className="space-y-1 text-slate-100 dark:text-slate-100">
+                    <div className="space-y-1.5">
                       {renderFormattedAiMessage(msg.text)}
+                    </div>
+                  )}
+
+                  {/* Optional Deep-Link Action Button */}
+                  {msg.appAction && (
+                    <div className="mt-3 pt-3 border-t border-emerald-500/20 flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 font-medium">Explore dedicated tool:</span>
+                      <button
+                        onClick={() => navigate(msg.appAction.route)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                      >
+                        <span>{msg.appAction.label}</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* Direct App Action Launch Button */}
-                {msg.appAction && (
-                  <button
-                    type="button"
-                    onClick={() => navigate(msg.appAction.route)}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition shadow-md shadow-emerald-500/20 cursor-pointer group"
-                  >
-                    <span>{msg.appAction.label}</span>
-                    <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
+                {/* User Avatar */}
+                {isUser && (
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/20 border border-indigo-400/30 mt-1">
+                    <User className="w-4 h-4" />
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
-          {/* High-Contrast Loading State */}
+          {/* AI Thinking Indicator */}
           {loading && (
-            <div className="flex items-start gap-3 animate-in fade-in duration-200">
-              <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0 text-xs font-bold shadow-md shadow-emerald-500/30">
-                <Bot className="w-5 h-5 animate-pulse" />
+            <div className="flex gap-3 justify-start animate-in fade-in">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20 border border-emerald-400/30">
+                <Bot className="w-4 h-4" />
               </div>
-              <div className="p-4 rounded-2xl bg-slate-900/90 dark:bg-slate-900/95 text-emerald-400 text-xs font-mono flex items-center gap-2.5 rounded-tl-xs border border-emerald-500/30 shadow-lg shadow-emerald-950/20">
-                <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
-                <span className="font-semibold text-slate-200">FinLabs AI is analyzing your financial context...</span>
+              <div className="p-3.5 rounded-2xl rounded-tl-none bg-slate-900/90 border border-emerald-500/30 flex items-center gap-2.5 text-xs text-emerald-400 font-medium shadow-md">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                <span>FinLabs AI is formulating financial response...</span>
               </div>
             </div>
           )}
@@ -308,74 +284,62 @@ export default function AiPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* DECISION TREE BUTTON TRAY & TOOLBAR */}
-        <div className="mt-4 pt-3.5 border-t border-slate-100 dark:border-slate-800/80 space-y-3">
-          {/* Navigation Toolbar (Back & Main Menu) */}
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                <Layers className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Flowchart Decision Tree</span>
-              </span>
-              {historyStack.length > 0 && (
-                <Badge variant="brand" className="text-[10px] font-mono">
-                  Depth: Level {historyStack.length + 1}
-                </Badge>
-              )}
-            </div>
-
-            {historyStack.length > 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleGoBack}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-emerald-500 text-[11px] font-bold transition cursor-pointer"
-                >
-                  <ArrowLeft className="w-3 h-3" />
-                  <span>Back</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleResetMainMenu}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-emerald-500 text-[11px] font-bold transition cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Main Menu</span>
-                </button>
+        {/* INTERACTIVE CONTROLS DOCK */}
+        <div className="p-3 sm:p-4 bg-slate-950/90 border-t border-slate-800 flex flex-col gap-3">
+          {/* 1. Quick Decision Tree Options Grid */}
+          {!loading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3 h-3 text-emerald-400" />
+                  <span>Interactive Quick Topics</span>
+                </span>
+                <div className="flex gap-2">
+                  {historyStack.length > 0 && (
+                    <button
+                      onClick={handleGoBack}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
+                    >
+                      ← Back
+                    </button>
+                  )}
+                  {historyStack.length > 0 && (
+                    <button
+                      onClick={handleResetMainMenu}
+                      className="px-2 py-0.5 rounded text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 transition"
+                    >
+                      Main Menu
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Quick-Tap Options Button Tray */}
-          <div className="flex flex-wrap gap-2">
-            {activeTreeOptions.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => handleSelectTreeNode(option)}
-                className="text-xs font-semibold px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-emerald-500/30 hover:bg-emerald-500/10 dark:hover:bg-emerald-950/60 hover:border-emerald-400 transition shadow-2xs cursor-pointer flex items-center gap-1.5"
-              >
-                <span>{option.title}</span>
-              </button>
-            ))}
+              {/* Dynamic Option Buttons Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                {activeTreeOptions.map((opt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSelectTreeNode(opt)}
+                    className="p-2 rounded-xl bg-slate-900/90 hover:bg-emerald-950/40 border border-slate-800 hover:border-emerald-500/40 text-left transition-all group flex items-start gap-2 active:scale-98 cursor-pointer"
+                  >
+                    <span className="text-base mt-0.5">{opt.icon || '💬'}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-slate-200 group-hover:text-emerald-300 text-xs truncate">
+                        {opt.title}
+                      </div>
+                      {opt.subtitle && (
+                        <div className="text-[10px] text-slate-400 truncate mt-0.5">
+                          {opt.subtitle}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* Smart Escape Hatch Option */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsEscapeHatchMode(true);
-                const inputEl = document.getElementById('nlp-custom-input');
-                if (inputEl) inputEl.focus();
-              }}
-              className="text-xs font-semibold px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20 transition cursor-pointer flex items-center gap-1.5"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>💬 Ask custom question</span>
-            </button>
-          </div>
-
-          {/* Text Input Bar (NLP Escape Hatch) */}
+          {/* 2. Free-Form NLP Input Bar */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -386,15 +350,11 @@ export default function AiPage() {
             <input
               id="nlp-custom-input"
               type="text"
-              placeholder={
-                isEscapeHatchMode
-                  ? "Type your custom financial question..."
-                  : "Type a question if not listed above..."
-              }
+              placeholder="Ask anything (e.g., 'What is a mutual fund?', 'How to invest ₹1,00,000')..."
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               disabled={loading}
-              className="flex-1 bg-slate-100/90 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 font-medium placeholder:text-slate-400"
+              className="flex-1 bg-slate-900/90 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 font-medium"
             />
             <button
               type="submit"
@@ -412,25 +372,69 @@ export default function AiPage() {
 }
 
 /**
- * Rich High-Contrast AI Message Renderer with Markdown support
+ * Rich High-Contrast AI Message Renderer with Markdown & Table support
  */
 function renderFormattedAiMessage(rawText) {
   if (!rawText) return null;
 
   const lines = rawText.split('\n');
+  const elements = [];
+  let tableBuffer = [];
 
-  return lines.map((line, lineIdx) => {
+  const flushTable = (key) => {
+    if (tableBuffer.length === 0) return null;
+    const header = tableBuffer[0].split('|').map((c) => c.trim()).filter(Boolean);
+    const dataRows = tableBuffer.slice(2).map((row) =>
+      row.split('|').map((c) => c.trim()).filter(Boolean)
+    );
+
+    const tbl = (
+      <div key={key} className="overflow-x-auto my-2 rounded-lg border border-slate-700/80 bg-slate-950/60 shadow-inner">
+        <table className="w-full text-[11px] text-left border-collapse">
+          <thead>
+            <tr className="border-b border-slate-700/80 bg-slate-900/90 text-emerald-400 font-bold">
+              {header.map((h, hi) => (
+                <th key={hi} className="p-2">{parseInlineMarkdown(h)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dataRows.map((r, ri) => (
+              <tr key={ri} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-900/40">
+                {r.map((c, ci) => (
+                  <td key={ci} className="p-2 text-slate-200">{parseInlineMarkdown(c)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+    tableBuffer = [];
+    return tbl;
+  };
+
+  lines.forEach((line, lineIdx) => {
     const trimmed = line.trim();
+
+    // Check if line is part of a markdown table
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      tableBuffer.push(trimmed);
+      return;
+    } else if (tableBuffer.length > 0) {
+      elements.push(flushTable(`table_${lineIdx}`));
+    }
 
     // 1. Bullet list item
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       const bulletContent = trimmed.substring(2);
-      return (
+      elements.push(
         <div key={lineIdx} className="flex items-start gap-2.5 my-1 text-slate-100">
           <span className="text-emerald-400 font-black text-sm mt-0.5 shrink-0">•</span>
           <span className="leading-relaxed">{parseInlineMarkdown(bulletContent)}</span>
         </div>
       );
+      return;
     }
 
     // 2. Numbered list item
@@ -438,7 +442,7 @@ function renderFormattedAiMessage(rawText) {
     if (numMatch) {
       const num = numMatch[1];
       const text = numMatch[2];
-      return (
+      elements.push(
         <div key={lineIdx} className="flex items-start gap-2.5 my-1.5 text-slate-100">
           <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-mono font-bold text-[10px] shrink-0 mt-0.5">
             {num}
@@ -446,29 +450,38 @@ function renderFormattedAiMessage(rawText) {
           <span className="leading-relaxed">{parseInlineMarkdown(text)}</span>
         </div>
       );
+      return;
     }
 
     // 3. Section Title / Header (**Title**)
     if (trimmed.startsWith('**') && trimmed.endsWith('**') && !trimmed.includes(':')) {
-      return (
+      elements.push(
         <div key={lineIdx} className="font-extrabold text-emerald-400 text-sm mt-3 mb-1 tracking-tight">
           {trimmed.replace(/\*\*/g, '')}
         </div>
       );
+      return;
     }
 
     // 4. Empty line
     if (!trimmed) {
-      return <div key={lineIdx} className="h-2" />;
+      elements.push(<div key={lineIdx} className="h-1.5" />);
+      return;
     }
 
     // 5. Normal paragraph
-    return (
+    elements.push(
       <p key={lineIdx} className="leading-relaxed text-slate-100 my-0.5">
         {parseInlineMarkdown(line)}
       </p>
     );
   });
+
+  if (tableBuffer.length > 0) {
+    elements.push(flushTable(`table_end`));
+  }
+
+  return elements;
 }
 
 function parseInlineMarkdown(text) {

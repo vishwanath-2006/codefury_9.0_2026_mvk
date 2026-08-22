@@ -1,14 +1,26 @@
 import os
-import pyotp
 import httpx
 import json
 import asyncio
 import time
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from typing import Optional, List, Any
+
+try:
+    import pyotp
+except Exception:
+    pyotp = None
+
+try:
+    from fastapi import FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
+except Exception:
+    FastAPI = None
+    HTTPException = Exception
+    CORSMiddleware = None
+    class BaseModel:
+        pass
 
 # Safe SmartConnect import fallback
 try:
@@ -16,20 +28,29 @@ try:
 except Exception:
     SmartConnect = None
 
-app = FastAPI(
-    title="Angel One SmartAPI Integration",
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json"
-)
-
-# Enable CORS for local development testing and production web client
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if FastAPI:
+    app = FastAPI(
+        title="Angel One SmartAPI Integration",
+        docs_url="/api/docs",
+        openapi_url="/api/openapi.json"
+    )
+    # Enable CORS for local development testing and production web client
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    class DummyApp:
+        def get(self, *args, **kwargs):
+            return lambda fn: fn
+        def post(self, *args, **kwargs):
+            return lambda fn: fn
+        def add_middleware(self, *args, **kwargs):
+            pass
+    app = DummyApp()
 
 # Server-side Session Cache with Concurrency Lock
 AUTH_LOCK = asyncio.Lock()
@@ -602,3 +623,332 @@ def get_holdings_by_token(payload: TokenSyncRequest):
             "message": str(e),
             "holdings": []
         }
+
+# ==========================================
+# FINLABS AI COPILOT ENDPOINT
+# ==========================================
+
+class AiChatRequest(BaseModel):
+    query: str
+    conversationHistory: Optional[List[dict]] = None
+    context: Optional[dict] = None
+
+def generate_finlabs_ai_response(query: str, context: Optional[dict] = None, history: Optional[List[dict]] = None) -> str:
+    import re
+    ctx = context or {}
+    q = query.lower().strip()
+    name = (ctx.get("fullName") or "there").split()[0]
+    monthly_income = float(ctx.get("monthlyIncome") or 0)
+    total_expenses = float(ctx.get("totalExpenses") or 0)
+    monthly_debt = float(ctx.get("monthlyDebtPayments") or 0)
+    monthly_surplus = float(ctx.get("monthlySurplus") or max(0, monthly_income - total_expenses - monthly_debt))
+    savings_rate = ctx.get("savingsRatePct") or (round((monthly_surplus / monthly_income) * 100) if monthly_income > 0 else 0)
+    health_score = ctx.get("overallHealthScore") or 74
+    prev_invest_amt = float(ctx.get("previousInvestmentAmount") or 0)
+    prev_platforms = ctx.get("previousInvestmentPlatforms") or []
+    risk_tolerance = ctx.get("riskTolerance") or "Moderate"
+    time_horizon = ctx.get("timeHorizon") or "5–10 years"
+    emergency_months = ctx.get("emergencyMonths") or (round(float(ctx.get("emergencyFund") or 0) / total_expenses, 1) if total_expenses > 0 else 0)
+
+    def fmt_inr(val):
+        try:
+            return f"₹{int(val):,}"
+        except Exception:
+            return f"₹{val}"
+
+    # 1. Greetings & Identity
+    if any(q == greet or q.startswith(greet + " ") or q.startswith(greet + ",") or q.startswith(greet + "!") for greet in ["hello", "hi", "hey", "hola", "namaste", "good morning", "good evening", "who are you", "what is finlabs ai", "what can you do"]):
+        return (
+            f"Hello {name}! 👋 I am **FinLabs AI**, your personal financial planning and education copilot.\n\n"
+            f"I help you understand financial concepts, analyze your cash flows, optimize monthly savings, manage debt, and build structured, long-term investment strategies aligned with your goals.\n\n"
+            f"**How can I assist you today?**\n"
+            f"- Ask about financial concepts (e.g. *What is a mutual fund?*, *Explain SIP*, *What is an ETF?*)\n"
+            f"- Explore investment allocation (e.g. *I have ₹1,00,000 to invest*, *How should I allocate my monthly surplus?*)\n"
+            f"- Review your personalized health diagnostics and goal milestones."
+        )
+
+    # 2. Concept: Mutual Funds
+    if "mutual fund" in q and not ("difference between" in q or "compare" in q or "already invested" in q or "stocks" in q):
+        return (
+            f"**A Mutual Fund** is an investment vehicle that pools money from multiple investors to invest in a diversified portfolio of stocks, bonds, or money market instruments, professionally managed by an Asset Management Company (AMC).\n\n"
+            f"**Core Principles:**\n"
+            f"- **Diversification**: Spreads capital across dozens of companies, reducing single-stock default or downturn risk.\n"
+            f"- **Professional Management**: Handled by SEBI-registered fund managers who conduct research and portfolio rebalancing.\n"
+            f"- **Liquidity**: Open-ended funds allow you to redeem units at the daily Net Asset Value (NAV) on any business day.\n"
+            f"- **Accessibility**: You can start investing via Systematic Investment Plans (SIP) with as little as ₹500/month.\n\n"
+            f"**Primary Types in India:**\n"
+            f"1. **Equity Funds** (Large Cap, Flexi Cap, Mid Cap): Aim for long-term wealth compounding (5+ years).\n"
+            f"2. **Debt Funds** (Liquid, Short Duration): Prioritize capital stability and predictable yields.\n"
+            f"3. **Hybrid Funds**: Blend equity and debt for balanced growth with controlled volatility."
+        )
+
+    # 3. Concept: SIP (Systematic Investment Plan)
+    if ("explain sip" in q or "what is sip" in q or "how does sip work" in q) and not ("sip vs" in q or "lump sum" in q):
+        return (
+            f"**A Systematic Investment Plan (SIP)** is a disciplined method of investing a fixed sum of money into a mutual fund scheme at regular recurring intervals (typically monthly).\n\n"
+            f"**Key Benefits:**\n"
+            f"- **Rupee Cost Averaging**: You automatically buy more units when market prices/NAVs are lower and fewer units when prices are higher, averaging out purchase cost without needing to time the market.\n"
+            f"- **Power of Compounding**: Investing recurring amounts month after month allows compounding to multiply returns exponentially over long horizons.\n"
+            f"- **Financial Discipline**: Automates savings directly from your bank account before discretionary spending occurs.\n"
+            f"- **Flexibility**: You can start, pause, increase (step-up SIP), or stop whenever your financial circumstances change without penalties."
+        )
+
+    # 4. Concept: ETF (Exchange Traded Fund)
+    if "etf" in q and not ("already invested" in q):
+        return (
+            f"**An ETF (Exchange Traded Fund)** is a marketable security that tracks an underlying index, commodity, or basket of assets, but trades directly on stock exchanges (like NSE and BSE) just like an individual stock.\n\n"
+            f"**Key Features:**\n"
+            f"- **Real-Time Intraday Trading**: Unlike mutual funds which execute orders once a day at closing NAV, ETFs can be bought and sold throughout market trading hours at live market prices.\n"
+            f"- **Ultra-Low Expense Ratios**: Because ETFs passively track indices (e.g. Nifty 50 ETF, Gold ETF), their annual management fees are typically between **0.05% and 0.25%**.\n"
+            f"- **Transparency**: Portfolio holdings and underlying index compositions are published daily.\n"
+            f"- **Requirement**: A Demat and trading account is required to buy and sell ETF units on the exchange."
+        )
+
+    # 5. Concept: P/E Ratio
+    if "p/e" in q or "pe ratio" in q or "price to earnings" in q:
+        return (
+            f"**The Price-to-Earnings (P/E) Ratio** is a core valuation metric used to determine whether a stock is overvalued, undervalued, or fairly priced relative to its actual earnings.\n\n"
+            f"**Formula:**\n"
+            f"$$\\text{{P/E Ratio}} = \\frac{{\\text{{Current Market Price per Share}}}}{{\\text{{Earnings Per Share (EPS)}}}}$$\n\n"
+            f"**How to Interpret:**\n"
+            f"- **High P/E**: Investors anticipate high future earnings growth, or the stock is trading at a premium valuation.\n"
+            f"- **Low P/E**: The stock may be undervalued (value opportunity), or the company is facing structural challenges.\n"
+            f"- **Context Matters**: Always compare a company's P/E ratio against its **historical 5-year average** and **sector peers** rather than looking at the number in isolation."
+        )
+
+    # 6. Concept: Diversification
+    if "diversification" in q or "diversify" in q:
+        return (
+            f"**Diversification** is the foundational risk-management strategy of spreading your capital across various asset classes, sectors, and instruments to reduce portfolio risk.\n\n"
+            f"**Why Diversification Works:**\n"
+            f"- **Minimizes Unsystematic Risk**: If one company, sector, or asset class underperforms, gains in other uncorrelated holdings cushion the downside.\n"
+            f"- **Smoother Return Profile**: Combining equities, fixed income, and gold creates steady wealth creation without violent drawdowns.\n\n"
+            f"**Practical Portfolio Allocation:**\n"
+            f"1. **Core Equities (60%–70%)**: Broad-market Index Funds (Nifty 50) and Flexi Cap Mutual Funds.\n"
+            f"2. **Fixed Income / Debt (20%–30%)**: PPF, Fixed Deposits, Liquid Funds for stability.\n"
+            f"3. **Hedges (5%–10%)**: Sovereign Gold Bonds (SGBs) or Gold ETFs for inflation protection."
+        )
+
+    # 7. Concept: Compound Interest
+    if "compound" in q or "compounding" in q:
+        return (
+            f"**Compound Interest** is the mathematical phenomenon where the returns earned on an investment begin generating returns of their own over time (\"interest on interest\").\n\n"
+            f"**Formula:**\n"
+            f"$$A = P \\left(1 + \\frac{{r}}{{n}}\\right)^{{nt}}$$\n"
+            f"*(where $P$ = Principal, $r$ = Annual return rate, $n$ = Compounding frequency per year, $t$ = Time in years).*\n\n"
+            f"**The Rule of Compounding:**\n"
+            f"- **Time in the market beats timing the market**: The earlier you start investing, the larger the compounding multiplier.\n"
+            f"- In a 20-year investment horizon, the compounding growth generated in years 15–20 often exceeds the total capital invested in years 1–10 combined."
+        )
+
+    # 8. Concept: Difference between SIP and Lump Sum
+    if ("sip" in q and "lump sum" in q) or ("difference between sip and" in q):
+        return (
+            f"**SIP vs. Lump Sum Investment: Direct Comparison**\n\n"
+            f"| Feature | SIP (Systematic Investment) | Lump Sum (One-Time) |\n"
+            f"| :--- | :--- | :--- |\n"
+            f"| **Mechanism** | Periodic monthly investments (e.g. ₹5,000/mo) | Single one-time investment (e.g. ₹2,00,000) |\n"
+            f"| **Market Timing** | Eliminates market timing via Rupee-Cost Averaging | High sensitivity to market entry timing |\n"
+            f"| **Best Suited For** | Regular salaried income & ongoing cash surplus | Windfalls, annual bonuses, or market corrections |\n"
+            f"| **Volatility Impact** | Buffers volatility by buying on market dips | Vulnerable to near-term market corrections |\n\n"
+            f"**Recommended Strategy**: If you have a large lump sum, consider parking it in a liquid fund and deploying it into equity funds via a **Systematic Transfer Plan (STP)** over 6–12 months to smooth entry risk."
+        )
+
+    # 9. Concept: Difference between Stocks and Mutual Funds
+    if "stocks" in q and "mutual fund" in q and ("difference" in q or "vs" in q or "between" in q):
+        return (
+            f"**Direct Stocks vs. Mutual Funds: Core Differences**\n\n"
+            f"| Dimension | Direct Stocks | Mutual Funds |\n"
+            f"| :--- | :--- | :--- |\n"
+            f"| **Management** | Self-managed (requires fundamental & technical analysis) | Managed by professional SEBI-registered fund managers |\n"
+            f"| **Diversification** | High concentration risk unless owning 20+ stocks | Instant diversification across 40–80 companies |\n"
+            f"| **Time Commitment** | High (quarterly results, corporate governance monitoring) | Low (automated monthly SIPs & periodic reviews) |\n"
+            f"| **Risk Profile** | High volatility with single-company default risk | Moderated volatility across diversified sectors |\n\n"
+            f"**Best Approach**: Use **Mutual Funds as your Core Portfolio (70%–80%)** for reliable wealth compounding, and allocate a **Satellite Portfolio (20%–30%)** to high-conviction Direct Stocks."
+        )
+
+    # 10. Question: Should I invest all my money in one stock?
+    if "all my money in one stock" in q or "single stock" in q or "invest all in one" in q or "one stock" in q:
+        return (
+            f"**No, you should never invest all your capital into a single stock.**\n\n"
+            f"**Why Single-Stock Concentration is Dangerous:**\n"
+            f"1. **Unsystematic Risk**: Even industry-leading companies can suffer from regulatory shifts, management fraud, sector disruptions, or sudden market crashes. If 100% of your capital is in one stock, a 50% drop halves your entire net worth.\n"
+            f"2. **Opportunity Cost**: You miss out on secular growth in other high-performing sectors (e.g. IT, Banking, Pharma, Manufacturing).\n"
+            f"3. **Zero Safety Net**: Unlike a diversified index fund, individual equities offer no structural downside cushion.\n\n"
+            f"**Prudent Allocation Rule:**\n"
+            f"- No single equity stock should exceed **5% to 10%** of your total investment portfolio."
+        )
+
+    # 11. Question: What is TCS / Stock price today? (Live market safety guard)
+    if ("price today" in q or "current price of" in q or "live price" in q or "stock price of" in q) and ("tcs" in q or "infy" in q or "reliance" in q or "stock" in q or "share" in q):
+        return (
+            f"I do not have a live streaming broker ticker connection in this chat window. To view real-time quotes and historical price charts, please navigate to our **Investment Comparison Tool** or connect your Angel One broker feed.\n\n"
+            f"FinLabs AI provides educational guidance, cash flow analytics, and asset allocation strategies without fabricating unverified live market prices."
+        )
+
+    # 12. Question / Scenario: "I have ₹1,00,000 / ₹2 lakh to invest" or Conversational Follow-up "How should I allocate it?"
+    amount_found = None
+    q_clean = q.replace(",", "")
+    amt_match = re.search(r'(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lac|l)\b', q_clean)
+    if amt_match:
+        amount_found = float(amt_match.group(1)) * 100000
+    else:
+        k_match = re.search(r'(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:k|thousand)\b', q_clean)
+        if k_match:
+            amount_found = float(k_match.group(1)) * 1000
+        else:
+            num_match = re.search(r'(?:₹|rs\.?|inr)?\s*(\d{4,9})', q_clean)
+            if num_match:
+                amount_found = float(num_match.group(1))
+
+    # Contextual Memory: If no amount in current query, check previous messages in conversation history!
+    if not amount_found and history:
+        for prev_msg in reversed(history):
+            if prev_msg.get("sender") == "user" or prev_msg.get("role") == "user":
+                prev_text = (prev_msg.get("text") or prev_msg.get("content") or "").lower()
+                prev_amt = re.search(r'(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:lakh|lac|l)\b', prev_text)
+                if prev_amt:
+                    amount_found = float(prev_amt.group(1)) * 100000
+                    break
+                prev_k = re.search(r'(?:₹|rs\.?|inr)?\s*(\d+(?:\.\d+)?)\s*(?:k|thousand)\b', prev_text)
+                if prev_k:
+                    amount_found = float(prev_k.group(1)) * 1000
+                    break
+                prev_num = re.search(r'(?:₹|rs\.?|inr)?\s*(\d{4,9})', prev_text)
+                if prev_num:
+                    amount_found = float(prev_num.group(1))
+                    break
+
+    # 12. Question: Existing investor with specific footprint (Check before generic new lump-sum)
+    if ("already invested" in q or "already invest" in q or "previous" in q or "stocks and mutual funds" in q) and ("what next" in q or "consider" in q or "recommend" in q or "invested in" in q or "consider next" in q or "where to" in q or "next" in q):
+        footprint_amt = fmt_inr(prev_invest_amt) if prev_invest_amt > 0 else (fmt_inr(500000) if "5,00,000" in q or "5 lakh" in q or "5lakh" in q else "your active portfolio")
+        platforms = prev_platforms if prev_platforms else (["Stocks", "Mutual Funds"] if "stocks and mutual funds" in q else ["Direct Equity", "Mutual Funds"])
+        platforms_str = ", ".join(platforms)
+
+        return (
+            f"Hi {name}! Since you already have an active investment footprint of **{footprint_amt}** across **{platforms_str}**, you have already established a solid foundation. Here is your tailored next-step roadmap:\n\n"
+            f"**1. Portfolio Audit & Concentration Check:**\n"
+            f"- Audit your direct stock holdings to ensure no single stock exceeds **10%** of your total portfolio value.\n"
+            f"- Verify that your direct stock holdings do not heavily overlap with the top holdings in your mutual funds.\n\n"
+            f"**2. Core vs Satellite Framework:**\n"
+            f"- **Core (70%)**: Low-cost Nifty 50 Index Funds + Diversified Flexi Cap funds for automated compounding.\n"
+            f"- **Satellite (30%)**: Quality growth stocks (e.g. TCS, HDFC Bank, Reliance) and sectoral/thematic growth bets.\n\n"
+            f"**3. Asset Class Rebalancing:**\n"
+            f"- Check if your equity-to-debt ratio matches your **{risk_tolerance}** risk profile and **{time_horizon}** horizon. Consider adding a 10% allocation in Gold ETFs or Debt Funds for downside protection.\n\n"
+            f"**4. Monthly Surplus Deployment:**\n"
+            f"- With your net monthly surplus of **{fmt_inr(monthly_surplus)}** ({savings_rate}% savings rate), automate step-up SIPs aligned with your specific financial goals."
+        )
+
+    # 13. Question / Scenario: "I have ₹1,00,000 / ₹2 lakh to invest" or Conversational Follow-up "How should I allocate it?"
+    if (amount_found and ("invest" in q or "allocate" in q or "where should i" in q or "what should i do" in q or "how should i" in q or "available" in q)) or (("allocate it" in q or "invest it" in q or "what to do with it" in q) and amount_found):
+        amt_str = fmt_inr(amount_found)
+        res_emergency = fmt_inr(amount_found * 0.20)
+        res_large_cap = fmt_inr(amount_found * 0.45)
+        res_flexi_cap = fmt_inr(amount_found * 0.25)
+        res_gold_fd = fmt_inr(amount_found * 0.10)
+
+        return (
+            f"Here is a disciplined, risk-adjusted allocation blueprint for your capital of **{amt_str}** based on your **{risk_tolerance}** profile and **{time_horizon}** horizon:\n\n"
+            f"**1. Step 1: Safety Buffer & Debt Check (20% — {res_emergency})**\n"
+            f"- Ensure your emergency reserve covers at least 3–6 months of essential living expenses (rent, bills, groceries, EMIs) in a liquid bank account or liquid fund.\n"
+            f"- If you have high-interest debt (e.g. credit cards or personal loans > 12% p.a.), clear that first before equity investing.\n\n"
+            f"**2. Step 2: Core Equity Index Allocation (45% — {res_large_cap})**\n"
+            f"- Deploy into low-cost **Nifty 50 / Sensex Index Funds** (e.g. UTI Nifty 50 Index Fund) for stable, long-term wealth compounding across India's top 50 companies.\n\n"
+            f"**3. Step 3: Active Growth & Flexi Cap Allocation (25% — {res_flexi_cap})**\n"
+            f"- Allocate to a high-quality **Flexi Cap Mutual Fund** (e.g. Parag Parikh Flexi Cap Fund) allowing fund managers to navigate large, mid, and international opportunities dynamically.\n\n"
+            f"**4. Step 4: Stability & Gold Hedge (10% — {res_gold_fd})**\n"
+            f"- Allocate to Sovereign Gold Bonds (SGBs) or Gold ETFs / Short-Duration Debt to hedge against inflation and equity market downturns.\n\n"
+            f"*Note: Rather than deploying 100% in a single day, consider deploying via a Systematic Transfer Plan (STP) over 3 to 6 months to reduce market timing risk.*"
+        )
+
+    # 14. Question: Financial health situation / score
+    if "health situation" in q or "financial health" in q or "my score" in q or "my health score" in q:
+        return (
+            f"**Your Personalized FinLabs Financial Health Snapshot:**\n\n"
+            f"- **Overall Health Score**: **{health_score}/100**\n"
+            f"- **Monthly Inflow**: {fmt_inr(monthly_income)}\n"
+            f"- **Monthly Expenses**: -{fmt_inr(total_expenses)}\n"
+            f"- **Monthly Loan EMIs / Debt**: -{fmt_inr(monthly_debt)}\n"
+            f"- **Net Monthly Recurring Surplus**: **{fmt_inr(monthly_surplus)}** ({savings_rate}% savings rate)\n"
+            f"- **Emergency Reserve Runway**: **{emergency_months} months** of essential expenses (Target: 6 months)\n"
+            f"- **Debt Status**: {'Active loans with ' + fmt_inr(monthly_debt) + '/mo EMI' if monthly_debt > 0 else 'Debt Free 🎉'}\n"
+            f"- **Risk Persona**: **{risk_tolerance}** ({time_horizon} horizon)\n\n"
+            f"**Recommended Action Plan:**\n"
+            f"1. {'Build emergency buffer to 6 months of expenses.' if float(emergency_months or 0) < 6 else 'Maintain your healthy 6-month liquid buffer.'}\n"
+            f"2. Automate your monthly surplus of **{fmt_inr(monthly_surplus)}** into diversified equity SIPs to compound wealth."
+        )
+
+    # 15. Question: What should I do with my monthly surplus?
+    if "monthly surplus" in q or "do with my surplus" in q or "what should i do with my savings" in q:
+        return (
+            f"You have a net monthly surplus of **{fmt_inr(monthly_surplus)}** ({savings_rate}% savings rate) after accounting for expenses ({fmt_inr(total_expenses)}) and debt payments ({fmt_inr(monthly_debt)}).\n\n"
+            f"**Optimal Surplus Deployment Blueprint:**\n\n"
+            f"1. **Emergency Reserve ({fmt_inr(monthly_surplus * 0.20)}/mo)**: Allocate toward high-yield savings / liquid funds until you reach 6 months of living expenses.\n"
+            f"2. **Goal-Targeted SIPs ({fmt_inr(monthly_surplus * 0.50)}/mo)**: Automate monthly SIPs in low-cost Nifty 50 Index and Flexi Cap Mutual Funds.\n"
+            f"3. **Long-Term Growth & Satellite Stocks ({fmt_inr(monthly_surplus * 0.20)}/mo)**: Invest in high-conviction quality stocks or mid-cap funds.\n"
+            f"4. **Liquid Buffer / Discretionary ({fmt_inr(monthly_surplus * 0.10)}/mo)**: Keep unallocated in your account for lifestyle flexibility."
+        )
+
+    # Fallback default response
+    return (
+        f"Hi {name}! As your FinLabs AI Copilot, I'm here to help you navigate financial decisions, asset allocation, and goal planning.\n\n"
+        f"Based on your profile, you have a net monthly surplus of **{fmt_inr(monthly_surplus)}** and a risk tolerance of **{risk_tolerance}**.\n\n"
+        f"You can ask me specific questions about:\n"
+        f"- **Asset Allocation**: *How to invest ₹1,00,000*, *What to do with my monthly surplus*\n"
+        f"- **Financial Concepts**: *What is a mutual fund?*, *Explain SIP*, *What is an ETF?*, *P/E ratio*\n"
+        f"- **Portfolio Strategies**: *Difference between stocks and mutual funds*, *Diversification principles*\n\n"
+        f"What would you like to explore?"
+    )
+
+@app.post("/api/ai/chat")
+async def ai_chat_handler(payload: AiChatRequest):
+    query = payload.query.strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+
+    context = payload.context or {}
+    history = payload.conversationHistory or []
+
+    # 1. Attempt External Gemini LLM if API Key is configured in environment
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if gemini_key:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            system_prompt = (
+                "You are FinLabs AI, an expert personal financial education and planning copilot. "
+                "Explain financial concepts clearly using markdown. Avoid guaranteed returns. "
+                f"User Profile Context: {json.dumps(context)}"
+            )
+
+            contents = []
+            for h in history[-6:]:
+                role = "user" if h.get("sender") == "user" or h.get("role") == "user" else "model"
+                text = h.get("text") or h.get("content") or ""
+                if text:
+                    contents.append({"role": role, "parts": [{"text": text}]})
+
+            contents.append({"role": "user", "parts": [{"text": f"System Context: {system_prompt}\n\nUser Question: {query}"}]})
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(url, json={"contents": contents})
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates and "content" in candidates[0]:
+                        parts = candidates[0]["content"].get("parts", [])
+                        if parts and "text" in parts[0]:
+                            return {
+                                "success": True,
+                                "answer": parts[0]["text"].strip(),
+                                "source": "gemini_api"
+                            }
+        except Exception as e:
+            print(f"Gemini API invocation fallback notice: {e}")
+
+    # 2. Server-Side FinLabs Deterministic Financial Intelligence Engine
+    answer = generate_finlabs_ai_response(query, context, history)
+    return {
+        "success": True,
+        "answer": answer,
+        "source": "finlabs_ai_engine"
+    }
