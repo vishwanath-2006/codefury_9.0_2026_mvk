@@ -197,7 +197,7 @@ export function searchAllInvestments(query, filterType = 'all') {
 export function getRiskScore(riskStr) {
   const lower = (riskStr || '').toLowerCase();
   if (lower.includes('low') && !lower.includes('moderate')) return 1;
-  if (lower.includes('low to moderate') || lower.includes('moderate') && !lower.includes('high')) return 2;
+  if (lower.includes('low to moderate') || (lower.includes('moderate') && !lower.includes('high'))) return 2;
   if (lower.includes('moderately high') || lower.includes('moderate to high')) return 3;
   if (lower.includes('high') && !lower.includes('very')) return 4;
   if (lower.includes('very high')) return 5;
@@ -281,7 +281,7 @@ export async function loadUnifiedComparison(selectedItems) {
           return1M: Number((mf.return1Y * 0.12).toFixed(1)),
           return6M: Number((mf.return1Y * 0.52).toFixed(1)),
           return1Y: mf.return1Y,
-          returnDisplay: `+${mf.return1Y}% CAGR`,
+          returnDisplay: `+${mf.return1Y}%`,
           risk: mf.risk,
           riskScore: getRiskScore(mf.risk),
           cost: `${mf.expenseRatio} Expense Ratio`,
@@ -346,7 +346,7 @@ export async function loadUnifiedComparison(selectedItems) {
 }
 
 /**
- * Generates 2–3 concise, beginner-friendly key takeaways.
+ * Generates 2–3 completely dynamic, beginner-friendly key takeaways strictly from currently selected items.
  */
 export function generateKeyDifferences(items) {
   if (!Array.isArray(items) || items.length < 2) return [];
@@ -355,7 +355,7 @@ export function generateKeyDifferences(items) {
   const types = new Set(items.map((i) => i.type));
   const isCrossAsset = types.size > 1;
 
-  // 1. Cross-Asset Comparison Takeaway
+  // 1. Cross-Asset Comparison Takeaway (Strictly using selected items)
   if (isCrossAsset) {
     const hasStock = items.some((i) => i.type === 'stock');
     const hasMf = items.some((i) => i.type === 'mf');
@@ -382,17 +382,17 @@ export function generateKeyDifferences(items) {
   const lowestRisk = sortedByRisk[0];
   const highestRisk = sortedByRisk[sortedByRisk.length - 1];
 
-  if (lowestRisk.id !== highestRisk.id) {
+  if (lowestRisk && highestRisk && lowestRisk.id !== highestRisk.id) {
     points.push(
       `${lowestRisk.name} is the most defensive option (${lowestRisk.risk} Risk), whereas ${highestRisk.name} has the highest risk profile.`
     );
   }
 
-  // 3. Minimum Entry Barrier
-  const sortedByReturn = [...items].sort((a, b) => b.return1Y - a.return1Y);
+  // 3. Return Leader Takeaway
+  const sortedByReturn = [...items].sort((a, b) => (b.return1Y || 0) - (a.return1Y || 0));
   if (sortedByReturn[0] && !points.some((p) => p.includes(sortedByReturn[0].name))) {
     points.push(
-      `${sortedByReturn[0].name} leads the cohort in 1-year historical return / GMP (${sortedByReturn[0].returnDisplay}).`
+      `${sortedByReturn[0].name} leads the selected cohort in 1-year historical gain / GMP (${sortedByReturn[0].returnDisplay}).`
     );
   }
 

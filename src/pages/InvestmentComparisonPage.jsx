@@ -83,7 +83,7 @@ export default function InvestmentComparisonPage() {
     setSelectedItems((prev) => prev.filter((i) => i.key !== keyToRemove));
   };
 
-  // Generate 2–3 concise takeaway points
+  // Generate dynamic 2–3 concise takeaway points strictly from selected items
   const keyDifferences = useMemo(() => {
     return generateKeyDifferences(comparisonData);
   }, [comparisonData]);
@@ -261,7 +261,7 @@ export default function InvestmentComparisonPage() {
       {/* MAIN COMPACT COMPARISON */}
       {!loading && comparisonData.length >= 2 && (
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* 3. Quick Comparison Table (8 core factors) */}
+          {/* 3. Quick Comparison Table (8 core factors with sticky Factor column) */}
           <Card className="overflow-hidden border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900/80 shadow-xs">
             <div className="p-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -280,7 +280,7 @@ export default function InvestmentComparisonPage() {
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200/80 dark:border-slate-800/80 text-slate-400 font-bold uppercase tracking-wider text-[11px]">
-                    <th className="p-3.5 min-w-[150px]">Factor</th>
+                    <th className="p-3.5 min-w-[150px] sticky left-0 bg-slate-50 dark:bg-slate-950 z-10">Factor</th>
                     {comparisonData.map((item) => (
                       <th key={item.id} className="p-3.5 min-w-[160px]">
                         <div className="flex items-center gap-1.5">
@@ -295,7 +295,7 @@ export default function InvestmentComparisonPage() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70">
                   {/* 1. Risk Profile Row (with colored indicator dot) */}
                   <tr>
-                    <td className="p-3.5 font-semibold text-slate-500">Risk Profile</td>
+                    <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">Risk Profile</td>
                     {comparisonData.map((item) => (
                       <td key={item.id} className="p-3.5">
                         <div className="flex items-center gap-2">
@@ -311,7 +311,7 @@ export default function InvestmentComparisonPage() {
 
                   {/* 2. 1-Year Return / Expected Gain Row (with subtle risk dot) */}
                   <tr>
-                    <td className="p-3.5 font-semibold text-slate-500">1-Year Return / Gain</td>
+                    <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">1-Year Return / Gain</td>
                     {comparisonData.map((item) => (
                       <td key={item.id} className="p-3.5">
                         <div className="flex items-center gap-2 font-mono font-bold text-emerald-500 text-sm">
@@ -327,7 +327,7 @@ export default function InvestmentComparisonPage() {
 
                   {/* 3. Cost & Expenses */}
                   <tr>
-                    <td className="p-3.5 font-semibold text-slate-500">Cost & Expenses</td>
+                    <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">Cost & Expenses</td>
                     {comparisonData.map((item) => (
                       <td key={item.id} className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">
                         {item.cost}
@@ -337,7 +337,7 @@ export default function InvestmentComparisonPage() {
 
                   {/* 4. Liquidity */}
                   <tr>
-                    <td className="p-3.5 font-semibold text-slate-500">Liquidity</td>
+                    <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">Liquidity</td>
                     {comparisonData.map((item) => (
                       <td key={item.id} className="p-3.5 text-slate-700 dark:text-slate-300">
                         {item.liquidity}
@@ -347,7 +347,7 @@ export default function InvestmentComparisonPage() {
 
                   {/* 5. Diversification */}
                   <tr>
-                    <td className="p-3.5 font-semibold text-slate-500">Diversification</td>
+                    <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">Diversification</td>
                     {comparisonData.map((item) => (
                       <td key={item.id} className="p-3.5 text-slate-700 dark:text-slate-300">
                         {item.diversification}
@@ -357,7 +357,7 @@ export default function InvestmentComparisonPage() {
 
                   {/* 6. Minimum Investment */}
                   <tr>
-                    <td className="p-3.5 font-semibold text-slate-500">Minimum Entry</td>
+                    <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">Minimum Entry</td>
                     {comparisonData.map((item) => (
                       <td key={item.id} className="p-3.5 font-mono font-bold text-slate-900 dark:text-slate-100">
                         {item.minInvestment}
@@ -367,7 +367,7 @@ export default function InvestmentComparisonPage() {
 
                   {/* 7. Recommended Horizon */}
                   <tr>
-                    <td className="p-3.5 font-semibold text-slate-500">Recommended Horizon</td>
+                    <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-white dark:bg-slate-900 z-10">Recommended Horizon</td>
                     {comparisonData.map((item) => (
                       <td key={item.id} className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">
                         {item.horizon}
@@ -377,7 +377,7 @@ export default function InvestmentComparisonPage() {
 
                   {/* 8. Best Suited For */}
                   <tr className="bg-slate-50/50 dark:bg-slate-950/40">
-                    <td className="p-3.5 font-semibold text-slate-500">Best Suited For</td>
+                    <td className="p-3.5 font-semibold text-slate-500 sticky left-0 bg-slate-50 dark:bg-slate-950 z-10">Best Suited For</td>
                     {comparisonData.map((item) => (
                       <td key={item.id} className="p-3.5 font-bold text-emerald-600 dark:text-emerald-400">
                         {item.suitability}
@@ -449,7 +449,7 @@ export default function InvestmentComparisonPage() {
                   onClick={() => setAnalyticsCategory('valuation')}
                   className={`px-3 py-1 rounded-lg transition-all duration-150 cursor-pointer ${
                     analyticsCategory === 'valuation'
-                      ? 'bg-emerald-500 text-white shadow-xs font-bold'
+                      ? 'bg-emerald-500 text-white shadow-xs'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -560,7 +560,7 @@ export default function InvestmentComparisonPage() {
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                     1-Year Return / Yield
                   </h4>
-                  <span className="text-[11px] text-slate-500">Historical / Estimated</span>
+                  <span className="text-[11px] text-slate-500">Historical Return / Estimated Premium</span>
                 </div>
 
                 <div className="space-y-3 my-2">
@@ -590,7 +590,7 @@ export default function InvestmentComparisonPage() {
               </div>
 
               <p className="text-[10px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                Returns based on 1-year historical CAGR or estimated IPO listing premium.
+                Returns based on 1-year historical return or estimated IPO listing premium.
               </p>
             </Card>
           </div>

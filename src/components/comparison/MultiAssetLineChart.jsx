@@ -278,7 +278,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
           className="cursor-crosshair block w-full"
         />
 
-        {/* Multi-series Tooltip */}
+        {/* Multi-series Tooltip without ₹ currency symbol */}
         {hoverIndex !== null && hoveredDate && (
           <div
             className="absolute z-20 pointer-events-none p-3 bg-slate-900/95 text-white rounded-xl shadow-xl text-xs font-semibold leading-tight flex flex-col gap-1.5 border border-slate-700/80 backdrop-blur-md"
@@ -305,7 +305,7 @@ export default function MultiAssetLineChart({ items = [], timeFilter = '1Y' }) {
                     <span className="font-bold">{s.symbol}</span>
                   </div>
                   <div className="font-mono flex items-center gap-2">
-                    <span className="text-slate-300">₹{pt.price.toLocaleString('en-IN')}</span>
+                    <span className="text-slate-200 font-bold">{pt.normalizedVal}</span>
                     <span className={`font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {isPositive ? '+' : ''}{pt.returnPct}%
                     </span>
