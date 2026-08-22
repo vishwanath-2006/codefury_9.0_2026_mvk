@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
@@ -12,34 +12,35 @@ export default function PortfolioPage() {
   const [error, setError] = useState(null);
   const [source, setSource] = useState(null);
 
-  // Broker Credentials Inputs
-  const [showConfig, setShowConfig] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [pin, setPin] = useState('');
-  const [totpSecret, setTotpSecret] = useState('');
+  // Monitor for incoming auth_token from redirect callback on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('auth_token');
+    if (token) {
+      // Clear auth_token from address bar to keep URL clean
+      window.history.replaceState({}, document.title, window.location.pathname);
+      syncWithToken(token);
+    }
+  }, []);
 
-  const syncHoldings = async (useDemo = false) => {
+  const syncWithToken = async (token) => {
     setSyncing(true);
     setError(null);
     try {
-      const response = await fetch('/api/broker/angelone/sync', {
+      const response = await fetch('/api/broker/angelone/holdings-by-token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          apiKey: useDemo ? 'demo' : apiKey || undefined,
-          clientId: useDemo ? 'demo' : clientId || undefined,
-          pin: useDemo ? 'demo' : pin || undefined,
-          totpSecret: useDemo ? 'demo' : totpSecret || undefined,
-          demo: useDemo
+          auth_token: token,
+          demo: token === 'demo'
         }),
       });
 
       if (!response.ok) {
         const errorJson = await response.json().catch(() => ({}));
-        throw new Error(errorJson.message || `HTTP error ${response.status}`);
+        throw new Error(errorJson.detail || errorJson.message || `HTTP error ${response.status}`);
       }
 
       const resJson = await response.json();
@@ -47,14 +48,19 @@ export default function PortfolioPage() {
         setHoldings(resJson.holdings || []);
         setSource(resJson.source);
       } else {
-        throw new Error(resJson.message || 'Verification failed');
+        throw new Error(resJson.message || 'Sync failed');
       }
     } catch (err) {
       console.error('Broker sync failed:', err);
-      setError(err.message || 'Unable to connect to integration service.');
+      setError(err.message || 'Unable to sync broker portfolio.');
     } finally {
       setSyncing(false);
     }
+  };
+
+  const connectAngelOne = () => {
+    const smartApiKey = 'OPvmoROA';
+    window.location.href = `https://smartapi.angelone.in/publisher-login?api_key=${smartApiKey}`;
   };
 
   const formatINR = (val) =>
@@ -147,14 +153,8 @@ export default function PortfolioPage() {
           
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setShowConfig(!showConfig)}
-              className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-300 transition"
-            >
-              Credentials Config
-            </button>
-            <button
               disabled={syncing}
-              onClick={() => syncHoldings(false)}
+              onClick={connectAngelOne}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-500/50 text-white text-xs font-bold transition shadow-md shadow-emerald-500/10"
             >
               {syncing ? (
@@ -165,13 +165,13 @@ export default function PortfolioPage() {
               ) : (
                 <>
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Sync Holdings</span>
+                  <span>Connect Angel One Account</span>
                 </>
               )}
             </button>
             <button
               disabled={syncing}
-              onClick={() => syncHoldings(true)}
+              onClick={() => syncWithToken('demo')}
               className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 text-xs font-bold transition"
             >
               Load Demo Holdings
@@ -180,78 +180,6 @@ export default function PortfolioPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Credentials Config Fields */}
-          {showConfig && (
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">API Key</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <Key className="w-3.5 h-3.5" />
-                  </span>
-                  <input
-                    type="password"
-                    placeholder="Enter SmartAPI Key"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-250/60 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:border-emerald-500 focus:outline-none transition font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Client ID</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <Lock className="w-3.5 h-3.5" />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Enter Client ID (e.g. K12345)"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-250/60 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:border-emerald-500 focus:outline-none transition font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">MPIN</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <Key className="w-3.5 h-3.5" />
-                  </span>
-                  <input
-                    type="password"
-                    placeholder="Enter 4-Digit MPIN"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-250/60 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:border-emerald-500 focus:outline-none transition font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">TOTP Secret Key</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <Lock className="w-3.5 h-3.5" />
-                  </span>
-                  <input
-                    type="password"
-                    placeholder="TOTP Secret Key"
-                    value={totpSecret}
-                    onChange={(e) => setTotpSecret(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-250/60 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs focus:border-emerald-500 focus:outline-none transition font-semibold"
-                  />
-                </div>
-              </div>
-              <p className="sm:col-span-2 lg:col-span-4 text-[10px] text-slate-400 font-semibold mt-1">
-                * Note: If fields are left blank, the API routes will fall back to environment secrets, or run in mock mode.
-              </p>
-            </div>
-          )}
-
           {error && (
             <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 text-rose-500 flex items-start gap-2 text-xs">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />

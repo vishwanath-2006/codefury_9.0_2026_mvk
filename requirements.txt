@@ -5,3 +5,4 @@ smartapi-python
 uvicorn
 logzero
 python-dotenv
+httpx

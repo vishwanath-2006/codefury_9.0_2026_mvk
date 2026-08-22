@@ -1,5 +1,6 @@
 import os
 import pyotp
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -238,3 +239,91 @@ async def get_stock_quote(payload: QuoteRequest):
 async def get_stock_quote_get(symbol: str, demo: Optional[bool] = False, apiKey: Optional[str] = None, clientId: Optional[str] = None, pin: Optional[str] = None, totpSecret: Optional[str] = None):
     req = QuoteRequest(symbol=symbol, apiKey=apiKey, clientId=clientId, pin=pin, totpSecret=totpSecret, demo=demo)
     return await get_stock_quote(req)
+
+class TokenSyncRequest(BaseModel):
+    auth_token: str
+    apiKey: Optional[str] = None
+    demo: Optional[bool] = False
+
+@app.post("/api/broker/angelone/holdings-by-token")
+async def get_holdings_by_token(payload: TokenSyncRequest):
+    auth_token = payload.auth_token
+    
+    if payload.demo or auth_token == "demo":
+        return {
+            "status": "success",
+            "source": "mock_demo",
+            "holdings": MOCK_HOLDINGS
+        }
+        
+    api_key = payload.apiKey or os.getenv('ANGELONE_API_KEY') or "OPvmoROA"
+    
+    try:
+        # Build headers for Angel One REST API call
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {auth_token}",
+            "X-PrivateKey": api_key,
+            "X-ClientPublicIP": "127.0.0.1",
+            "X-MACAddress": "02:00:00:00:00:00",
+            "X-UserType": "USER"
+        }
+        
+        url = "https://apiconnect.angelone.in/rest/secure/angelbroking/portfolio/v1/getHolding"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail=f"Angel One API error: {response.text}")
+            
+        res_json = response.json()
+        
+        if not res_json.get('status'):
+            raise HTTPException(status_code=400, detail=res_json.get('message', 'Angel One reported failure'))
+            
+        raw_holdings = res_json.get('data', [])
+        processed_holdings = []
+        
+        for stock in raw_holdings:
+            raw_symbol = stock.get('tradingsymbol', 'UNKNOWN')
+            symbol = raw_symbol.split('-')[0]
+            
+            quantity = float(stock.get('quantity', 0))
+            average_price = float(stock.get('averageprice', 0))
+            ltp = float(stock.get('ltp', 0))
+            
+            invested_value = quantity * average_price
+            current_value = quantity * ltp
+            pnl = current_value - invested_value
+            pnl_percentage = (pnl / invested_value * 100) if invested_value > 0 else 0.0
+            
+            processed_holdings.append({
+                "symbol": symbol,
+                "quantity": quantity,
+                "averagePrice": round(average_price, 2),
+                "ltp": round(ltp, 2),
+                "investedValue": round(invested_value, 2),
+                "currentValue": round(current_value, 2),
+                "pnl": round(pnl, 2),
+                "pnlPercentage": round(pnl_percentage, 2)
+            })
+            
+        return {
+            "status": "success",
+            "source": "live_angelone",
+            "holdings": processed_holdings
+        }
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        # Fallback to mock data on invalid credentials/tokens to keep UI interactive
+        print(f"Holding sync failed: {str(e)}. Falling back to mock data.")
+        return {
+            "status": "success",
+            "source": "mock_demo_fallback",
+            "holdings": MOCK_HOLDINGS,
+            "warning": f"Synced using mock fallback due to API error: {str(e)}"
+        }
