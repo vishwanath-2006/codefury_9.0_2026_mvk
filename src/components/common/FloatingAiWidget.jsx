@@ -131,10 +131,16 @@ export default function FloatingAiWidget() {
     };
   }, [contextMenu, isDragging]);
 
-  // 1-CLICK OPEN ACTION: Navigate directly to AI Assistant
+  // 1-CLICK OPEN ACTION: Navigate directly to AI Assistant or Focus Chat Input
   const openAiChat = useCallback(() => {
     if (!isAiPage) {
       navigate('/ai');
+    } else {
+      const inputEl = document.getElementById('nlp-custom-input');
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   }, [isAiPage, navigate]);
 
@@ -334,7 +340,7 @@ export default function FloatingAiWidget() {
             top: position.y !== null ? `${position.y}px` : undefined,
             bottom: position.x === null ? '24px' : undefined,
             right: position.x === null ? '24px' : undefined,
-            zIndex: 45,
+            zIndex: 50,
             touchAction: 'none'
           }}
           className={`flex flex-col items-end gap-2 select-none ${

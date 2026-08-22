@@ -197,6 +197,10 @@ export default function OnboardingPage() {
         setErrorMsg('Please provide your monthly take-home income.');
         return;
       }
+      if (formData.previousInvestmentAmount !== '' && parseFloat(formData.previousInvestmentAmount) < 0) {
+        setErrorMsg('Previous investment amount cannot be negative.');
+        return;
+      }
     }
     setCurrentStep((prev) => Math.min(3, prev + 1));
   };

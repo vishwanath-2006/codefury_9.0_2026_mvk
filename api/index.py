@@ -539,7 +539,7 @@ def get_holdings_by_token(payload: TokenSyncRequest):
             "holdings": MOCK_HOLDINGS
         }
 
-    api_key = payload.apiKey or os.getenv('ANGELONE_API_KEY') or "OPvmoROA"
+    api_key = payload.apiKey or os.getenv('ANGELONE_API_KEY')
 
     import requests
     try:
