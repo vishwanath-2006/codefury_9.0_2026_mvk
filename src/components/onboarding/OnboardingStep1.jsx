@@ -235,7 +235,7 @@ export default function OnboardingStep1({ data, onChange }) {
                     <span>An SMS OTP code was dispatched to <strong>{data.phone}</strong>. Please check your physical mobile phone.</span>
                   </p>
 
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-2 items-center flex-wrap">
                     <input
                       type="text"
                       maxLength={6}
@@ -255,6 +255,20 @@ export default function OnboardingStep1({ data, onChange }) {
                     >
                       {otpLoading ? 'Verifying...' : 'Verify OTP'}
                     </Button>
+
+                    {generatedOtp && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserOtpInput(generatedOtp);
+                        }}
+                        className="text-[11px] font-mono px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 font-bold transition cursor-pointer"
+                        title="Click to auto-fill OTP for testing"
+                      >
+                        🔑 Test OTP: {generatedOtp}
+                      </button>
+                    )}
+
                     {resendTimer > 0 && (
                       <span className="text-[11px] text-slate-400 font-mono">
                         Resend in {resendTimer}s
