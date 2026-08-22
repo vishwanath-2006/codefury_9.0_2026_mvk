@@ -611,6 +611,11 @@ def get_holdings_by_token(payload: TokenSyncRequest):
 class AiChatRequest(BaseModel):
     message: Optional[str] = None
     query: Optional[str] = None
+    domain: Optional[str] = None
+    sessionId: Optional[str] = None
+    currentQuestion: Optional[str] = None
+    knownFacts: Optional[dict] = None
+    answers: Optional[List[dict]] = None
     ctx: Optional[dict] = None
     context: Optional[dict] = None
     messages: Optional[List[dict]] = None
@@ -975,6 +980,8 @@ async def ai_chat_post(payload: AiChatRequest):
                                 "success": True,
                                 "response": text_answer,
                                 "answer": text_answer,
+                                "domain": payload.domain,
+                                "knownFacts": payload.knownFacts or {},
                                 "source": "gemini"
                             }
         except Exception as e:
@@ -986,5 +993,7 @@ async def ai_chat_post(payload: AiChatRequest):
         "success": True,
         "response": answer,
         "answer": answer,
+        "domain": payload.domain,
+        "knownFacts": payload.knownFacts or {},
         "source": "finlabs_engine"
     }

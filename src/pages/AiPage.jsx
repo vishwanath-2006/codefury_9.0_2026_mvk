@@ -2,54 +2,58 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, resolveUserName } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
-import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import PlatformOverviewBanner from '../components/common/PlatformOverviewBanner';
 import {
   Bot,
   Send,
   Sparkles,
   User,
   Loader2,
-  TrendingUp,
-  ShieldAlert,
-  Target,
-  ArrowLeft,
   RotateCcw,
   ExternalLink,
-  MessageSquare,
-  HelpCircle,
-  Layers
+  CheckCircle2,
+  ArrowRight,
+  RefreshCw,
+  Compass,
+  Check
 } from 'lucide-react';
+import { ADVISOR_DOMAINS } from '../data/advisorDomains';
+import {
+  loadAdvisorSession,
+  saveAdvisorSession,
+  clearAdvisorSession,
+  initializeKnownFactsFromProfile,
+  extractFactsFromAnswer,
+  getNextAdvisorStep,
+  generateDomainPlan,
+  isUserRequestingStop
+} from '../services/aiAdvisorEngine';
 import { generateAiResponse, buildUserFinancialContext } from '../services/aiService';
-import { BOT_ROOT_TREE } from '../data/botDecisionTree';
 
 export default function AiPage() {
   const { user, profile } = useAuth();
   const { isOnboarded } = useOnboarding();
   const navigate = useNavigate();
   const userName = resolveUserName(user, profile);
-  const firstName = userName && userName !== 'Investor' ? userName.split(' ')[0] : null;
+  const firstName = userName && userName !== 'Investor' ? userName.split(' ')[0] : 'there';
 
-  // Chat Transcript State
+  // Domain & Guided Interview State
+  const [activeDomain, setActiveDomain] = useState(null);
+  const [currentStep, setCurrentStep] = useState(null); // { questionKey, questionText, options, isEnough }
+  const [knownFacts, setKnownFacts] = useState({});
+  const [questionsAsked, setQuestionsAsked] = useState([]);
+  const [answersHistory, setAnswersHistory] = useState([]);
   const [messages, setMessages] = useState([]);
   const [inputQuery, setInputQuery] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Decision Tree State Engine
-  const [activeTreeOptions, setActiveTreeOptions] = useState(BOT_ROOT_TREE);
-  const [historyStack, setHistoryStack] = useState([]);
-  const [isEscapeHatchMode, setIsEscapeHatchMode] = useState(false);
+  const [isPlanGenerated, setIsPlanGenerated] = useState(false);
 
   // Chat scroll refs
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
-  // Financial Analysis state for Action Plan
-  const [userAnalysis, setUserAnalysis] = useState(null);
-
-  // Auto-scroll to bottom of chat container
+  // Auto-scroll helper
   const scrollToBottom = (behavior = 'smooth') => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
@@ -60,110 +64,201 @@ export default function AiPage() {
 
   useEffect(() => {
     scrollToBottom('smooth');
-  }, [messages, loading, activeTreeOptions]);
+  }, [messages, loading, currentStep, activeDomain]);
 
-  // Load user financial context on mount
+  // 1. Initialize Profile Context & Restore Active Session
   useEffect(() => {
     let mounted = true;
-    setUserAnalysis(null);
-    async function loadAnalysis() {
-      if (user?.id) {
-        try {
-          const ctx = await buildUserFinancialContext(user.id, profile);
-          if (mounted && ctx?.financialAnalysis) {
-            setUserAnalysis(ctx.financialAnalysis);
-          }
-        } catch (e) {
-          console.info('Analysis context load notice:', e);
+    async function initSession() {
+      try {
+        const profileCtx = await buildUserFinancialContext(user?.id, profile);
+        if (!mounted) return;
+
+        const baseFacts = initializeKnownFactsFromProfile(profileCtx);
+        const savedSession = loadAdvisorSession(user?.id);
+
+        if (savedSession && savedSession.messages && savedSession.messages.length > 0) {
+          setActiveDomain(savedSession.activeDomain || null);
+          setCurrentStep(savedSession.currentStep || null);
+          setKnownFacts({ ...baseFacts, ...(savedSession.knownFacts || {}) });
+          setQuestionsAsked(savedSession.questionsAsked || []);
+          setAnswersHistory(savedSession.answersHistory || []);
+          setMessages(savedSession.messages || []);
+          setIsPlanGenerated(savedSession.isPlanGenerated || false);
+        } else {
+          setKnownFacts(baseFacts);
+          // Initial greeting without selecting a domain yet
+          setMessages([
+            {
+              id: 'init_welcome',
+              sender: 'ai',
+              text: `Hi ${firstName} 👋 I'm **FinLabs AI**.
+
+Instead of making you think of random questions, I'll guide you step-by-step through your finances with an adaptive financial interview.
+
+**What would you like to work on today?**`
+            }
+          ]);
         }
+      } catch (err) {
+        console.info('Session initialization notice:', err);
       }
     }
-    loadAnalysis();
+
+    initSession();
     return () => {
       mounted = false;
     };
-  }, [user?.id, profile]);
+  }, [user?.id, profile, firstName]);
 
-  // Initial greeting
+  // 2. Persist Session State on Changes
   useEffect(() => {
-    const greetingText = firstName
-      ? `Hello ${firstName} 👋 I'm your FinLabs Hybrid AI Copilot. Choose a topic from the quick-tap decision tree below, or type any custom question to activate NLP mode.`
-      : "Hello 👋 I'm your FinLabs Hybrid AI Copilot. Choose a topic from the quick-tap decision tree below, or type any custom question to activate NLP mode.";
+    if (messages.length > 0) {
+      saveAdvisorSession({
+        userId: user?.id,
+        activeDomain,
+        currentStep,
+        knownFacts,
+        questionsAsked,
+        answersHistory,
+        messages,
+        isPlanGenerated
+      });
+    }
+  }, [activeDomain, currentStep, knownFacts, questionsAsked, answersHistory, messages, isPlanGenerated, user?.id]);
 
-    setMessages([
-      {
-        id: 'init_msg',
-        sender: 'ai',
-        text: greetingText
-      }
-    ]);
-  }, [firstName]);
+  // 3. Handle Domain Selection
+  const handleSelectDomain = (domainId) => {
+    const domain = ADVISOR_DOMAINS.find((d) => d.id === domainId);
+    if (!domain) return;
 
-  // Handle Tree Node Option Selection
-  const handleSelectTreeNode = (node) => {
-    // 1. Append user's selection
+    setActiveDomain(domainId);
+    setIsPlanGenerated(false);
+
+    // Append user selection
     const userMsg = {
-      id: `user_${Date.now()}`,
+      id: `user_domain_${Date.now()}`,
       sender: 'user',
-      text: node.title
+      text: `Let's work on ${domain.title}`
     };
 
-    // 2. Append deterministic bot response
-    const botMsg = {
-      id: `ai_${Date.now()}`,
+    // Evaluate next question based on existing known facts
+    const nextStep = getNextAdvisorStep(domainId, knownFacts, questionsAsked);
+
+    let aiGreetingText = `Great! ${domain.initialPrompt}`;
+    if (nextStep.questionText) {
+      aiGreetingText += `
+
+${nextStep.questionText}`;
+    }
+
+    const aiMsg = {
+      id: `ai_domain_${Date.now()}`,
       sender: 'ai',
-      text: node.botResponse,
-      appAction: node.appAction
+      text: aiGreetingText
     };
 
-    setMessages((prev) => [...prev, userMsg, botMsg]);
+    setMessages((prev) => [...prev, userMsg, aiMsg]);
+    setCurrentStep(nextStep);
+    if (nextStep.questionKey) {
+      setQuestionsAsked((prev) => [...prev, nextStep.questionKey]);
+    }
 
-    // 3. Update Tree Navigation Stack
-    if (node.options && node.options.length > 0) {
-      setHistoryStack((prev) => [...prev, activeTreeOptions]);
-      setActiveTreeOptions(node.options);
-      setIsEscapeHatchMode(false);
-    } else {
-      // Leaf node reached
-      setIsEscapeHatchMode(true);
+    if (nextStep.isEnough) {
+      // If we already have all facts for this domain, generate plan directly
+      triggerPlanGeneration(domainId, knownFacts);
     }
   };
 
-  // Back Navigation
-  const handleGoBack = () => {
-    if (historyStack.length === 0) return;
-    const previousOptions = historyStack[historyStack.length - 1];
-    setHistoryStack((prev) => prev.slice(0, -1));
-    setActiveTreeOptions(previousOptions);
-    setIsEscapeHatchMode(false);
+  // 4. Trigger Final Plan Generation
+  const triggerPlanGeneration = (domainId, factsToUse) => {
+    const targetDomain = domainId || activeDomain || 'my_profile';
+    const planMarkdown = generateDomainPlan(targetDomain, factsToUse || knownFacts);
+    const domainObj = ADVISOR_DOMAINS.find((d) => d.id === targetDomain);
+
+    const planMessage = {
+      id: `ai_plan_${Date.now()}`,
+      sender: 'ai',
+      text: `${planMarkdown}
+
+---
+
+**✅ I've completed your personalized analysis for ${domainObj ? domainObj.title : 'this area'}.**
+
+What would you like to work on next?`
+    };
+
+    setMessages((prev) => [...prev, planMessage]);
+    setIsPlanGenerated(true);
+    setCurrentStep(null);
   };
 
-  // Main Menu Reset Navigation
-  const handleResetMainMenu = () => {
-    setHistoryStack([]);
-    setActiveTreeOptions(BOT_ROOT_TREE);
-    setIsEscapeHatchMode(false);
-  };
+  // 5. Handle User Answer to Adaptive Question
+  const handleUserAnswer = async (answerText) => {
+    const text = (answerText || inputQuery).trim();
+    if (!text || loading) return;
 
-  // Handle Free-Form Custom Prompt (Gemini API NLP Fallback)
-  const handleSendCustomPrompt = async (textToSend) => {
-    const text = textToSend || inputQuery;
-    if (!text.trim() || loading) return;
+    // Check if user requested stop / plan
+    if (isUserRequestingStop(text)) {
+      const userMsg = { id: `user_${Date.now()}`, sender: 'user', text };
+      setMessages((prev) => [...prev, userMsg]);
+      setInputQuery('');
+      triggerPlanGeneration(activeDomain, knownFacts);
+      return;
+    }
 
     const userMessage = { id: `user_${Date.now()}`, sender: 'user', text };
     setMessages((prev) => [...prev, userMessage]);
-    if (!textToSend) setInputQuery('');
+    if (!answerText) setInputQuery('');
+
+    // Extract facts from the answer
+    const currentQKey = currentStep?.questionKey || 'general';
+    const updatedFacts = extractFactsFromAnswer(currentQKey, text, knownFacts);
+    setKnownFacts(updatedFacts);
+    setAnswersHistory((prev) => [...prev, { questionKey: currentQKey, answer: text }]);
 
     setLoading(true);
 
     try {
-      const aiResponse = await generateAiResponse(text, user?.id, profile, messages);
-      setMessages((prev) => [
-        ...prev,
-        { id: `ai_${Date.now()}`, sender: 'ai', text: aiResponse }
-      ]);
+      // Evaluate if we should ask next question or finalize
+      const nextStep = getNextAdvisorStep(activeDomain || 'my_profile', updatedFacts, [...questionsAsked, currentQKey]);
+
+      if (nextStep.isEnough || !nextStep.questionText) {
+        // Complete domain interview and render plan
+        triggerPlanGeneration(activeDomain, updatedFacts);
+      } else {
+        // Acknowledge briefly and ask next question
+        let responseText = nextStep.questionText;
+
+        // Optional server-side NLP enrichment
+        try {
+          const serverResponse = await generateAiResponse(
+            `Context: Working on domain ${activeDomain}. User just answered: "${text}". Next question to ask: "${nextStep.questionText}"`,
+            user?.id,
+            profile,
+            messages
+          );
+          if (serverResponse && !serverResponse.includes('Unable to formulate')) {
+            // Keep clean formatted response
+          }
+        } catch (e) {
+          // fallback to deterministic response
+        }
+
+        const aiResponseMsg = {
+          id: `ai_${Date.now()}`,
+          sender: 'ai',
+          text: responseText
+        };
+
+        setMessages((prev) => [...prev, aiResponseMsg]);
+        setCurrentStep(nextStep);
+        if (nextStep.questionKey) {
+          setQuestionsAsked((prev) => [...prev, nextStep.questionKey]);
+        }
+      }
     } catch (err) {
-      console.error('AI response error:', err);
+      console.error('Advisor processing error:', err);
       setMessages((prev) => [
         ...prev,
         {
@@ -171,12 +266,31 @@ export default function AiPage() {
           sender: 'ai',
           isError: true,
           failedQuery: text,
-          text: 'Unable to formulate financial response right now. Please check your network connection and click Retry.'
+          text: 'Unable to process your answer right now. Please click Retry.'
         }
       ]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 6. Reset or Switch Domain
+  const handleResetSession = () => {
+    clearAdvisorSession();
+    setActiveDomain(null);
+    setCurrentStep(null);
+    setIsPlanGenerated(false);
+    setQuestionsAsked([]);
+    setAnswersHistory([]);
+    setMessages([
+      {
+        id: 'init_welcome_reset',
+        sender: 'ai',
+        text: `Hi ${firstName} 👋 I'm **FinLabs AI**.
+
+What would you like to work on next?`
+      }
+    ]);
   };
 
   return (
@@ -187,23 +301,35 @@ export default function AiPage() {
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
               <Sparkles className="w-6 h-6 text-emerald-500 animate-pulse" />
-              <span>FinLabs AI Copilot</span>
+              <span>FinLabs Guided Financial Advisor</span>
             </h1>
             <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 dark:text-emerald-400 text-[10px] font-mono font-bold">
-              v2.0 Active
+              v2.0 Adaptive
             </span>
           </div>
           <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-            Personalized wealth intelligence, cash-flow diagnostic, and financial education engine.
+            Context-aware financial interview, cash flow diagnostics, and personalized wealth roadmap.
           </p>
         </div>
 
-        {/* Status Pill */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold self-start sm:self-auto">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-          <span className="text-slate-700 dark:text-slate-300 text-[11px]">
-            {user?.email ? `Connected: ${userName}` : 'Guest Session'}
-          </span>
+        {/* Action Controls & Status */}
+        <div className="flex items-center gap-2">
+          {activeDomain && (
+            <button
+              onClick={handleResetSession}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Switch Domain</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-slate-700 dark:text-slate-300 text-[11px]">
+              {user?.email ? `Connected: ${firstName}` : 'Guest Session'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -245,27 +371,13 @@ export default function AiPage() {
                     </div>
                   )}
 
-                  {/* Optional Deep-Link Action Button */}
-                  {msg.appAction && (
-                    <div className="mt-3 pt-3 border-t border-emerald-500/20 flex items-center justify-between">
-                      <span className="text-[11px] text-slate-400 font-medium">Explore dedicated tool:</span>
-                      <button
-                        onClick={() => navigate(msg.appAction.route)}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
-                      >
-                        <span>{msg.appAction.label}</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-
                   {/* Optional Retry Button on Error */}
                   {msg.isError && msg.failedQuery && (
                     <div className="mt-2.5 pt-2 border-t border-rose-500/20 flex items-center justify-between">
                       <span className="text-[11px] text-rose-400 font-medium">Request failed</span>
                       <button
                         type="button"
-                        onClick={() => handleSendCustomPrompt(msg.failedQuery)}
+                        onClick={() => handleUserAnswer(msg.failedQuery)}
                         className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
                       >
                         <RotateCcw className="w-3 h-3" />
@@ -293,7 +405,7 @@ export default function AiPage() {
               </div>
               <div className="p-3.5 rounded-2xl rounded-tl-none bg-slate-900/90 border border-emerald-500/30 flex items-center gap-2.5 text-xs text-emerald-400 font-medium shadow-md">
                 <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                <span>FinLabs AI is formulating financial response...</span>
+                <span>FinLabs AI is formulating adaptive response...</span>
               </div>
             </div>
           )}
@@ -301,54 +413,39 @@ export default function AiPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INTERACTIVE CONTROLS DOCK */}
-        <div className="p-3 sm:p-4 bg-slate-950/90 border-t border-slate-800 flex flex-col gap-3">
-          {/* 1. Quick Decision Tree Options Grid */}
-          {!loading && (
+        {/* INTERACTIVE DOCK & GUIDED CONTROLS */}
+        <div className="p-3 sm:p-4 bg-slate-950/95 border-t border-slate-800 flex flex-col gap-3">
+          {/* STATE A: Show Domain Cards if No Active Domain OR Plan Completed */}
+          {(!activeDomain || isPlanGenerated) && !loading && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Layers className="w-3 h-3 text-emerald-400" />
-                  <span>Interactive Quick Topics</span>
+                  <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Choose a Financial Domain to Guide You</span>
                 </span>
-                <div className="flex gap-2">
-                  {historyStack.length > 0 && (
-                    <button
-                      onClick={handleGoBack}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
-                    >
-                      ← Back
-                    </button>
-                  )}
-                  {historyStack.length > 0 && (
-                    <button
-                      onClick={handleResetMainMenu}
-                      className="px-2 py-0.5 rounded text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 transition"
-                    >
-                      Main Menu
-                    </button>
-                  )}
-                </div>
               </div>
 
-              {/* Dynamic Option Buttons Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
-                {activeTreeOptions.map((opt, idx) => (
+              {/* 8 Core Selectable Domain Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+                {ADVISOR_DOMAINS.map((domain) => (
                   <button
-                    key={idx}
-                    onClick={() => handleSelectTreeNode(opt)}
-                    className="p-2 rounded-xl bg-slate-900/90 hover:bg-emerald-950/40 border border-slate-800 hover:border-emerald-500/40 text-left transition-all group flex items-start gap-2 active:scale-98 cursor-pointer"
+                    key={domain.id}
+                    onClick={() => handleSelectDomain(domain.id)}
+                    className="p-2.5 rounded-xl bg-slate-900/90 hover:bg-emerald-950/40 border border-slate-800 hover:border-emerald-500/50 text-left transition-all group flex flex-col justify-between gap-1.5 active:scale-98 cursor-pointer shadow-sm hover:shadow-emerald-900/20"
                   >
-                    <span className="text-base mt-0.5">{opt.icon || '💬'}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-slate-200 group-hover:text-emerald-300 text-xs truncate">
-                        {opt.title}
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg">{domain.icon}</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-bold">
+                        {domain.badge}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-200 group-hover:text-emerald-300 text-xs">
+                        {domain.title}
                       </div>
-                      {opt.subtitle && (
-                        <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                          {opt.subtitle}
-                        </div>
-                      )}
+                      <div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">
+                        {domain.tagline}
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -356,12 +453,47 @@ export default function AiPage() {
             </div>
           )}
 
-          {/* 2. Free-Form NLP Input Bar */}
+          {/* STATE B: Active Interview with Quick Option Buttons */}
+          {activeDomain && !isPlanGenerated && currentStep && !loading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>Suggested Quick Answers</span>
+                </span>
+
+                {/* Explicit Stop / Generate Plan Button */}
+                <button
+                  onClick={() => triggerPlanGeneration(activeDomain, knownFacts)}
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-[11px] flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>✓ I have enough information</span>
+                </button>
+              </div>
+
+              {/* Dynamic Quick Answer Chips */}
+              {currentStep.options && currentStep.options.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                  {currentStep.options.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleUserAnswer(opt)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-emerald-950/60 border border-slate-700/80 hover:border-emerald-500/50 text-slate-200 hover:text-emerald-300 text-xs font-semibold transition active:scale-95 cursor-pointer shadow-sm"
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Natural Language Fallback Input Bar */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               if (inputQuery.trim() && !loading) {
-                handleSendCustomPrompt();
+                handleUserAnswer(inputQuery);
               }
             }}
             className="flex gap-2 pt-1"
@@ -369,14 +501,18 @@ export default function AiPage() {
             <input
               id="nlp-custom-input"
               type="text"
-              placeholder="Ask anything (e.g., 'What is a mutual fund?', 'How to invest ₹1,00,000')..."
+              placeholder={
+                activeDomain
+                  ? "Type your answer or amount (or say 'that's enough')..."
+                  : "Select a domain above or ask anything..."
+              }
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   if (inputQuery.trim() && !loading) {
-                    handleSendCustomPrompt();
+                    handleUserAnswer(inputQuery);
                   }
                 }
               }}
@@ -388,7 +524,7 @@ export default function AiPage() {
               disabled={loading || !inputQuery.trim()}
               className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-98 text-white text-xs font-bold flex items-center gap-2 transition shadow-md shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
             >
-              <span>Ask</span>
+              <span>Send</span>
               <Send className="w-3.5 h-3.5" />
             </button>
           </form>
@@ -452,7 +588,13 @@ function renderFormattedAiMessage(rawText) {
       elements.push(flushTable(`table_${lineIdx}`));
     }
 
-    // 1. Bullet list item
+    // 1. Horizontal Divider
+    if (trimmed === '---' || trimmed === '***') {
+      elements.push(<hr key={lineIdx} className="border-slate-800 my-2" />);
+      return;
+    }
+
+    // 2. Bullet list item
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       const bulletContent = trimmed.substring(2);
       elements.push(
@@ -464,7 +606,7 @@ function renderFormattedAiMessage(rawText) {
       return;
     }
 
-    // 2. Numbered list item
+    // 3. Numbered list item
     const numMatch = trimmed.match(/^(\\d+)\\.\\s+(.*)$/);
     if (numMatch) {
       const num = numMatch[1];
@@ -480,7 +622,17 @@ function renderFormattedAiMessage(rawText) {
       return;
     }
 
-    // 3. Section Title / Header (**Title**)
+    // 4. Section Title / Header (### Title or **Title**)
+    if (trimmed.startsWith('### ')) {
+      const title = trimmed.replace('### ', '');
+      elements.push(
+        <div key={lineIdx} className="font-extrabold text-emerald-400 text-sm mt-3 mb-1.5 tracking-tight flex items-center gap-1.5">
+          {parseInlineMarkdown(title)}
+        </div>
+      );
+      return;
+    }
+
     if (trimmed.startsWith('**') && trimmed.endsWith('**') && !trimmed.includes(':')) {
       elements.push(
         <div key={lineIdx} className="font-extrabold text-emerald-400 text-sm mt-3 mb-1 tracking-tight">
@@ -490,13 +642,13 @@ function renderFormattedAiMessage(rawText) {
       return;
     }
 
-    // 4. Empty line
+    // 5. Empty line
     if (!trimmed) {
       elements.push(<div key={lineIdx} className="h-1.5" />);
       return;
     }
 
-    // 5. Normal paragraph
+    // 6. Normal paragraph
     elements.push(
       <p key={lineIdx} className="leading-relaxed text-slate-100 my-0.5">
         {parseInlineMarkdown(line)}
