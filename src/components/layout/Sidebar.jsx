@@ -20,7 +20,7 @@ import {
   X
 } from 'lucide-react';
 
-export default function Sidebar({ isOpen, onClose }) {
+export default function Sidebar({ isOpen, onClose, isHovered = false, onMouseEnter, onMouseLeave }) {
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -37,7 +37,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const displayName = profile?.full_name || user?.user_metadata?.full_name || 'FinLabs User';
   const displayEmail = user?.email || 'user@finlabs.io';
 
-  // Market & Investments placed FIRST at the very top as requested
+  // Market & Investments placed FIRST at the very top
   const marketAndInvestmentNav = [
     { name: 'Market Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Mutual Funds', path: '/investments/mutual-funds', icon: TrendingUp },
@@ -45,7 +45,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'IPOs', path: '/investments/ipos', icon: Rocket },
   ];
 
-  // Personal Finance placed SECOND (Personal Overview, Financial Health, Expenses, Goals, Portfolio)
+  // Personal Finance placed SECOND
   const personalFinanceNav = [
     { name: 'Personal Overview', path: '/overview', icon: LayoutDashboard },
     { name: 'Financial Health', path: '/financial-health', icon: Activity },
@@ -99,18 +99,31 @@ export default function Sidebar({ isOpen, onClose }) {
 
   return (
     <>
-      {/* Mobile Backdrop */}
-      {isOpen && (
+      {/* Mobile & Hover Backdrop Overlay */}
+      {(isOpen || isHovered) && (
         <div
           onClick={onClose}
-          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs transition-opacity duration-300"
         />
       )}
 
-      {/* Sidebar Drawer */}
+      {/* Edge Hover Indicator Tab (Visible when sidebar is collapsed on desktop) */}
+      {!isHovered && !isOpen && (
+        <div
+          onMouseEnter={onMouseEnter}
+          className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 items-center justify-center w-3 h-20 bg-emerald-500 hover:w-5 text-white rounded-r-xl cursor-pointer shadow-lg shadow-emerald-500/30 transition-all duration-200 group"
+          title="Hover to open navigation menu"
+        >
+          <div className="w-1 h-8 bg-white/60 rounded-full group-hover:bg-white" />
+        </div>
+      )}
+
+      {/* Sidebar Drawer Container */}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between transition-transform duration-200 ease-in-out lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        className={`fixed top-0 left-0 z-50 h-full w-64 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800/80 flex flex-col justify-between shadow-2xl transition-transform duration-300 ease-in-out ${
+          isOpen || isHovered ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Top Brand Header */}
@@ -143,7 +156,7 @@ export default function Sidebar({ isOpen, onClose }) {
             {renderNavGroup(marketAndInvestmentNav)}
           </div>
 
-          {/* 2. Personal Finance (SECOND - Personal Overview, Health, Expenses, Goals, Portfolio) */}
+          {/* 2. Personal Finance */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-3">
               Personal Finance

@@ -10,439 +10,454 @@ import {
   Shield,
   Bell,
   Sliders,
-  Database,
+  Moon,
+  Sun,
   Lock,
-  KeyRound,
-  CheckCircle2,
-  AlertTriangle,
   Smartphone,
   Laptop,
-  Download,
-  Trash2,
+  Save,
+  CheckCircle2,
+  AlertCircle,
+  SmartphoneNfc,
+  Eye,
   RefreshCw,
   Sparkles,
-  Save,
-  Check
+  HelpCircle
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user, profile } = useAuth();
   const { formData, updateProfile, resetToOverview } = useOnboarding();
-  const [activeTab, setActiveTab] = useState('profile');
 
-  // Success Feedback Toast State
+  // Save Success State
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Form States
-  const [fullName, setFullName] = useState(formData.fullName || profile?.full_name || 'Manoj');
-  const [occupation, setOccupation] = useState(formData.occupation || 'Software Engineer');
-  const [cityTier, setCityTier] = useState(formData.cityTier || 'Tier 1 Metro');
+  // 1. Profile States
+  const [fullName, setFullName] = useState(formData.fullName || profile?.full_name || 'Manoj Kumar');
   const [phone, setPhone] = useState('+91 98765 43210');
+  const email = user?.email || 'milanakn87@gmail.com';
 
-  // Security States
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
+  // 2. Appearance & Theme States
+  const [themeMode, setThemeMode] = useState(() => {
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  });
+  const [compactLayout, setCompactLayout] = useState(false);
+  const [currency, setCurrency] = useState('INR');
+
+  // 3. Security & Login States
+  const [twoFactor, setTwoFactor] = useState(true);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [passSaved, setPassSaved] = useState(false);
 
-  // Notification States
-  const [digestFreq, setDigestFreq] = useState('weekly');
-  const [emergencyAlert, setEmergencyAlert] = useState(true);
-  const [debtAlert, setDebtAlert] = useState(true);
-  const [rebalanceAlert, setRebalanceAlert] = useState(true);
+  // 4. Notification States
+  const [emailDigest, setEmailDigest] = useState('weekly');
+  const [marketAlerts, setMarketAlerts] = useState(true);
+  const [priceMovementAlerts, setPriceMovementAlerts] = useState(true);
+  const [orderConfirmationAlerts, setOrderConfirmationAlerts] = useState(true);
 
-  // Engine Preferences States
-  const [cagrRate, setCagrRate] = useState(12);
-  const [inflationRate, setInflationRate] = useState(6);
-  const [targetRunwayMonths, setTargetRunwayMonths] = useState(6);
+  // 5. Investment & App Preferences
+  const [defaultPage, setDefaultPage] = useState('/dashboard');
+  const [orderConfirmPopup, setOrderConfirmPopup] = useState(true);
+  const [riskWarningPopup, setRiskWarningPopup] = useState(true);
 
+  // Theme Switcher Handler
+  const handleThemeChange = (mode) => {
+    setThemeMode(mode);
+    if (mode === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  // Save Profile Handler
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     await updateProfile({
       ...formData,
-      fullName,
-      occupation,
-      cityTier
+      fullName
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  const handleExportData = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(formData, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `finlabs_financial_profile_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+  // Save Password Handler
+  const handlePasswordChange = (e) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) return;
+    setPassSaved(true);
+    setCurrentPassword('');
+    setNewPassword('');
+    setTimeout(() => setPassSaved(false), 3000);
   };
 
-  const tabs = [
-    { id: 'profile', label: 'Profile & Identity', icon: User },
-    { id: 'security', label: 'Security & Auth', icon: Shield },
-    { id: 'notifications', label: 'Alerts & Notifications', icon: Bell },
-    { id: 'engine', label: 'Engine Preferences', icon: Sliders },
-    { id: 'privacy', label: 'Data & Privacy', icon: Database },
-  ];
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-150 max-w-5xl mx-auto py-2">
+    <div className="space-y-6 animate-in fade-in duration-200 max-w-4xl mx-auto py-2 pb-12">
+      {/* PAGE HEADER */}
       <PageHeader
-        title="Enterprise Settings Center"
-        subtitle="Manage account credentials, security standards, notification triggers, and financial engine calculation models."
-        tag="System Controls"
+        title="Settings & Preferences"
+        subtitle="Manage your personal profile, security details, app themes, and notifications in one simple vertical view."
+        tag="Account Settings"
       />
 
-      {/* SAVE SUCCESS BANNER */}
+      {/* SAVE FEEDBACK BANNER */}
       {savedSuccess && (
         <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          <span>Settings changes saved successfully and synced with your persistent baseline!</span>
+          <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+          <span>Your settings have been saved successfully!</span>
         </div>
       )}
 
-      {/* HORIZONTAL TAB SELECTOR */}
-      <div className="flex bg-slate-100 dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 overflow-x-auto custom-scrollbar">
-        {tabs.map((t) => {
-          const Icon = t.icon;
-          const isActive = activeTab === t.id;
-          return (
+      {/* SECTION 1: PROFILE & ACCOUNT DETAILS */}
+      <Card className="p-6 space-y-6">
+        <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-extrabold">Profile & Account</CardTitle>
+              <CardDescription>Your personal details and identity verification status</CardDescription>
+            </div>
+          </div>
+          <Badge variant="success" className="font-semibold text-xs px-2.5 py-1">
+            ● KYC Verified
+          </Badge>
+        </CardHeader>
+
+        <form onSubmit={handleSaveProfile} className="space-y-4 text-xs font-semibold">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-slate-600 dark:text-slate-400 mb-1 font-bold">Full Name</label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold focus:border-emerald-500 focus:outline-none transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-600 dark:text-slate-400 mb-1 font-bold">Email Address</label>
+              <input
+                type="email"
+                disabled
+                value={email}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-600 dark:text-slate-400 mb-1 font-bold">Mobile Phone Number</label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 Phone Number"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold focus:border-emerald-500 focus:outline-none transition"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-600 dark:text-slate-400 mb-1 font-bold">Primary Account Type</label>
+              <input
+                type="text"
+                disabled
+                value="Individual Resident Investor"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed font-medium"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <Button type="submit" variant="primary" size="md" icon={Save} className="bg-emerald-500 hover:bg-emerald-600 font-bold">
+              Save Profile Details
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {/* SECTION 2: APP THEME & DISPLAY PREFERENCES */}
+      <Card className="p-6 space-y-6">
+        <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold">
+            <Sun className="w-5 h-5" />
+          </div>
+          <div>
+            <CardTitle className="text-base font-extrabold">App Appearance & Theme</CardTitle>
+            <CardDescription>Customize colors, dark mode, and interface display density</CardDescription>
+          </div>
+        </CardHeader>
+
+        <div className="space-y-5 text-xs font-semibold">
+          {/* Theme Selector */}
+          <div>
+            <label className="block text-slate-600 dark:text-slate-400 mb-2 font-bold">Color Theme</label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => handleThemeChange('light')}
+                className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition ${
+                  themeMode === 'light'
+                    ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                  <Sun className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Light Theme</h4>
+                  <p className="text-[11px] text-slate-400 font-normal">Clean bright background</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleThemeChange('dark')}
+                className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition ${
+                  themeMode === 'dark'
+                    ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                }`}
+              >
+                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                  <Moon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Dark Theme</h4>
+                  <p className="text-[11px] text-slate-400 font-normal">Sleek dark interface</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Currency Display */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+            <div>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Reporting Currency</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Currency symbol used across market charts & portfolio</p>
+            </div>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold focus:border-emerald-500"
+            >
+              <option value="INR">₹ INR (Indian Rupee)</option>
+              <option value="USD">$ USD (US Dollar)</option>
+            </select>
+          </div>
+        </div>
+      </Card>
+
+      {/* SECTION 3: SECURITY & LOGIN */}
+      <Card className="p-6 space-y-6">
+        <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold">
+            <Shield className="w-5 h-5" />
+          </div>
+          <div>
+            <CardTitle className="text-base font-extrabold">Security & Login</CardTitle>
+            <CardDescription>Password management, two-factor authentication, and connected devices</CardDescription>
+          </div>
+        </CardHeader>
+
+        <div className="space-y-6 text-xs font-semibold">
+          {/* Two Factor Switch */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+            <div>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Two-Factor Authentication (2FA)</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Ask for an OTP / Authenticator code on login</p>
+            </div>
             <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                isActive
-                  ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-md shadow-emerald-500/5 border border-slate-200/60 dark:border-slate-700/60'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              type="button"
+              onClick={() => setTwoFactor(!twoFactor)}
+              className={`px-4 py-2 rounded-xl font-bold transition ${
+                twoFactor
+                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                  : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-500' : 'text-slate-400'}`} />
-              <span>{t.label}</span>
+              {twoFactor ? 'Enabled' : 'Disabled'}
             </button>
-          );
-        })}
-      </div>
+          </div>
 
-      {/* TAB 1: PROFILE & IDENTITY */}
-      {activeTab === 'profile' && (
-        <Card className="p-6 space-y-6">
-          <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-            <div>
-              <CardTitle className="text-base font-extrabold flex items-center gap-2">
-                <User className="w-5 h-5 text-emerald-500" />
-                Profile & Identity Details
-              </CardTitle>
-              <CardDescription>Personal identification credentials and demographic markers</CardDescription>
-            </div>
-            <Badge variant="success" className="font-mono text-xs">
-              ● Supabase Verified
-            </Badge>
-          </CardHeader>
+          {/* Change Password Form */}
+          <form onSubmit={handlePasswordChange} className="space-y-3 pt-2">
+            <h4 className="font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Lock className="w-4 h-4 text-emerald-500" />
+              Change Password
+            </h4>
 
-          <form onSubmit={handleSaveProfile} className="space-y-4 text-xs font-semibold">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-slate-500 dark:text-slate-400 mb-1">Full Legal Name</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold focus:border-emerald-500 focus:outline-none"
-                />
+            {passSaved && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                Password updated successfully!
               </div>
+            )}
 
-              <div>
-                <label className="block text-slate-500 dark:text-slate-400 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  disabled
-                  value={user?.email || 'milanakn87@gmail.com'}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-500 dark:text-slate-400 mb-1">Occupation</label>
-                <input
-                  type="text"
-                  value={occupation}
-                  onChange={(e) => setOccupation(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-500 dark:text-slate-400 mb-1">City Tier / Location</label>
-                <select
-                  value={cityTier}
-                  onChange={(e) => setCityTier(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="Tier 1 Metro">Tier 1 Metro (Mumbai, BLR, NCR)</option>
-                  <option value="Tier 2 City">Tier 2 City (Pune, Ahmedabad, Jaipur)</option>
-                  <option value="Tier 3 / Regional">Tier 3 / Regional Hub</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-500 dark:text-slate-400 mb-1">Contact Phone Number</label>
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold focus:border-emerald-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-500 dark:text-slate-400 mb-1">Reporting Currency</label>
-                <input
-                  type="text"
-                  disabled
-                  value="INR (₹) — Indian Rupee"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="password"
+                placeholder="Current Password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold focus:border-emerald-500 focus:outline-none"
+              />
+              <input
+                type="password"
+                placeholder="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold focus:border-emerald-500 focus:outline-none"
+              />
             </div>
 
-            <div className="pt-4 flex justify-end">
-              <Button type="submit" variant="primary" size="md" icon={Save} className="bg-emerald-500 hover:bg-emerald-600 font-bold">
-                Save Profile Settings
+            <div className="flex justify-end pt-1">
+              <Button type="submit" variant="outline" size="sm" className="font-bold">
+                Update Password
               </Button>
             </div>
           </form>
-        </Card>
-      )}
 
-      {/* TAB 2: SECURITY & AUTHENTICATION */}
-      {activeTab === 'security' && (
-        <div className="space-y-6">
-          <Card className="p-6 space-y-6">
-            <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-              <div>
-                <CardTitle className="text-base font-extrabold flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-indigo-500" />
-                  Two-Factor Authentication (2FA)
-                </CardTitle>
-                <CardDescription>Add an extra layer of biometric security to your financial data</CardDescription>
-              </div>
-              <Badge variant={twoFactorEnabled ? 'success' : 'warning'} className="font-mono text-xs">
-                {twoFactorEnabled ? '● 2FA Active' : 'Disabled'}
-              </Badge>
-            </CardHeader>
-
-            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-              <div>
-                <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100">Authenticator App (TOTP)</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Use Google Authenticator or Authy for secure single-use codes</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-                  twoFactorEnabled
-                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/20'
-                    : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                {twoFactorEnabled ? '2FA Enabled' : 'Enable 2FA'}
-              </button>
-            </div>
-          </Card>
-
-          {/* ACTIVE SESSIONS */}
-          <Card className="p-6 space-y-4">
-            <CardHeader className="p-0 pb-3 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-base font-extrabold flex items-center gap-2">
+          {/* Active Devices */}
+          <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Logged-in Devices</h4>
+            <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+              <div className="flex items-center gap-3">
                 <Laptop className="w-5 h-5 text-emerald-500" />
-                Active Sessions & Connected Devices
-              </CardTitle>
-            </CardHeader>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
-                <div className="flex items-center gap-3">
-                  <Laptop className="w-5 h-5 text-emerald-500 shrink-0" />
-                  <div>
-                    <h5 className="font-bold text-slate-900 dark:text-slate-100">Chrome on Windows 11 (Current Device)</h5>
-                    <p className="text-[10px] text-slate-400 font-mono">IP: 103.45.12.98 · Active Now</p>
-                  </div>
+                <div>
+                  <p className="font-bold text-slate-900 dark:text-slate-100">Windows PC — Chrome Web Browser</p>
+                  <p className="text-[10px] text-slate-400">Current Session · Active Now</p>
                 </div>
-                <Badge variant="success" className="text-[10px]">Current Session</Badge>
               </div>
-
-              <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
-                <div className="flex items-center gap-3">
-                  <Smartphone className="w-5 h-5 text-indigo-500 shrink-0" />
-                  <div>
-                    <h5 className="font-bold text-slate-900 dark:text-slate-100">FinLabs iOS App</h5>
-                    <p className="text-[10px] text-slate-400 font-mono">iPhone 15 Pro · 2 hours ago</p>
-                  </div>
-                </div>
-                <button className="text-[11px] font-bold text-rose-500 hover:underline">Revoke</button>
-              </div>
+              <Badge variant="success">Active</Badge>
             </div>
-          </Card>
+          </div>
         </div>
-      )}
+      </Card>
 
-      {/* TAB 3: NOTIFICATIONS & ALERTS */}
-      {activeTab === 'notifications' && (
-        <Card className="p-6 space-y-6">
-          <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-base font-extrabold flex items-center gap-2">
-              <Bell className="w-5 h-5 text-amber-500" />
-              Financial Warning Alerts & Triggers
-            </CardTitle>
-            <CardDescription>Configure automated thresholds for health, debt, and portfolio warnings</CardDescription>
-          </CardHeader>
-
-          <div className="space-y-4 text-xs font-semibold">
-            {/* Alert 1: Emergency Buffer */}
-            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-              <div>
-                <h4 className="font-bold text-slate-900 dark:text-slate-100">Emergency Buffer Alert</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Notify immediately if liquid reserve runway drops below 3 months</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={emergencyAlert}
-                onChange={(e) => setEmergencyAlert(e.target.checked)}
-                className="w-5 h-5 accent-emerald-500 cursor-pointer"
-              />
-            </div>
-
-            {/* Alert 2: Debt Ratio */}
-            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-              <div>
-                <h4 className="font-bold text-slate-900 dark:text-slate-100">High Debt-to-Income (DTI) Warning</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Trigger amber warning if total monthly loan EMIs exceed 30% of income</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={debtAlert}
-                onChange={(e) => setDebtAlert(e.target.checked)}
-                className="w-5 h-5 accent-emerald-500 cursor-pointer"
-              />
-            </div>
-
-            {/* Alert 3: Rebalancing Alert */}
-            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-              <div>
-                <h4 className="font-bold text-slate-900 dark:text-slate-100">Portfolio Rebalancing Trigger</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Alert if actual equity allocation deviates &gt; 20% from PRQ target</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={rebalanceAlert}
-                onChange={(e) => setRebalanceAlert(e.target.checked)}
-                className="w-5 h-5 accent-emerald-500 cursor-pointer"
-              />
-            </div>
+      {/* SECTION 4: NOTIFICATIONS & ALERTS */}
+      <Card className="p-6 space-y-6">
+        <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+            <Bell className="w-5 h-5" />
           </div>
-        </Card>
-      )}
-
-      {/* TAB 4: ENGINE PREFERENCES */}
-      {activeTab === 'engine' && (
-        <Card className="p-6 space-y-6">
-          <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-base font-extrabold flex items-center gap-2">
-              <Sliders className="w-5 h-5 text-emerald-500" />
-              Financial Calculation Model Preferences
-            </CardTitle>
-            <CardDescription>Adjust baseline returns, inflation models, and target runway parameters</CardDescription>
-          </CardHeader>
-
-          <div className="space-y-5 text-xs font-semibold">
-            {/* Preference 1: CAGR Rate */}
-            <div className="space-y-2 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-              <div className="flex justify-between items-center">
-                <label className="font-bold text-slate-900 dark:text-slate-100">Default CAGR Compounding Rate</label>
-                <span className="font-mono font-extrabold text-emerald-500 text-sm">{cagrRate}% Annual</span>
-              </div>
-              <input
-                type="range"
-                min="8"
-                max="18"
-                value={cagrRate}
-                onChange={(e) => setCagrRate(Number(e.target.value))}
-                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-              />
-              <p className="text-[10px] text-slate-400">Used for forward wealth projections in SIP & Goal Simulators.</p>
-            </div>
-
-            {/* Preference 2: Inflation Rate */}
-            <div className="space-y-2 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
-              <div className="flex justify-between items-center">
-                <label className="font-bold text-slate-900 dark:text-slate-100">Expected Inflation Rate Adjustment</label>
-                <span className="font-mono font-extrabold text-indigo-500 text-sm">{inflationRate}% Annual</span>
-              </div>
-              <input
-                type="range"
-                min="4"
-                max="10"
-                value={inflationRate}
-                onChange={(e) => setInflationRate(Number(e.target.value))}
-                className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-              />
-              <p className="text-[10px] text-slate-400">Adjusts target corpus calculations for future goal purchasing power.</p>
-            </div>
+          <div>
+            <CardTitle className="text-base font-extrabold">Notifications & Alerts</CardTitle>
+            <CardDescription>Choose how and when you receive market updates & investment emails</CardDescription>
           </div>
-        </Card>
-      )}
+        </CardHeader>
 
-      {/* TAB 5: DATA & PRIVACY */}
-      {activeTab === 'privacy' && (
-        <div className="space-y-6">
-          <Card className="p-6 space-y-4">
-            <CardHeader className="p-0 pb-3 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-              <div>
-                <CardTitle className="text-base font-extrabold flex items-center gap-2">
-                  <Database className="w-5 h-5 text-indigo-500" />
-                  Supabase Cloud Persistence Sync
-                </CardTitle>
-                <CardDescription>Backend URL: https://laqhsduhrnneutijqdaw.supabase.co</CardDescription>
-              </div>
-              <Badge variant="success">Active Sync</Badge>
-            </CardHeader>
-
-            <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-              Your financial profile, questionnaire data, and calculated health metrics are fully encrypted and synchronized in real time.
+        <div className="space-y-4 text-xs font-semibold">
+          {/* Notification Option 1 */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+            <div>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Email Digest Summary</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Receive periodic financial summary reports via email</p>
             </div>
-
-            <div className="flex items-center justify-between pt-2">
-              <div>
-                <h5 className="font-bold text-xs text-slate-900 dark:text-slate-100">Export Complete Financial Record</h5>
-                <p className="text-[10px] text-slate-400">Download your raw questionnaire data in JSON format</p>
-              </div>
-              <Button variant="outline" size="sm" icon={Download} onClick={handleExportData} className="font-bold">
-                Export JSON
-              </Button>
-            </div>
-          </Card>
-
-          {/* DANGER ZONE */}
-          <Card className="p-6 border-rose-500/30 bg-rose-500/5 space-y-4">
-            <h4 className="font-extrabold text-sm text-rose-500 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-500" />
-              Reset Local Baseline
-            </h4>
-            <p className="text-xs text-slate-600 dark:text-slate-300">
-              Clear your local baseline state to restart the 3-step questionnaire from scratch.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={RefreshCw}
-              onClick={resetToOverview}
-              className="border-rose-500/40 text-rose-500 hover:bg-rose-500/10 font-bold"
+            <select
+              value={emailDigest}
+              onChange={(e) => setEmailDigest(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold focus:border-emerald-500"
             >
-              Reset Onboarding Baseline
-            </Button>
-          </Card>
+              <option value="daily">Daily Summary</option>
+              <option value="weekly">Weekly Digest</option>
+              <option value="monthly">Monthly Report</option>
+              <option value="none">Disabled</option>
+            </select>
+          </div>
+
+          {/* Notification Option 2 */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+            <div>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Market Price Alerts</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Get notified when stock / mutual fund prices change drastically</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={marketAlerts}
+              onChange={(e) => setMarketAlerts(e.target.checked)}
+              className="w-5 h-5 accent-emerald-500 cursor-pointer rounded"
+            />
+          </div>
+
+          {/* Notification Option 3 */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+            <div>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100">SIP & Investment Due Reminders</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Remind me 3 days before upcoming monthly SIP debits</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={orderConfirmationAlerts}
+              onChange={(e) => setOrderConfirmationAlerts(e.target.checked)}
+              className="w-5 h-5 accent-emerald-500 cursor-pointer rounded"
+            />
+          </div>
         </div>
-      )}
+      </Card>
+
+      {/* SECTION 5: TRADING & INVESTMENT PREFERENCES */}
+      <Card className="p-6 space-y-6">
+        <CardHeader className="p-0 pb-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold">
+            <Sliders className="w-5 h-5" />
+          </div>
+          <div>
+            <CardTitle className="text-base font-extrabold">Investment Preferences</CardTitle>
+            <CardDescription>Default landing view, trade prompts, and risk safety confirmation popups</CardDescription>
+          </div>
+        </CardHeader>
+
+        <div className="space-y-4 text-xs font-semibold">
+          {/* Preference 1 */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+            <div>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Default Home View</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">First page shown when you launch the app</p>
+            </div>
+            <select
+              value={defaultPage}
+              onChange={(e) => setDefaultPage(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-bold focus:border-emerald-500"
+            >
+              <option value="/dashboard">Market Dashboard</option>
+              <option value="/overview">Personal Finance Overview</option>
+              <option value="/portfolio">My Portfolio</option>
+            </select>
+          </div>
+
+          {/* Preference 2 */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+            <div>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Order Confirmation Popup</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Show confirmation popups before placing buy / sell orders</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={orderConfirmPopup}
+              onChange={(e) => setOrderConfirmPopup(e.target.checked)}
+              className="w-5 h-5 accent-emerald-500 cursor-pointer rounded"
+            />
+          </div>
+
+          {/* Preference 3 */}
+          <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/50 dark:border-slate-800/50">
+            <div>
+              <h4 className="font-extrabold text-slate-900 dark:text-slate-100">Risk Disclosure Warnings</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Display SEBI / Market volatility disclaimers when investing</p>
+            </div>
+            <input
+              type="checkbox"
+              checked={riskWarningPopup}
+              onChange={(e) => setRiskWarningPopup(e.target.checked)}
+              className="w-5 h-5 accent-emerald-500 cursor-pointer rounded"
+            />
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
