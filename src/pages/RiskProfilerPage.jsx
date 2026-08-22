@@ -151,26 +151,26 @@ export default function RiskProfilerPage() {
       {/* SECTION A: SCORE CARD & SUB-SCORE BREAKDOWN */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* SCORE DISPLAY CARD WITH DONUT SCORE */}
-        <Card className="p-6 flex flex-col items-center justify-center text-center bg-slate-900 text-white border-slate-800 shadow-xl">
-          <CardHeader className="p-0 pb-2 mb-2 w-full text-center border-b border-slate-800">
-            <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider block mb-1">
+        <Card className="p-6 flex flex-col items-center justify-center text-center bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 shadow-xl">
+          <CardHeader className="p-0 pb-2 mb-2 w-full text-center border-b border-slate-100 dark:border-slate-800">
+            <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">
               Your Personal Risk Score
             </span>
-            <CardTitle className="text-base font-extrabold text-white">Investor Profile Score</CardTitle>
+            <CardTitle className="text-base font-extrabold text-slate-900 dark:text-white">Investor Profile Score</CardTitle>
           </CardHeader>
 
           {/* SVG Radial Arc Gauge */}
           <div className="relative w-48 h-48 my-4 flex items-center justify-center mx-auto">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
               <path
-                className="text-slate-800"
+                className="text-slate-200 dark:text-slate-800"
                 strokeWidth="3.5"
                 stroke="currentColor"
                 fill="none"
                 d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
               />
               <path
-                className="text-emerald-400 transition-all duration-700 ease-out"
+                className="text-emerald-500 dark:text-emerald-400 transition-all duration-700 ease-out"
                 strokeDasharray={`${prq}, 100`}
                 strokeWidth="3.5"
                 strokeLinecap="round"
@@ -181,12 +181,12 @@ export default function RiskProfilerPage() {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
               <div className="flex items-baseline justify-center">
-                <span className="text-5xl font-black font-mono tracking-tight text-white drop-shadow-md">
+                <span className="text-5xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
                   {prq}
                 </span>
-                <span className="text-xs font-bold text-emerald-400 font-mono ml-1">/100</span>
+                <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 font-mono ml-1">/100</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-1 block">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-widest mt-1 block">
                 Risk Score
               </span>
             </div>
@@ -196,7 +196,7 @@ export default function RiskProfilerPage() {
             {archetype.label}
           </div>
 
-          <p className="text-xs text-slate-300 leading-relaxed font-medium px-2 bg-slate-950/80 p-3 rounded-2xl border border-slate-800">
+          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium px-3 py-3 bg-slate-50 dark:bg-slate-950/80 rounded-2xl border border-slate-200 dark:border-slate-800">
             "{archetype.translation}"
           </p>
         </Card>
