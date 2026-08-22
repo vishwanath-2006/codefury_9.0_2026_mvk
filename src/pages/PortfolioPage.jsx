@@ -4,7 +4,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
 import Badge from '../components/ui/Badge';
-import BenchmarkFooterBanner from '../components/common/BenchmarkFooterBanner';
+import FeatureOverviewCard from '../components/common/FeatureOverviewCard';
 import { PieChart, TrendingUp, LineChart, ShieldCheck, RefreshCw } from 'lucide-react';
 
 export default function PortfolioPage() {
@@ -15,17 +15,14 @@ export default function PortfolioPage() {
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val ?? 0);
 
-  const portfolio = isOnboarded
-    ? (userProfile.portfolio || { mutualFunds: 175000, stocks: 105000, fixedDeposits: 35000, gold: 35000, cashBuffer: 150000 })
-    : { mutualFunds: 210000, stocks: 87500, fixedDeposits: 35000, gold: 17500, cashBuffer: 0 };
-
-  const totalNetWorth = (portfolio.mutualFunds + portfolio.stocks + portfolio.fixedDeposits + portfolio.gold + (portfolio.cashBuffer || 0)) || 350000;
+  const portfolio = userProfile.portfolio || { mutualFunds: 175000, stocks: 105000, fixedDeposits: 35000, gold: 35000, cashBuffer: 150000 };
+  const totalNetWorth = userProfile.totalPortfolioNetWorth || (portfolio.mutualFunds + portfolio.stocks + portfolio.fixedDeposits + portfolio.gold + (portfolio.cashBuffer || 0)) || 350000;
 
   const dynamicAllocation = [
-    { name: 'Equity Mutual Funds', value: portfolio.mutualFunds, percentage: Math.round(((portfolio.mutualFunds) / totalNetWorth) * 100) || 60, color: '#10b981' },
-    { name: 'Direct Equities / Stocks', value: portfolio.stocks, percentage: Math.round(((portfolio.stocks) / totalNetWorth) * 100) || 25, color: '#6366f1' },
+    { name: 'Equity Mutual Funds', value: portfolio.mutualFunds, percentage: Math.round(((portfolio.mutualFunds) / totalNetWorth) * 100) || 50, color: '#10b981' },
+    { name: 'Direct Equities / Stocks', value: portfolio.stocks, percentage: Math.round(((portfolio.stocks) / totalNetWorth) * 100) || 30, color: '#6366f1' },
     { name: 'Fixed Income / FDs', value: portfolio.fixedDeposits, percentage: Math.round(((portfolio.fixedDeposits) / totalNetWorth) * 100) || 10, color: '#f59e0b' },
-    { name: 'Gold Reserves', value: portfolio.gold, percentage: Math.round(((portfolio.gold) / totalNetWorth) * 100) || 5, color: '#eab308' },
+    { name: 'Gold Reserves', value: portfolio.gold, percentage: Math.round(((portfolio.gold) / totalNetWorth) * 100) || 10, color: '#eab308' },
   ].filter(item => item.value > 0 || item.percentage > 0);
 
   const fallbackHoldings = [
@@ -48,14 +45,8 @@ export default function PortfolioPage() {
     }, 600);
   };
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-150">
-      <PageHeader
-        title="Integrated Portfolio Workspace"
-        subtitle="Unified view of your mutual funds, equity holdings, debt instruments, and net worth trajectory."
-        tag="Asset Management"
-      />
-
+  const portfolioContent = (
+    <div className="space-y-8">
       {/* Portfolio Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
@@ -64,14 +55,14 @@ export default function PortfolioPage() {
           icon={TrendingUp}
           change={`${dynamicAllocation.length} Active Asset Classes`}
           changeType="positive"
-          description={isOnboarded ? "Consolidated Net Holdings" : "Early Career Model Portfolio"}
+          description="Consolidated Net Holdings"
         />
 
         <StatCard
           title="Primary Asset Class"
           value={dynamicAllocation[0]?.name || 'Equity Mutual Funds'}
           icon={PieChart}
-          change={`${dynamicAllocation[0]?.percentage || 60}% Allocation`}
+          change={`${dynamicAllocation[0]?.percentage || 50}% Allocation`}
           changeType="positive"
           description="Core growth holdings"
         />
@@ -94,7 +85,7 @@ export default function PortfolioPage() {
             Asset Class Allocation Guide
           </CardTitle>
           <CardDescription>
-            {isOnboarded ? 'Live asset class distribution of your holdings' : 'Standard balanced asset distribution for long-term CAGR compounding'}
+            Live asset class distribution of your holdings
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -204,11 +195,48 @@ export default function PortfolioPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
 
-      {/* SUBTLE BENCHMARK FOOTER CTA */}
-      {!isOnboarded && (
-        <BenchmarkFooterBanner message="Enter your active holdings to compute your live portfolio allocation." />
-      )}
+  // NON-ONBOARDED BLURRED LOCK ARCHITECTURE
+  if (!isOnboarded) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-150">
+        <PageHeader
+          title="Integrated Portfolio Workspace"
+          subtitle="Unified view of your mutual funds, equity holdings, debt instruments, and net worth trajectory."
+          tag="Asset Management"
+        />
+
+        <FeatureOverviewCard
+          moduleName="Integrated Portfolio Workspace"
+          subtitle="Consolidates holdings across Equity Mutual Funds, Direct Stocks, FDs, and Sovereign Gold into a single net worth allocation engine."
+          capabilities={[
+            "Real-time Asset Allocation: Computes exact percentages deployed across Equities, Fixed Income, and Gold.",
+            "Angel One SmartAPI Integration: Direct OAuth sync with Demat accounts to fetch live equity positions.",
+            "Net Worth Trajectory Tracking: Monitors portfolio compounding over 1, 3, and 5-year investment horizons."
+          ]}
+          whyItMatters={[
+            "Without consolidated portfolio tracking, investors miscalculate their overall equity risk exposure.",
+            "Visualizing asset allocation prevents over-concentration in a single volatile asset class."
+          ]}
+        >
+          {portfolioContent}
+        </FeatureOverviewCard>
+      </div>
+    );
+  }
+
+  // ONBOARDED Crisp Live Mode
+  return (
+    <div className="space-y-8 animate-in fade-in duration-150">
+      <PageHeader
+        title="Integrated Portfolio Workspace"
+        subtitle="Unified view of your mutual funds, equity holdings, debt instruments, and net worth trajectory."
+        tag="Asset Management"
+      />
+
+      {portfolioContent}
     </div>
   );
 }

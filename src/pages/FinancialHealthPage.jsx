@@ -5,10 +5,9 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import BenchmarkFooterBanner from '../components/common/BenchmarkFooterBanner';
+import FeatureOverviewCard from '../components/common/FeatureOverviewCard';
 import {
   Activity,
-  ShieldCheck,
   CheckCircle2,
   AlertTriangle,
   Wallet,
@@ -62,30 +61,20 @@ export default function FinancialHealthPage() {
 
   const { overallScore, status, dataCompleteness, factorsEvaluated, totalFactors, components, strengths, improvementAreas } = diagnostic;
 
-  const displayScore = isOnboarded ? overallScore : 72;
-  const displayStatus = isOnboarded ? status : 'Good Baseline';
+  const displayScore = overallScore || 72;
+  const displayStatus = status || 'Good Baseline';
 
   const componentList = [
-    { key: 'savingsRate', title: 'Savings Rate', maxScore: 20, icon: Wallet, comp: isOnboarded ? components.savingsRate : { score: 16, status: 'Good', explanation: 'Target: 30% of income saved for investing & compounding.', isAvailable: true } },
-    { key: 'emergencyFund', title: 'Emergency Reserve', maxScore: 20, icon: PiggyBank, comp: isOnboarded ? components.emergencyFund : { score: 18, status: 'Strong', explanation: 'Target: 6 months of fixed liquid living expenses.', isAvailable: true } },
-    { key: 'debtManagement', title: 'Debt Management', maxScore: 20, icon: ArrowDownRight, comp: isOnboarded ? components.debtManagement : { score: 15, status: 'Good', explanation: 'Target: Keep total monthly loan EMIs below 15% of income.', isAvailable: true } },
-    { key: 'goalReadiness', title: 'Goal Readiness', maxScore: 15, icon: Target, comp: isOnboarded ? components.goalReadiness : { score: 10, status: 'Moderate', explanation: 'Evaluates funding progress toward target milestone dates.', isAvailable: true } },
-    { key: 'diversification', title: 'Investment Diversification', maxScore: 15, icon: PieChart, comp: isOnboarded ? components.diversification : { score: 8, status: 'Moderate', explanation: 'Evaluates distribution across Equities, Debt, FDs, and Gold.', isAvailable: true } },
-    { key: 'financialSafety', title: 'Financial Safety', maxScore: 10, icon: Shield, comp: isOnboarded ? components.financialSafety : { score: 5, status: 'Moderate', explanation: 'Checks for active Health & Life Insurance coverage.', isAvailable: true } },
+    { key: 'savingsRate', title: 'Savings Rate', maxScore: 20, icon: Wallet, comp: components.savingsRate || { score: 16, status: 'Good', explanation: 'Target: 30% of income saved for investing & compounding.', isAvailable: true } },
+    { key: 'emergencyFund', title: 'Emergency Reserve', maxScore: 20, icon: PiggyBank, comp: components.emergencyFund || { score: 18, status: 'Strong', explanation: 'Target: 6 months of fixed liquid living expenses.', isAvailable: true } },
+    { key: 'debtManagement', title: 'Debt Management', maxScore: 20, icon: ArrowDownRight, comp: components.debtManagement || { score: 15, status: 'Good', explanation: 'Target: Keep total monthly loan EMIs below 15% of income.', isAvailable: true } },
+    { key: 'goalReadiness', title: 'Goal Readiness', maxScore: 15, icon: Target, comp: components.goalReadiness || { score: 10, status: 'Moderate', explanation: 'Evaluates funding progress toward target milestone dates.', isAvailable: true } },
+    { key: 'diversification', title: 'Investment Diversification', maxScore: 15, icon: PieChart, comp: components.diversification || { score: 8, status: 'Moderate', explanation: 'Evaluates distribution across Equities, Debt, FDs, and Gold.', isAvailable: true } },
+    { key: 'financialSafety', title: 'Financial Safety', maxScore: 10, icon: Shield, comp: components.financialSafety || { score: 5, status: 'Moderate', explanation: 'Checks for active Health & Life Insurance coverage.', isAvailable: true } },
   ];
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-150">
-      <PageHeader
-        title="Financial Health Diagnostic"
-        subtitle="Deterministic rule engine evaluating your financial foundation."
-        tag="Core Intelligence"
-      >
-        <Button variant="outline" size="sm" icon={FlaskConical} onClick={handleRunTests}>
-          Run Engine Tests
-        </Button>
-      </PageHeader>
-
+  const diagnosticContent = (
+    <div className="space-y-8">
       {/* Automated Unit Test Runner Results Overlay */}
       {testResults && (
         <Card className="bg-slate-900 text-white border-slate-800 p-5 space-y-3">
@@ -128,7 +117,7 @@ export default function FinancialHealthPage() {
                   {displayStatus}
                 </Badge>
                 <Badge variant="neutral" className="bg-slate-800 text-slate-300 border-slate-700 text-[10px]">
-                  {isOnboarded ? `Evaluated across ${factorsEvaluated} of ${totalFactors} factors (${dataCompleteness}%)` : 'National Peer Baseline (Early Career Benchmark)'}
+                  Evaluated across {factorsEvaluated} of {totalFactors} factors ({dataCompleteness}%)
                 </Badge>
               </div>
               <h2 className="text-2xl font-extrabold text-white tracking-tight">Financial Health Index</h2>
@@ -177,65 +166,105 @@ export default function FinancialHealthPage() {
         ))}
       </div>
 
-      {/* What's Going Well & Areas to Improve (Onboarded Mode) */}
-      {isOnboarded && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Strengths */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-4 h-4" />
-                What's Going Well ({strengths.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {strengths.length === 0 ? (
-                <p className="text-xs text-slate-400">No strong baseline factors recorded yet.</p>
-              ) : (
-                strengths.map((s, idx) => (
-                  <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs border border-emerald-500/20">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="block">{s.title} ({s.score}/{s.maxScore} pts)</strong>
-                      <span>{s.explanation}</span>
-                    </div>
+      {/* What's Going Well & Areas to Improve */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Strengths */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="w-4 h-4" />
+              What's Going Well ({strengths?.length || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!strengths?.length ? (
+              <p className="text-xs text-slate-400">No strong baseline factors recorded yet.</p>
+            ) : (
+              strengths.map((s, idx) => (
+                <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs border border-emerald-500/20">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block">{s.title} ({s.score}/{s.maxScore} pts)</strong>
+                    <span>{s.explanation}</span>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Areas to Improve */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="w-4 h-4" />
-                Areas to Improve ({improvementAreas.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {improvementAreas.length === 0 ? (
-                <p className="text-xs text-slate-400">All evaluated factors meet high financial health benchmarks!</p>
-              ) : (
-                improvementAreas.map((imp, idx) => (
-                  <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs border border-amber-500/20">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="block">{imp.title} ({imp.score}/{imp.maxScore} pts)</strong>
-                      <span>{imp.explanation}</span>
-                    </div>
+        {/* Areas to Improve */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="w-4 h-4" />
+              Areas to Improve ({improvementAreas?.length || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!improvementAreas?.length ? (
+              <p className="text-xs text-slate-400">All evaluated factors meet high financial health benchmarks!</p>
+            ) : (
+              improvementAreas.map((imp, idx) => (
+                <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs border border-amber-500/20">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block">{imp.title} ({imp.score}/{imp.maxScore} pts)</strong>
+                    <span>{imp.explanation}</span>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 
-      {/* SUBTLE BENCHMARK FOOTER CTA */}
-      {!isOnboarded && (
-        <BenchmarkFooterBanner message="Calculate your true personalized score by completing onboarding." />
-      )}
+  // NON-ONBOARDED BLURRED LOCK ARCHITECTURE
+  if (!isOnboarded) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-150">
+        <PageHeader
+          title="Financial Health Diagnostic"
+          subtitle="Deterministic rule engine evaluating your financial foundation."
+          tag="Core Intelligence"
+        />
+
+        <FeatureOverviewCard
+          moduleName="Financial Health Engine"
+          subtitle="Evaluates 6 core pillars of financial stability to calculate a weighted 0-100 Financial Health Index."
+          capabilities={[
+            "Savings Rate Evaluation (20 pts): Measures investable monthly margin against gross income.",
+            "Emergency Reserve Buffer (20 pts): Verifies liquid cushion covering 3-6 months of essential living.",
+            "Debt Burden Ratio (20 pts): Stress tests total monthly loan EMIs against net income.",
+            "Goal Funding Readiness (15 pts), Asset Diversification (15 pts), and Insurance Safety (10 pts)."
+          ]}
+          whyItMatters={[
+            "Without calculating your true Debt-to-Income (DTI) and Emergency Buffer, investing in volatile equities exposes you to panic selling.",
+            "A high Financial Health Index guarantees your wealth foundation is bulletproof before taking market risks."
+          ]}
+        >
+          {diagnosticContent}
+        </FeatureOverviewCard>
+      </div>
+    );
+  }
+
+  // ONBOARDED Crisp Live Mode
+  return (
+    <div className="space-y-8 animate-in fade-in duration-150">
+      <PageHeader
+        title="Financial Health Diagnostic"
+        subtitle="Deterministic rule engine evaluating your financial foundation."
+        tag="Core Intelligence"
+      >
+        <Button variant="outline" size="sm" icon={FlaskConical} onClick={handleRunTests}>
+          Run Engine Tests
+        </Button>
+      </PageHeader>
+
+      {diagnosticContent}
     </div>
   );
 }

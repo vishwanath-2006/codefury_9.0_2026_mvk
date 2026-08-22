@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
@@ -7,9 +7,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../co
 import StatCard from '../components/ui/StatCard';
 import ProgressIndicator from '../components/ui/ProgressIndicator';
 import Badge from '../components/ui/Badge';
-import BenchmarkFooterBanner from '../components/common/BenchmarkFooterBanner';
+import FeatureOverviewCard from '../components/common/FeatureOverviewCard';
 import { Wallet, TrendingUp, PiggyBank, Activity, Target, PieChart, Sparkles, ArrowRight, Settings2 } from 'lucide-react';
-import OnboardingEntryModal from '../components/onboarding/OnboardingEntryModal';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -21,19 +20,19 @@ export default function DashboardPage() {
 
   // Dynamic User Name & Avatar
   const googleName = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name;
-  const userName = isOnboarded ? (formData.fullName || googleName || 'FinLabs Investor') : 'Alex (Sample Early Career Profile)';
+  const userName = isOnboarded ? (formData.fullName || googleName || 'FinLabs Investor') : 'Investor Profile';
   const avatarUrl = isOnboarded ? (formData.profilePhoto || profile?.avatar_url || user?.user_metadata?.avatar_url) : null;
 
-  // Onboarded vs Benchmark Data Mapping
-  const totalIncome = isOnboarded ? userProfile.monthlyIncome : 75000;
-  const totalExpenses = isOnboarded ? (userProfile.essentialExpenses + userProfile.discretionaryExpenses) : 45000;
-  const totalEmis = isOnboarded ? userProfile.totalMonthlyEmis : 0;
+  // Onboarded Data Mapping
+  const totalIncome = userProfile.monthlyIncome || 75000;
+  const totalExpenses = (userProfile.essentialExpenses + userProfile.discretionaryExpenses) || 45000;
+  const totalEmis = userProfile.totalMonthlyEmis || 0;
   const monthlySavings = Math.max(0, totalIncome - totalExpenses - totalEmis);
   const savingsRatePct = Math.round((monthlySavings / (totalIncome || 1)) * 100);
   const emiRatioPct = Math.round((totalEmis / (totalIncome || 1)) * 100);
 
-  const netWorthValue = isOnboarded ? userProfile.totalPortfolioNetWorth : 350000;
-  const currentHealthScore = isOnboarded ? healthScore : 72;
+  const netWorthValue = userProfile.totalPortfolioNetWorth || 350000;
+  const currentHealthScore = healthScore || 72;
 
   const dynamicHealthMetrics = [
     {
@@ -45,10 +44,10 @@ export default function DashboardPage() {
     },
     {
       metric: 'Emergency Fund',
-      score: isOnboarded ? `${Math.round((userProfile.emergencyFundAmount / (userProfile.essentialExpenses || 1)) * 10) / 10} Mos` : '6.0 Months',
+      score: `${Math.round((userProfile.emergencyFundAmount / (userProfile.essentialExpenses || 1)) * 10) / 10} Mos`,
       target: '6.0 Months',
       status: 'Excellent',
-      description: `${formatINR(isOnboarded ? userProfile.emergencyFundAmount : 180000)} liquid buffer.`,
+      description: `${formatINR(userProfile.emergencyFundAmount)} liquid buffer.`,
     },
     {
       metric: 'Debt-to-Income',
@@ -66,29 +65,21 @@ export default function DashboardPage() {
     },
   ];
 
-  const benchmarkAllocation = isOnboarded
-    ? [
-        { name: 'Equity Mutual Funds', value: userProfile.portfolio.mutualFunds, percentage: Math.round((userProfile.portfolio.mutualFunds / netWorthValue) * 100) || 50, color: '#10b981' },
-        { name: 'Direct Equities / Stocks', value: userProfile.portfolio.stocks, percentage: Math.round((userProfile.portfolio.stocks / netWorthValue) * 100) || 30, color: '#6366f1' },
-        { name: 'Fixed Income / FDs', value: userProfile.portfolio.fixedDeposits, percentage: Math.round((userProfile.portfolio.fixedDeposits / netWorthValue) * 100) || 10, color: '#f59e0b' },
-        { name: 'Gold Reserves', value: userProfile.portfolio.gold, percentage: Math.round((userProfile.portfolio.gold / netWorthValue) * 100) || 10, color: '#eab308' },
-      ].filter(item => item.value > 0 || item.percentage > 0)
-    : [
-        { name: 'Equity Mutual Funds', value: 210000, percentage: 60, color: '#10b981' },
-        { name: 'Fixed Deposits & Debt', value: 87500, percentage: 25, color: '#6366f1' },
-        { name: 'Gold Reserves', value: 52500, percentage: 15, color: '#eab308' },
-      ];
+  const benchmarkAllocation = [
+    { name: 'Equity Mutual Funds', value: userProfile.portfolio.mutualFunds, percentage: Math.round((userProfile.portfolio.mutualFunds / netWorthValue) * 100) || 50, color: '#10b981' },
+    { name: 'Direct Equities / Stocks', value: userProfile.portfolio.stocks, percentage: Math.round((userProfile.portfolio.stocks / netWorthValue) * 100) || 30, color: '#6366f1' },
+    { name: 'Fixed Income / FDs', value: userProfile.portfolio.fixedDeposits, percentage: Math.round((userProfile.portfolio.fixedDeposits / netWorthValue) * 100) || 10, color: '#f59e0b' },
+    { name: 'Gold Reserves', value: userProfile.portfolio.gold, percentage: Math.round((userProfile.portfolio.gold / netWorthValue) * 100) || 10, color: '#eab308' },
+  ].filter(item => item.value > 0 || item.percentage > 0);
 
-  const goalTitle = isOnboarded ? userProfile.primaryGoal.name : 'Home Down Payment';
-  const targetCorpus = isOnboarded ? userProfile.primaryGoal.targetAmount : 1500000;
-  const timeframeYears = isOnboarded ? userProfile.primaryGoal.timeframeYears : 5;
-  const monthlySip = isOnboarded ? userProfile.primaryGoal.monthlyCommitmentAmount : 15000;
-  const goalProgressPct = isOnboarded
-    ? Math.min(100, Math.round((userProfile.primaryGoal.accumulatedAmount / targetCorpus) * 100))
-    : 35;
+  const goalTitle = userProfile.primaryGoal.name || 'Home Down Payment';
+  const targetCorpus = userProfile.primaryGoal.targetAmount || 1500000;
+  const timeframeYears = userProfile.primaryGoal.timeframeYears || 5;
+  const monthlySip = userProfile.primaryGoal.monthlyCommitmentAmount || 15000;
+  const goalProgressPct = Math.min(100, Math.round((userProfile.primaryGoal.accumulatedAmount / targetCorpus) * 100)) || 35;
 
-  return (
-    <div className="space-y-6 animate-in fade-in duration-150 relative">
+  const dashboardContent = (
+    <div className="space-y-6">
       {/* HEADER WITH USER PROFILE AVATAR & BLUEPRINT ACTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -108,11 +99,7 @@ export default function DashboardPage() {
               Good day, {userName} 👋
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {isOnboarded ? (
-                <>Risk Profile: <span className="font-bold text-emerald-500">{riskProfile} Investor</span> — FinLabs Blueprint Active</>
-              ) : (
-                <span className="font-bold text-indigo-500 font-mono">Sample Early Career Benchmark (₹75k/mo Baseline)</span>
-              )}
+              Risk Profile: <span className="font-bold text-emerald-500">{riskProfile} Investor</span> — FinLabs Blueprint Active
             </p>
           </div>
         </div>
@@ -122,7 +109,7 @@ export default function DashboardPage() {
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-500/50 hover:text-emerald-500 transition shadow-sm self-start sm:self-auto"
         >
           <Settings2 className="w-4 h-4 text-emerald-500" />
-          <span>{isOnboarded ? 'Edit Wealth Blueprint' : 'Complete Onboarding to Customize'}</span>
+          <span>Edit Wealth Blueprint</span>
         </button>
       </div>
 
@@ -134,7 +121,7 @@ export default function DashboardPage() {
           icon={Activity}
           change={currentHealthScore >= 70 ? 'Strong Baseline' : 'Good Baseline'}
           changeType="positive"
-          description={isOnboarded ? 'Personalized FinLabs Score' : 'National Peer Benchmark'}
+          description="Personalized FinLabs Score"
         />
 
         <StatCard
@@ -173,7 +160,7 @@ export default function DashboardPage() {
               <Activity className="w-4 h-4 text-emerald-500" />
               Financial Health Summary
             </CardTitle>
-            <CardDescription>{isOnboarded ? 'Calculated from your personalized financial profile' : 'Standard 28-year-old professional peer benchmarks'}</CardDescription>
+            <CardDescription>Calculated from your personalized financial profile</CardDescription>
           </div>
           <button
             onClick={() => navigate('/financial-health')}
@@ -310,9 +297,7 @@ export default function DashboardPage() {
                 SIP Step-Up & Compounding Strategy
               </h4>
               <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                {isOnboarded
-                  ? `Your current savings surplus of ${formatINR(monthlySavings)}/mo (${savingsRatePct}%) gives you strong leverage. Increasing your monthly goal allocation by ₹2,000 accelerates your ${goalTitle} timeline by 14 months.`
-                  : `In the early career benchmark (₹75k/mo baseline), allocating 20% to equity SIPs accelerates long-term compounding by 18% over traditional FDs.`}
+                Your current savings surplus of {formatINR(monthlySavings)}/mo ({savingsRatePct}%) gives you strong leverage. Increasing your monthly goal allocation by ₹2,000 accelerates your {goalTitle} timeline by 14 months.
               </p>
             </div>
           </div>
@@ -326,11 +311,45 @@ export default function DashboardPage() {
           </button>
         </div>
       </Card>
+    </div>
+  );
 
-      {/* SUBTLE BENCHMARK FOOTER CTA (Non-Onboarded Only) */}
-      {!isOnboarded && (
-        <BenchmarkFooterBanner message="Currently displaying the Early Career Benchmark. Complete onboarding to map your own assets." />
-      )}
+  // NON-ONBOARDED BLURRED LOCK ARCHITECTURE
+  if (!isOnboarded) {
+    return (
+      <div className="animate-in fade-in duration-150 py-2">
+        <PageHeader
+          title="Financial Overview & Capabilities"
+          subtitle="Educational preview of the FinLabs central wealth intelligence dashboard."
+          tag="Overview Mode"
+        />
+
+        <div className="mt-6">
+          <FeatureOverviewCard
+            moduleName="Financial Overview"
+            subtitle="Consolidated high-level view of your net worth, health score, active goals, and monthly surplus."
+            capabilities={[
+              "Live calculation of net worth & portfolio asset classes",
+              "Automated financial health score diagnostic rating",
+              "Goal target progress & SIP annuity projections",
+              "Real-time cash flow surplus and expense tracking"
+            ]}
+            whyItMatters={[
+              "Having a single dashboard view prevents fragmented wealth tracking across multiple bank accounts & broker apps.",
+              "Clear visibility of monthly cash surplus guarantees disciplined automated investing."
+            ]}
+          >
+            {dashboardContent}
+          </FeatureOverviewCard>
+        </div>
+      </div>
+    );
+  }
+
+  // ONBOARDED Crisp Live Mode
+  return (
+    <div className="animate-in fade-in duration-150 py-2">
+      {dashboardContent}
     </div>
   );
 }

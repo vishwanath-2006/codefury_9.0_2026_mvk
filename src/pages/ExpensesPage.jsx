@@ -3,8 +3,8 @@ import { useOnboarding } from '../context/OnboardingContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import StatCard from '../components/ui/StatCard';
-import BenchmarkFooterBanner from '../components/common/BenchmarkFooterBanner';
-import { Wallet, PieChart, ArrowDownRight, TrendingDown } from 'lucide-react';
+import FeatureOverviewCard from '../components/common/FeatureOverviewCard';
+import { Wallet, PieChart, ArrowDownRight } from 'lucide-react';
 
 export default function ExpensesPage() {
   const { userProfile, isOnboarded } = useOnboarding();
@@ -12,13 +12,13 @@ export default function ExpensesPage() {
   const formatINR = (val) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val ?? 0);
 
-  // Onboarded vs 50/30/20 Benchmark Data
-  const essential = isOnboarded ? userProfile.essentialExpenses : 37500;
-  const discretionary = isOnboarded ? userProfile.discretionaryExpenses : 22500;
-  const emiOutflow = isOnboarded ? userProfile.totalMonthlyEmis : 0;
+  // Onboarded Data
+  const essential = userProfile.essentialExpenses || 30000;
+  const discretionary = userProfile.discretionaryExpenses || 15000;
+  const emiOutflow = userProfile.totalMonthlyEmis || 0;
   const totalOutflow = essential + discretionary + emiOutflow;
 
-  const totalIncome = isOnboarded ? userProfile.monthlyIncome : 75000;
+  const totalIncome = userProfile.monthlyIncome || 75000;
   const savingsMargin = Math.max(0, totalIncome - totalOutflow);
 
   const essentialPct = Math.round((essential / (totalOutflow || 1)) * 100) || 50;
@@ -31,14 +31,8 @@ export default function ExpensesPage() {
     { name: 'Monthly Loan EMIs & Debt Outflow (< 15% Target)', amount: emiOutflow, percentage: emiPct, color: '#f59e0b' },
   ];
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-150">
-      <PageHeader
-        title="Income & Expense Analytics"
-        subtitle="Track spending trends, categorize subscriptions, and discover cashflow optimization points."
-        tag="Analytics"
-      />
-
+  const expensesContent = (
+    <div className="space-y-8">
       {/* Expense Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
@@ -47,7 +41,7 @@ export default function ExpensesPage() {
           icon={ArrowDownRight}
           change={`${Math.round((totalOutflow / totalIncome) * 100)}% of Income`}
           changeType="neutral"
-          description={isOnboarded ? 'Fixed living + lifestyle + EMIs' : '50/30/20 Benchmark Outflow'}
+          description="Fixed living + lifestyle + EMIs"
         />
 
         <StatCard
@@ -77,7 +71,7 @@ export default function ExpensesPage() {
             Monthly Category Breakdown (50/30/20 Framework)
           </CardTitle>
           <CardDescription>
-            {isOnboarded ? 'Detailed distribution of your monthly expenses & debt payments' : 'Standard 50% Needs / 30% Wants / 20% Savings breakdown model'}
+            Detailed distribution of your monthly expenses & debt payments
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -103,11 +97,48 @@ export default function ExpensesPage() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
 
-      {/* SUBTLE BENCHMARK FOOTER CTA */}
-      {!isOnboarded && (
-        <BenchmarkFooterBanner message="Sync your personal monthly inflows and outlays to generate live expense alerts." />
-      )}
+  // NON-ONBOARDED BLURRED LOCK ARCHITECTURE
+  if (!isOnboarded) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-150">
+        <PageHeader
+          title="Income & Expense Analytics"
+          subtitle="Track spending trends, categorize subscriptions, and discover cashflow optimization points."
+          tag="Analytics"
+        />
+
+        <FeatureOverviewCard
+          moduleName="Income & Expense Analytics"
+          subtitle="Categorizes monthly cash outflows using the 50/30/20 financial planning benchmark."
+          capabilities={[
+            "50% Essential Fixed Living: Rent, groceries, utilities, and insurance.",
+            "30% Discretionary Spend: Dining out, subscriptions, shopping, and leisure.",
+            "20% Investable Savings Margin: Direct monthly SIP capacity & wealth building."
+          ]}
+          whyItMatters={[
+            "Lifestyle creep often swallows salary hikes. Tracking expenses guarantees you maintain a 20%+ savings margin.",
+            "Detecting high monthly EMI obligations prevents over-leveraging before taking on new debt."
+          ]}
+        >
+          {expensesContent}
+        </FeatureOverviewCard>
+      </div>
+    );
+  }
+
+  // ONBOARDED Crisp Live Mode
+  return (
+    <div className="space-y-8 animate-in fade-in duration-150">
+      <PageHeader
+        title="Income & Expense Analytics"
+        subtitle="Track spending trends, categorize subscriptions, and discover cashflow optimization points."
+        tag="Analytics"
+      />
+
+      {expensesContent}
     </div>
   );
 }
