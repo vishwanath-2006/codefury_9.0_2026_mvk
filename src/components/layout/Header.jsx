@@ -25,8 +25,13 @@ const SEARCHABLE_PAGES = [
 export default function Header({ onOpenSidebar }) {
   const { isDark, toggleTheme } = useTheme();
   const { user, profile, logout, isDevTestMode, disableDevTestMode } = useAuth();
-  const { formData, isOnboarded } = useOnboarding();
+  const { formData, isOnboarded, setIsOnboarded } = useOnboarding();
   const navigate = useNavigate();
+
+  const handleTestPopUpModal = () => {
+    setIsOnboarded(false);
+    sessionStorage.removeItem('finlabs_entry_modal_dismissed');
+  };
 
   // Search Engine States
   const [query, setQuery] = useState('');
@@ -260,6 +265,18 @@ export default function Header({ onOpenSidebar }) {
             <span>{isOnboarded ? 'ONBOARDING SETUP' : 'COMPLETE ONBOARDING'}</span>
           </span>
         </button>
+
+        {/* Quick Pop-up Test Button */}
+        {isOnboarded && (
+          <button
+            onClick={handleTestPopUpModal}
+            className="hidden lg:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold hover:bg-emerald-500/20 transition cursor-pointer"
+            title="Reset profile state to test the onboarding entry pop-up notification modal"
+          >
+            <Sparkles className="w-3 h-3 text-emerald-500" />
+            <span>Test Pop-Up Notification</span>
+          </button>
+        )}
 
         <Badge variant="brand" className="hidden sm:inline-flex gap-1 text-[10px]">
           <Sparkles className="w-3 h-3 text-emerald-500" />

@@ -19,6 +19,8 @@ export default function AppLayout() {
 
     if (!isCompleted && !isDismissedInSession) {
       setShowEntryModal(true);
+    } else {
+      setShowEntryModal(false);
     }
   }, [isOnboarded]);
 
