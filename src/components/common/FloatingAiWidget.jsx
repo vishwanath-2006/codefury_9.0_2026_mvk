@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, X, Move, EyeOff, RotateCcw, Bot } from 'lucide-react';
 
-const STORAGE_KEY = 'finlabs_robot_position_v2';
-const MARGIN = 16;
+const STORAGE_KEY = 'finlabs_robot_position_v3';
+const MARGIN = 24;
 const ROBOT_WIDTH = 110;
-const ROBOT_HEIGHT = 130;
+const ROBOT_HEIGHT = 140;
 
 export default function FloatingAiWidget() {
   const navigate = useNavigate();
@@ -23,10 +23,10 @@ export default function FloatingAiWidget() {
   const widgetRef = useRef(null);
   const contextMenuRef = useRef(null);
 
-  // Hide on active AI page
+  // Hide the floating widget when the user is actively on the /ai chat page
   const isAiPage = location.pathname === '/ai';
 
-  // 1. Load initial position from localStorage or default to bottom-right
+  // 1. Initial State: Always default to visible bottom-right unless explicitly moved/hidden by user
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -46,20 +46,22 @@ export default function FloatingAiWidget() {
           y: Math.min(Math.max(MARGIN, parsed.lastY ?? clampedY), maxY)
         });
       } else {
-        const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - 24);
-        const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - 24);
+        const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
+        const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
         setPosition({ x: defaultX, y: defaultY });
         setLastVisiblePos({ x: defaultX, y: defaultY });
+        setIsHidden(false);
       }
     } catch {
-      const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - 24);
-      const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - 24);
+      const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
+      const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
       setPosition({ x: defaultX, y: defaultY });
       setLastVisiblePos({ x: defaultX, y: defaultY });
+      setIsHidden(false);
     }
   }, []);
 
-  // 2. Clamp on window resize to prevent losing the robot
+  // 2. Clamp position on window resize so robot is never off-screen
   useEffect(() => {
     const handleResize = () => {
       setPosition((prev) => {
@@ -76,7 +78,7 @@ export default function FloatingAiWidget() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 3. Save position changes to localStorage
+  // 3. Persist State
   const persistState = useCallback((newPos, hiddenState, edge, lastPos) => {
     try {
       localStorage.setItem(
@@ -145,13 +147,13 @@ export default function FloatingAiWidget() {
     setContextMenu({ x: Math.max(10, menuX), y: Math.max(10, menuY) });
   };
 
-  // Dragging handlers
+  // Dragging logic
   const startDrag = (clientX, clientY) => {
     dragStartRef.current = {
       mouseX: clientX,
       mouseY: clientY,
-      posX: position.x ?? (window.innerWidth - ROBOT_WIDTH - 24),
-      posY: position.y ?? (window.innerHeight - ROBOT_HEIGHT - 24),
+      posX: position.x ?? (window.innerWidth - ROBOT_WIDTH - MARGIN),
+      posY: position.y ?? (window.innerHeight - ROBOT_HEIGHT - MARGIN),
       hasMoved: false
     };
     setIsDragging(true);
@@ -160,7 +162,6 @@ export default function FloatingAiWidget() {
 
   const handleMouseDown = (e) => {
     if (e.button === 0) {
-      // Left click mousedown — prepare drag detector
       startDrag(e.clientX, e.clientY);
     }
   };
@@ -171,7 +172,6 @@ export default function FloatingAiWidget() {
     }
   };
 
-  // Global mousemove/mouseup while dragging
   useEffect(() => {
     if (!isDragging) return;
 
@@ -236,8 +236,8 @@ export default function FloatingAiWidget() {
   const handleRestoreRobot = () => {
     setIsHidden(false);
     const restoredPos = lastVisiblePos.x !== null ? lastVisiblePos : {
-      x: window.innerWidth - ROBOT_WIDTH - 24,
-      y: window.innerHeight - ROBOT_HEIGHT - 24
+      x: window.innerWidth - ROBOT_WIDTH - MARGIN,
+      y: window.innerHeight - ROBOT_HEIGHT - MARGIN
     };
     setPosition(restoredPos);
     persistState(restoredPos, false, hiddenEdge, restoredPos);
@@ -245,8 +245,8 @@ export default function FloatingAiWidget() {
 
   const handleResetPosition = () => {
     setContextMenu(null);
-    const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - 24);
-    const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - 24);
+    const defaultX = Math.max(MARGIN, window.innerWidth - ROBOT_WIDTH - MARGIN);
+    const defaultY = Math.max(MARGIN, window.innerHeight - ROBOT_HEIGHT - MARGIN);
     const defaultPos = { x: defaultX, y: defaultY };
     setPosition(defaultPos);
     setLastVisiblePos(defaultPos);
@@ -337,18 +337,18 @@ export default function FloatingAiWidget() {
             zIndex: 45,
             touchAction: 'none'
           }}
-          className={`flex flex-col items-center select-none ${
+          className={`flex flex-col items-end gap-2.5 select-none ${
             isDragging ? 'cursor-grabbing opacity-90 scale-102' : 'cursor-grab'
-          } transition-transform duration-100 animate-in fade-in duration-200`}
+          } transition-transform duration-100 animate-in fade-in duration-300`}
         >
           {/* Dragging indicator badge */}
           {isDragging && (
-            <div className="absolute -top-7 px-2.5 py-0.5 rounded-full bg-slate-900/90 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/40 shadow-lg pointer-events-none whitespace-nowrap animate-pulse">
+            <div className="self-center px-2.5 py-0.5 rounded-full bg-slate-900/90 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/40 shadow-lg pointer-events-none whitespace-nowrap animate-pulse">
               📍 Dragging Robot...
             </div>
           )}
 
-          {/* Speech Bubble (only shown when not dragging) */}
+          {/* Speech Bubble */}
           {!bubbleDismissed && !isDragging && (
             <div
               role="button"
@@ -357,7 +357,7 @@ export default function FloatingAiWidget() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') handleClick();
               }}
-              className="cursor-pointer relative max-w-[220px] sm:max-w-[240px] p-2.5 sm:p-3 rounded-2xl bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-md text-slate-100 border border-emerald-500/40 shadow-xl shadow-emerald-950/30 text-xs leading-relaxed transition-all hover:border-emerald-400 mb-2"
+              className="pointer-events-auto cursor-pointer relative max-w-[240px] sm:max-w-[270px] p-3 sm:p-3.5 rounded-2xl bg-slate-900/90 dark:bg-slate-900/95 backdrop-blur-md text-slate-100 border border-emerald-500/40 shadow-xl shadow-emerald-950/30 text-xs leading-relaxed transition-all hover:scale-102 hover:border-emerald-400 hover:shadow-emerald-500/20 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 mr-2"
             >
               <button
                 type="button"
@@ -366,128 +366,256 @@ export default function FloatingAiWidget() {
                   e.stopPropagation();
                   setBubbleDismissed(true);
                 }}
-                className="absolute top-1 right-1 p-0.5 rounded text-slate-400 hover:text-slate-200"
+                className="absolute top-1.5 right-1.5 p-1 rounded-lg text-slate-400 hover:text-slate-200 transition cursor-pointer"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
-              <div className="flex items-center gap-1 font-bold text-emerald-400 text-[11px] mb-0.5 pr-3">
-                <Sparkles className="w-3 h-3 shrink-0 text-emerald-300 animate-pulse" />
-                <span>Hi! I'm FinLabs AI 👋</span>
+
+              <div className="flex items-center gap-1.5 font-bold text-emerald-400 mb-0.5 pr-4">
+                <Sparkles className="w-3.5 h-3.5 shrink-0 text-emerald-300 animate-pulse" />
+                <span className="tracking-tight font-extrabold text-[12px]">Hi! I'm FinLabs AI 👋</span>
               </div>
-              <p className="text-[10px] text-slate-300 font-medium">
-                Right-click me to Move or Hide!
+              <p className="text-[11px] text-slate-300 font-medium">
+                I'm free — ask me any financial question!
               </p>
-              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-900 border-r border-b border-emerald-500/40 rotate-45" />
+
+              {/* Speech bubble pointer arrow */}
+              <div className="absolute -bottom-1.5 right-10 sm:right-12 w-3 h-3 bg-slate-900 border-r border-b border-emerald-500/40 rotate-45" />
             </div>
           )}
 
-          {/* 3D FinLabs Robot Character */}
-          <button
-            type="button"
-            aria-label="FinLabs AI Copilot (Right-click to move/hide)"
-            onClick={handleClick}
-            className="group relative w-22 h-26 sm:w-24 sm:h-28 flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-none p-0 bg-transparent border-0"
-          >
-            {/* Ambient Glow Aura */}
-            <div className="absolute inset-2 rounded-full bg-emerald-500/30 blur-2xl finlabs-glow-ambient group-hover:bg-emerald-400/50 transition-colors pointer-events-none" />
+          {/* Prominent Original 3D FinLabs Robot Companion */}
+          <div className="pointer-events-auto relative flex flex-col items-center">
+            <button
+              type="button"
+              aria-label="Open FinLabs AI Copilot (Right-click to move/hide)"
+              onClick={handleClick}
+              className="group relative w-22 h-26 sm:w-26 sm:h-30 md:w-28 md:h-32 flex items-center justify-center transition-transform duration-200 hover:scale-106 active:scale-95 focus:outline-none cursor-pointer p-0 bg-transparent border-0"
+            >
+              {/* Ambient Glow Aura */}
+              <div className="absolute inset-2 rounded-full bg-emerald-500/30 blur-2xl finlabs-glow-ambient group-hover:bg-emerald-400/50 transition-colors pointer-events-none" />
 
-            {/* Floating Robot Body */}
-            <div className="finlabs-robot-body w-full h-full relative flex items-center justify-center drop-shadow-[0_10px_22px_rgba(16,185,129,0.4)]">
-              <svg viewBox="0 0 80 90" className="w-full h-full overflow-visible" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="robotHelmetGrad" x1="20" y1="14" x2="60" y2="52" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#1e293b" />
-                    <stop offset="45%" stopColor="#0f172a" />
-                    <stop offset="100%" stopColor="#020617" />
-                  </linearGradient>
-                  <linearGradient id="robotHelmetStroke" x1="16" y1="14" x2="64" y2="54" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#34d399" />
-                    <stop offset="40%" stopColor="#10b981" />
-                    <stop offset="80%" stopColor="#064e3b" />
-                    <stop offset="100%" stopColor="#10b981" />
-                  </linearGradient>
-                  <linearGradient id="robotVisorGrad" x1="22" y1="18" x2="58" y2="44" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#09141d" />
-                    <stop offset="60%" stopColor="#061a23" />
-                    <stop offset="100%" stopColor="#022c22" />
-                  </linearGradient>
-                  <linearGradient id="robotBodyGrad" x1="24" y1="52" x2="56" y2="72" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#10b981" />
-                    <stop offset="40%" stopColor="#059669" />
-                    <stop offset="100%" stopColor="#044e39" />
-                  </linearGradient>
-                  <linearGradient id="haloGrad" x1="20" y1="14" x2="60" y2="14" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#22d3ee" />
-                    <stop offset="50%" stopColor="#34d399" />
-                    <stop offset="100%" stopColor="#6ee7b7" />
-                  </linearGradient>
-                  <filter id="emeraldAura" x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                  </filter>
-                  <filter id="eyeCyanGlow" x="-30%" y="-30%" width="160%" height="160%">
-                    <feGaussianBlur stdDeviation="1.8" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                  </filter>
-                </defs>
+              {/* Floating Robot Body Structure */}
+              <div className="finlabs-robot-body w-full h-full relative flex items-center justify-center drop-shadow-[0_10px_22px_rgba(16,185,129,0.4)]">
+                <svg
+                  viewBox="0 0 80 90"
+                  className="w-full h-full overflow-visible"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <defs>
+                    {/* 3D Helmet Gradient */}
+                    <linearGradient id="robotHelmetGrad" x1="20" y1="14" x2="60" y2="52" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#1e293b" />
+                      <stop offset="45%" stopColor="#0f172a" />
+                      <stop offset="100%" stopColor="#020617" />
+                    </linearGradient>
 
-                {/* 1. Floating Energy Halo */}
-                <g className="finlabs-halo-rotate">
-                  <ellipse cx="40" cy="14" rx="19" ry="5.5" stroke="url(#haloGrad)" strokeWidth="1.8" strokeDasharray="6 3" filter="url(#emeraldAura)" />
-                  <ellipse cx="40" cy="14" rx="19" ry="5.5" stroke="#a7f3d0" strokeWidth="0.75" />
-                </g>
+                    {/* 3D Helmet Stroke Highlight */}
+                    <linearGradient id="robotHelmetStroke" x1="16" y1="14" x2="64" y2="54" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#34d399" />
+                      <stop offset="40%" stopColor="#10b981" />
+                      <stop offset="80%" stopColor="#064e3b" />
+                      <stop offset="100%" stopColor="#10b981" />
+                    </linearGradient>
 
-                {/* 2. Top Antenna Beacon */}
-                <line x1="40" y1="18" x2="40" y2="10" stroke="#34d399" strokeWidth="2.2" strokeLinecap="round" />
-                <circle cx="40" cy="8.5" r="3.2" fill="#34d399" filter="url(#emeraldAura)" />
-                <circle cx="40" cy="8.5" r="2" fill="#ffffff" className="finlabs-beacon-pulse" />
+                    {/* Visor Glass Screen */}
+                    <linearGradient id="robotVisorGrad" x1="22" y1="18" x2="58" y2="44" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#09141d" />
+                      <stop offset="60%" stopColor="#061a23" />
+                      <stop offset="100%" stopColor="#022c22" />
+                    </linearGradient>
 
-                {/* 3. Left & Right Ear Pods */}
-                <rect x="11" y="27" width="5" height="13" rx="2.5" fill="#0f172a" stroke="#10b981" strokeWidth="1.2" />
-                <circle cx="13.5" cy="33.5" r="1.5" fill="#34d399" />
-                <rect x="64" y="27" width="5" height="13" rx="2.5" fill="#0f172a" stroke="#10b981" strokeWidth="1.2" />
-                <circle cx="66.5" cy="33.5" r="1.5" fill="#34d399" />
+                    {/* Body Torso Gradient */}
+                    <linearGradient id="robotBodyGrad" x1="24" y1="52" x2="56" y2="72" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="40%" stopColor="#059669" />
+                      <stop offset="100%" stopColor="#044e39" />
+                    </linearGradient>
 
-                {/* 4. Head Helmet Base */}
-                <rect x="15" y="16" width="50" height="35" rx="17.5" fill="url(#robotHelmetGrad)" stroke="url(#robotHelmetStroke)" strokeWidth="2.2" />
+                    {/* Halo Energy Ring Gradient */}
+                    <linearGradient id="haloGrad" x1="20" y1="14" x2="60" y2="14" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#22d3ee" />
+                      <stop offset="50%" stopColor="#34d399" />
+                      <stop offset="100%" stopColor="#6ee7b7" />
+                    </linearGradient>
 
-                {/* 5. Visor Screen */}
-                <rect x="19" y="21" width="42" height="25" rx="12.5" fill="url(#robotVisorGrad)" stroke="#064e3b" strokeWidth="1.2" />
-                <path d="M 22 25 Q 40 21 58 25" stroke="rgba(255, 255, 255, 0.28)" strokeWidth="1" fill="none" strokeLinecap="round" />
+                    {/* Glowing Filters */}
+                    <filter id="emeraldAura" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
 
-                {/* 6. Expressive Cyber Eyes */}
-                <g className="finlabs-eye">
-                  <ellipse cx="32" cy="33" rx="4.8" ry="5.8" fill="#06b6d4" filter="url(#eyeCyanGlow)" />
-                  <ellipse cx="32" cy="33" rx="3.4" ry="4.4" fill="#a5f3fc" />
-                  <circle cx="33.8" cy="31.2" r="1.4" fill="#ffffff" />
-                  <ellipse cx="48" cy="33" rx="4.8" ry="5.8" fill="#06b6d4" filter="url(#eyeCyanGlow)" />
-                  <ellipse cx="48" cy="33" rx="3.4" ry="4.4" fill="#a5f3fc" />
-                  <circle cx="49.8" cy="31.2" r="1.4" fill="#ffffff" />
-                </g>
+                    <filter id="eyeCyanGlow" x="-30%" y="-30%" width="160%" height="160%">
+                      <feGaussianBlur stdDeviation="1.8" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
 
-                {/* 7. Cute Blush Dots */}
-                <circle cx="26" cy="39" r="1.8" fill="#10b981" opacity="0.65" />
-                <circle cx="54" cy="39" r="1.8" fill="#10b981" opacity="0.65" />
+                  {/* 1. Floating Energy Halo */}
+                  <g className="finlabs-halo-rotate">
+                    <ellipse
+                      cx="40"
+                      cy="14"
+                      rx="19"
+                      ry="5"
+                      stroke="url(#haloGrad)"
+                      strokeWidth="1.8"
+                      strokeDasharray="8 4"
+                      fill="none"
+                      filter="url(#emeraldAura)"
+                      opacity="0.85"
+                    />
+                  </g>
 
-                {/* 8. Floating Torso */}
-                <path d="M 27 52 Q 40 49 53 52 L 50 67 Q 40 70 30 67 Z" fill="url(#robotBodyGrad)" stroke="#34d399" strokeWidth="1.5" strokeLinejoin="round" />
+                  {/* 2. Top Antenna & Blinking Beacon */}
+                  <rect x="38.5" y="8" width="3" height="8" rx="1.5" fill="#334155" />
+                  <circle
+                    cx="40"
+                    cy="7"
+                    r="3.5"
+                    fill="#10b981"
+                    className="finlabs-beacon-pulse"
+                    filter="url(#emeraldAura)"
+                  />
+                  <circle cx="40" cy="7" r="1.5" fill="#ffffff" />
 
-                {/* 9. Core Energy Diamond */}
-                <polygon points="40,55 45,60 40,65 35,60" fill="#a7f3d0" stroke="#ffffff" strokeWidth="0.8" filter="url(#emeraldAura)" />
+                  {/* 3. Ear Pods / Audio Nodes */}
+                  <rect x="14" y="27" width="5" height="14" rx="2.5" fill="#047857" stroke="#34d399" strokeWidth="0.8" />
+                  <rect x="61" y="27" width="5" height="14" rx="2.5" fill="#047857" stroke="#34d399" strokeWidth="0.8" />
 
-                {/* 10. Left & Right Floating Hands */}
-                <ellipse cx="20" cy="58" rx="3.8" ry="5.2" fill="#0f172a" stroke="#10b981" strokeWidth="1.4" transform="rotate(15 20 58)" />
-                <ellipse cx="60" cy="58" rx="3.8" ry="5.2" fill="#0f172a" stroke="#10b981" strokeWidth="1.4" transform="rotate(-15 60 58)" />
+                  {/* 4. Rounded 3D Helmet Head */}
+                  <rect
+                    x="17"
+                    y="16"
+                    width="46"
+                    height="35"
+                    rx="17.5"
+                    fill="url(#robotHelmetGrad)"
+                    stroke="url(#robotHelmetStroke)"
+                    strokeWidth="1.8"
+                  />
 
-                {/* 11. Jet Thruster Ring */}
-                <ellipse cx="40" cy="69" rx="8" ry="2.5" fill="#047857" stroke="#10b981" strokeWidth="1" />
-                <ellipse cx="40" cy="71" rx="5" ry="1.8" fill="#34d399" filter="url(#emeraldAura)" />
-              </svg>
-            </div>
+                  {/* 5. Visor Screen */}
+                  <rect
+                    x="22"
+                    y="20"
+                    width="36"
+                    height="25"
+                    rx="12.5"
+                    fill="url(#robotVisorGrad)"
+                    stroke="#10b981"
+                    strokeWidth="0.9"
+                    strokeOpacity="0.6"
+                  />
 
-            {/* Dynamic Ground Shadow */}
-            <div className="finlabs-robot-shadow absolute -bottom-1 w-12 h-2.5 rounded-full bg-emerald-950/70 dark:bg-emerald-950/90 blur-[2px] pointer-events-none" />
-          </button>
+                  {/* 6. Visor Glass 3D Highlight Reflection */}
+                  <path
+                    d="M24 23 C30 21, 46 21, 54 23 C42 27, 28 29, 24 27 Z"
+                    fill="#ffffff"
+                    opacity="0.22"
+                  />
+
+                  {/* 7. Expressive Cybernetic Glowing Eyes */}
+                  <g className="finlabs-eye">
+                    {/* Left Eye */}
+                    <ellipse cx="32" cy="32" rx="4.2" ry="5" fill="#22d3ee" filter="url(#eyeCyanGlow)" />
+                    <ellipse cx="32" cy="32" rx="2.2" ry="2.6" fill="#ffffff" />
+                    <circle cx="33.8" cy="30.2" r="1.2" fill="#ffffff" />
+
+                    {/* Right Eye */}
+                    <ellipse cx="48" cy="32" rx="4.2" ry="5" fill="#22d3ee" filter="url(#eyeCyanGlow)" />
+                    <ellipse cx="48" cy="32" rx="2.2" ry="2.6" fill="#ffffff" />
+                    <circle cx="49.8" cy="30.2" r="1.2" fill="#ffffff" />
+                  </g>
+
+                  {/* 8. Friendly Digital Mouth / Audio Wave Line */}
+                  <path
+                    d="M35 40 Q40 42.5 45 40"
+                    fill="none"
+                    stroke="#34d399"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    opacity="0.95"
+                    filter="url(#eyeCyanGlow)"
+                  />
+
+                  {/* 9. Neck Articulation Joint */}
+                  <rect x="36" y="50" width="8" height="4" rx="2" fill="#1e293b" stroke="#334155" strokeWidth="0.8" />
+
+                  {/* 10. Magnetic Floating Arms */}
+                  <rect
+                    x="18"
+                    y="55"
+                    width="6"
+                    height="12"
+                    rx="3"
+                    fill="#0f172a"
+                    stroke="#10b981"
+                    strokeWidth="1"
+                    transform="rotate(14 21 61)"
+                  />
+                  <rect
+                    x="56"
+                    y="55"
+                    width="6"
+                    height="12"
+                    rx="3"
+                    fill="#0f172a"
+                    stroke="#10b981"
+                    strokeWidth="1"
+                    transform="rotate(-14 59 61)"
+                  />
+
+                  {/* 11. 3D Body Torso */}
+                  <path
+                    d="M26 53 C26 51, 54 51, 54 53 L50 68 C50 70.5, 30 70.5, 30 68 Z"
+                    fill="url(#robotBodyGrad)"
+                    stroke="#34d399"
+                    strokeWidth="1.4"
+                  />
+
+                  {/* 12. FinLabs "AI" Heart Core / Chest Emblem */}
+                  <circle
+                    cx="40"
+                    cy="60"
+                    r="5"
+                    fill="#064e3b"
+                    stroke="#34d399"
+                    strokeWidth="1.2"
+                    filter="url(#emeraldAura)"
+                  />
+                  <text
+                    x="40"
+                    y="62"
+                    textAnchor="middle"
+                    fontSize="4.8"
+                    fontWeight="900"
+                    fill="#ffffff"
+                    fontFamily="system-ui, -apple-system, sans-serif"
+                    letterSpacing="0.2"
+                  >
+                    AI
+                  </text>
+
+                  {/* 13. Anti-Gravity Thruster Glow Base */}
+                  <ellipse
+                    cx="40"
+                    cy="71"
+                    rx="10"
+                    ry="3.5"
+                    fill="#10b981"
+                    filter="url(#emeraldAura)"
+                    opacity="0.95"
+                  />
+                  <ellipse cx="40" cy="71" rx="5" ry="1.8" fill="#a7f3d0" />
+                </svg>
+              </div>
+            </button>
+
+            {/* 3D Floating Contact Shadow */}
+            <div className="finlabs-robot-shadow w-14 sm:w-18 md:w-20 h-2.5 sm:h-3 -mt-1.5 rounded-full bg-emerald-950/70 dark:bg-emerald-900/60 blur-[4px]" />
+          </div>
         </aside>
       )}
 
