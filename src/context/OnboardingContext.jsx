@@ -5,15 +5,29 @@ const OnboardingContext = createContext(null);
 
 export function OnboardingProvider({ children }) {
   const [profileState, setProfileState] = useState(() => getSavedOnboardingProfile());
+  const [isOnboarded, setIsOnboardedState] = useState(() => {
+    return localStorage.getItem('finlabs_onboarding_completed') === 'true';
+  });
 
   useEffect(() => {
-    // Reload state if updated elsewhere
-    const loaded = getSavedOnboardingProfile();
-    setProfileState(loaded);
+    // Sync onboarding completion state
+    const completed = localStorage.getItem('finlabs_onboarding_completed') === 'true';
+    setIsOnboardedState(completed);
   }, []);
+
+  const setIsOnboarded = (value) => {
+    if (value) {
+      localStorage.setItem('finlabs_onboarding_completed', 'true');
+    } else {
+      localStorage.removeItem('finlabs_onboarding_completed');
+    }
+    setIsOnboardedState(Boolean(value));
+  };
 
   const updateProfile = async (formData) => {
     const result = await saveOnboardingProfile(formData);
+    localStorage.setItem('finlabs_onboarding_completed', 'true');
+    setIsOnboardedState(true);
     setProfileState(result);
     return result;
   };
@@ -25,6 +39,8 @@ export function OnboardingProvider({ children }) {
         healthScore: profileState.healthScore ?? 74,
         riskProfile: profileState.riskProfile || 'Moderate',
         completedAt: profileState.completedAt,
+        isOnboarded,
+        setIsOnboarded,
         updateProfile,
       }}
     >
