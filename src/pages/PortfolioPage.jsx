@@ -12,6 +12,7 @@ export default function PortfolioPage() {
   const [error, setError] = useState(null);
   const [source, setSource] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const [syncWarning, setSyncWarning] = useState(null);
 
   const fallbackHoldings = [
     {
@@ -91,6 +92,7 @@ export default function PortfolioPage() {
     setSyncing(true);
     setError(null);
     setSuccessMessage(null);
+    setSyncWarning(null);
     try {
       const response = await fetch('/api/broker/angelone/holdings-by-token', {
         method: 'POST',
@@ -113,6 +115,7 @@ export default function PortfolioPage() {
         setHoldings(resJson.holdings || []);
         setSource(resJson.source);
         setSuccessMessage("Angel One Demat Connected successfully (Synced View)");
+        setSyncWarning(resJson.warning || null);
       } else {
         throw new Error(resJson.message || 'Sync failed');
       }
@@ -122,6 +125,7 @@ export default function PortfolioPage() {
       setHoldings(processed);
       setSource("mock_demo_fallback");
       setSuccessMessage("Angel One Demat Connected successfully (Synced View)");
+      setSyncWarning(err.message || 'Connection offline');
     } finally {
       setSyncing(false);
     }
@@ -272,10 +276,17 @@ export default function PortfolioPage() {
           {holdings ? (
             holdings.length > 0 ? (
               <div className="space-y-4">
-                <div className="flex items-center justify-between text-xs border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <span className="font-semibold text-slate-500">
-                    Source: <span className="font-extrabold text-emerald-500 uppercase">{source}</span>
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs border-b border-slate-100 dark:border-slate-800 pb-2 gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-slate-500">
+                      Source: <span className="font-extrabold text-emerald-500 uppercase">{source}</span>
+                    </span>
+                    {syncWarning && (
+                      <span className="text-[10px] text-amber-500 dark:text-amber-400 bg-amber-500/5 px-2 py-0.5 rounded-md font-semibold">
+                        ({syncWarning})
+                      </span>
+                    )}
+                  </div>
                   <span className="font-bold font-mono text-slate-400">
                     Synced {holdings.length} Positions
                   </span>
