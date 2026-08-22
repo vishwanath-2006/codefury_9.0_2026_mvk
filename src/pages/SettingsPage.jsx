@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
+import { useTheme } from '../context/ThemeContext';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -28,6 +29,7 @@ import {
 export default function SettingsPage() {
   const { user, profile } = useAuth();
   const { formData, updateProfile, resetToOverview } = useOnboarding();
+  const { theme, setTheme } = useTheme();
 
   // Save Success State
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -38,9 +40,6 @@ export default function SettingsPage() {
   const email = user?.email || 'milanakn87@gmail.com';
 
   // 2. Appearance & Theme States
-  const [themeMode, setThemeMode] = useState(() => {
-    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-  });
   const [compactLayout, setCompactLayout] = useState(false);
   const [currency, setCurrency] = useState('INR');
 
@@ -63,12 +62,7 @@ export default function SettingsPage() {
 
   // Theme Switcher Handler
   const handleThemeChange = (mode) => {
-    setThemeMode(mode);
-    if (mode === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    setTheme(mode);
   };
 
   // Save Profile Handler
@@ -200,7 +194,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => handleThemeChange('light')}
                 className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition ${
-                  themeMode === 'light'
+                  theme === 'light'
                     ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/20'
                     : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                 }`}
@@ -218,7 +212,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => handleThemeChange('dark')}
                 className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition ${
-                  themeMode === 'dark'
+                  theme === 'dark'
                     ? 'border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/20'
                     : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                 }`}
